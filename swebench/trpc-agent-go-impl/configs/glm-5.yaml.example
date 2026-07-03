@@ -1,0 +1,16 @@
+model:
+  model_name: "glm50"
+  model_kwargs:
+    custom_llm_provider: "openai"
+    api_base: "${GLM5_API_BASE}"
+    api_key: "${GLM5_API_KEY}"
+    default_headers:
+      X-SMG-Routing-Key: "${GLM5_ROUTING_KEY}"
+      X-SMG-Agent-Name: "trpc-agent-go-benchmark"
+    temperature: 0.0
+    reasoning_effort: "high"
+
+agent:
+  step_limit: 100
+  token_limit: 1000000
+  timeout_minutes: 60

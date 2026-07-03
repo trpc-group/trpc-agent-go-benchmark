@@ -39,6 +39,7 @@ examples/**/*.evalset_result.json
 examples/results/
 __pycache__
 .venv
+.venv-*
 examples/knowledge/evaluation/dataset/*
 !examples/claudecode/.claude
 !examples/evaluation/claudecode/.claude
