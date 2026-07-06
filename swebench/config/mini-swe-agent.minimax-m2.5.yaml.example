@@ -5,6 +5,7 @@ model:
     api_base: http://03-llm.woa.com/gateway/v1
     api_key: ""
     temperature: 0.0
+    timeout: 120
     drop_params: true
     parallel_tool_calls: true
     reasoning_effort: high

@@ -11,8 +11,9 @@
 - smoke 模型：`minimax-m2.5`，通过 OpenAI-compatible endpoint 接入。
 - mini 模型名：`openai/minimax-m2.5`。
 - mini 默认温度：`0.0`。
+- mini 模型请求 timeout：`120s`。
 - high reasoning：当前网关接受并校验 `reasoning_effort=high`。
-- agent 生成并发：默认 15；单 case smoke 实际并发为 1。
+- agent 生成并发：CLI 支持配置；当前公共 endpoint 实测不适合 15 并发 full run。
 - verifier：SWE-Bench official local harness；`sb-cli` 不作为主路径。
 
 ## 本地配置
@@ -159,6 +160,8 @@ go run . run-config \
 - gold patch harness smoke：`astropy__astropy-12907` resolved `1/1`。
 - mini-SWE-agent batch smoke：`astropy__astropy-12907` submitted patch，local harness resolved `1/1`。
 - mini-SWE-agent 5-case cross-repo smoke：5/5 submitted，local harness completed 5/5，resolved 3/5，unresolved 2/5，error 0。该 run 中观测到公开模型服务 `30/min` 限流和 worker unavailable 重试，full run 前需要基于正式 endpoint 能力重新确认实际吞吐。
+- mini-SWE-agent timeout 校准：`agent-workers=1`、`timeout=120` 时，5-case run submitted 5/5，local harness completed 5/5，resolved 3/5，unresolved 2/5，error 0。
+- 当前公共 endpoint 吞吐结论：`agent-workers=15` 会触发持续限流和 worker unavailable；`agent-workers=3` 可推进但不健康；full run 应使用更高容量 endpoint，或采用低并发并保留 request timeout。
 
 ## Devcloud Docker 注意事项
 
