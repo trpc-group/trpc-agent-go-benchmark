@@ -39,6 +39,8 @@ func main() {
 		err = runVerify(ctx, os.Args[2:])
 	case "import":
 		err = runImport(os.Args[2:])
+	case "run-config":
+		err = runRunConfig(os.Args[2:])
 	case "help", "-h", "--help":
 		usage()
 		return
@@ -57,6 +59,7 @@ func usage() {
   swebench run-mini [flags]
   swebench verify   [flags]
   swebench import   [flags]
+  swebench run-config [flags]
 
 Commands:
   doctor    Probe local benchmark environment and model endpoint.
@@ -64,6 +67,7 @@ Commands:
   run-mini  Run mini-SWE-agent batch runner for a filter/slice.
   verify    Run SWE-Bench official local harness for predictions.
   import    Normalize mini predictions, trajectories, and harness report.
+  run-config  Write a run-level manifest from generated artifacts.
 
 `)
 }

@@ -64,13 +64,14 @@ env:
 swebench/trpc-agent-go-impl/
 ```
 
-当前提供五个命令：
+当前提供六个命令：
 
 - `doctor`：检查 Python、mini-SWE-agent、swebench、Docker、dataset 和模型 endpoint。
 - `prepare-data`：生成安全 case manifest、case list hash 和 manifest 元信息。
 - `run-mini`：调用 mini-SWE-agent batch runner，保存 raw predictions、trajectory 和日志。
 - `verify`：调用 SWE-Bench official local harness。
 - `import`：导入 baseline predictions、trajectory 和 harness report，输出统一 `cases.jsonl`、patches、scrubbed traces 和 summary。
+- `run-config`：聚合 dataset、runner、verifier、import summary 等产物，写出本次 run 的总 manifest。
 
 第一版 `import` 只支持 baseline；native agent 接入后再扩展 native 字段。
 
@@ -136,12 +137,28 @@ go run . import \
   --raw-dir /data/swebench-verified/results/baseline-smoke/mini-batch-astropy-12907 \
   --harness-report /data/swebench-verified/openai__minimax-m2.5.mini-batch-astropy-12907-smoke.json \
   --output /data/swebench-verified/results/baseline-smoke/mini-batch-astropy-12907/imported
+
+go run . run-config \
+  --run-id mini-batch-astropy-12907-smoke \
+  --target baseline \
+  --cases-manifest /data/swebench-verified/data/cases.manifest.json \
+  --run-mini-manifest /data/swebench-verified/results/baseline-smoke/mini-batch-astropy-12907/run-mini-manifest.json \
+  --verifier-manifest /data/swebench-verified/results/baseline-smoke/mini-batch-astropy-12907/harness-report/verifier_manifest.json \
+  --import-summary /data/swebench-verified/results/baseline-smoke/mini-batch-astropy-12907/imported/summary/baseline.json \
+  --harness-report /data/swebench-verified/openai__minimax-m2.5.mini-batch-astropy-12907-smoke.json \
+  --doctor /data/swebench-verified/results/baseline-smoke/doctor/doctor.json \
+  --model-name minimax-m2.5 \
+  --mini-model-name openai/minimax-m2.5 \
+  --temperature 0.0 \
+  --reasoning-effort high \
+  --output /data/swebench-verified/results/baseline-smoke/mini-batch-astropy-12907/run_config.json
 ```
 
 当前已完成的 smoke 结果：
 
 - gold patch harness smoke：`astropy__astropy-12907` resolved `1/1`。
 - mini-SWE-agent batch smoke：`astropy__astropy-12907` submitted patch，local harness resolved `1/1`。
+- mini-SWE-agent 5-case cross-repo smoke：5/5 submitted，local harness completed 5/5，resolved 3/5，unresolved 2/5，error 0。该 run 中观测到公开模型服务 `30/min` 限流和 worker unavailable 重试，full run 前需要基于正式 endpoint 能力重新确认实际吞吐。
 
 ## Devcloud Docker 注意事项
 
