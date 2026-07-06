@@ -32,6 +32,7 @@ pnpm-lock.yaml
 !.github/scripts/run-go-tests.sh
 .DS_Store
 swebench/config/*.env
+swebench/config/*.local.yaml
 .gomodcache
 next-env.d.ts
 .codebuddy

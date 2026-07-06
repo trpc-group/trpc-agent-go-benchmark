@@ -1,0 +1,29 @@
+model:
+  model_name: openai/minimax-m2.5
+  cost_tracking: ignore_errors
+  model_kwargs:
+    api_base: http://03-llm.woa.com/gateway/v1
+    api_key: ""
+    temperature: 0.0
+    drop_params: true
+    parallel_tool_calls: true
+    reasoning_effort: high
+    extra_headers:
+      X-SMG-Routing-Key: haoranchang
+      X-SMG-Agent-Name: BenchSWE
+      X-SMG-Provider: ""
+
+environment:
+  env:
+    OPENBLAS_NUM_THREADS: "1"
+    OMP_NUM_THREADS: "1"
+    MKL_NUM_THREADS: "1"
+    NUMEXPR_NUM_THREADS: "1"
+    GIT_CONFIG_COUNT: "1"
+    GIT_CONFIG_KEY_0: core.preloadindex
+    GIT_CONFIG_VALUE_0: "false"
+  interpreter:
+    - bash
+    - -lc
+    - source /opt/miniconda3/bin/activate testbed && eval "$@"
+    - mini-swe-agent-command
