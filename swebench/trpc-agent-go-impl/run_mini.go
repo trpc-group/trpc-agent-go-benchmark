@@ -42,6 +42,7 @@ type runMiniConfig struct {
 	DockerHost   string `json:"docker_host"`
 	HFHome       string `json:"hf_home,omitempty"`
 	RedoExisting bool   `json:"redo_existing"`
+	Timeout      string `json:"timeout,omitempty"`
 }
 
 func runMini(ctx context.Context, args []string) error {
@@ -59,6 +60,7 @@ func runMini(ctx context.Context, args []string) error {
 	dockerHost := fs.String("docker-host", envOrDefault("DOCKER_HOST", defaultDockerHost), "Docker host")
 	hfHome := fs.String("hf-home", os.Getenv("HF_HOME"), "HF_HOME cache path")
 	redoExisting := fs.Bool("redo-existing", false, "pass --redo-existing to mini-extra")
+	timeout := fs.Duration("timeout", 0, "optional wall timeout for this mini-SWE-agent batch")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -99,9 +101,16 @@ func runMini(ctx context.Context, args []string) error {
 		env = append(env, "HF_HOME="+*hfHome)
 	}
 
+	runCtx := ctx
+	cancel := func() {}
+	if *timeout > 0 {
+		runCtx, cancel = context.WithTimeout(ctx, *timeout)
+	}
+	defer cancel()
+
 	start := time.Now()
 	logPath := filepath.Join(*output, "run-mini.log")
-	result := runLogged(ctx, "", env, logPath, *miniExtra, cmdArgs...)
+	result := runLogged(runCtx, "", env, logPath, *miniExtra, cmdArgs...)
 	finish := time.Now()
 
 	manifest := runMiniManifest{
@@ -123,6 +132,7 @@ func runMini(ctx context.Context, args []string) error {
 			DockerHost:   *dockerHost,
 			HFHome:       *hfHome,
 			RedoExisting: *redoExisting,
+			Timeout:      timeoutString(*timeout),
 		},
 	}
 	if err := writeJSON(filepath.Join(*output, "run-mini-manifest.json"), manifest); err != nil {
@@ -132,4 +142,11 @@ func runMini(ctx context.Context, args []string) error {
 		return fmt.Errorf("mini-extra failed with exit code %d; see %s", result.ExitCode, logPath)
 	}
 	return nil
+}
+
+func timeoutString(d time.Duration) string {
+	if d <= 0 {
+		return ""
+	}
+	return d.String()
 }

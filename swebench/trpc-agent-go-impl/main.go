@@ -41,6 +41,8 @@ func main() {
 		err = runImport(os.Args[2:])
 	case "run-config":
 		err = runRunConfig(os.Args[2:])
+	case "plan-batches":
+		err = runPlanBatches(os.Args[2:])
 	case "help", "-h", "--help":
 		usage()
 		return
@@ -60,6 +62,7 @@ func usage() {
   swebench verify   [flags]
   swebench import   [flags]
   swebench run-config [flags]
+  swebench plan-batches [flags]
 
 Commands:
   doctor    Probe local benchmark environment and model endpoint.
@@ -68,6 +71,7 @@ Commands:
   verify    Run SWE-Bench official local harness for predictions.
   import    Normalize mini predictions, trajectories, and harness report.
   run-config  Write a run-level manifest from generated artifacts.
+  plan-batches  Create fixed case batches and mini-SWE-agent filters.
 
 `)
 }

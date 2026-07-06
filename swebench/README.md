@@ -8,8 +8,8 @@
 - 已观测 dataset revision：`c104f840cc67f8b6eec6f759ebc8b2693d585d4a`。
 - 当前 case list hash：`a6b0fd7c8c2969a0eef892e032250adcfa6d32362d395c246930e61b575ac9b9`。
 - baseline：mini-SWE-agent `v2.0.0`。
-- smoke 模型：`minimax-m2.5`，通过 OpenAI-compatible endpoint 接入。
-- mini 模型名：`openai/minimax-m2.5`。
+- smoke 模型：`minimax-m2.5`、`gemini-3-flash`，通过 OpenAI-compatible endpoint 接入。
+- mini 模型名：`openai/minimax-m2.5`；Gemini text 模式使用 `openai/gemini-3-flash`。
 - mini 默认温度：`0.0`。
 - mini 模型请求 timeout：`120s`。
 - high reasoning：当前网关接受并校验 `reasoning_effort=high`。
@@ -24,6 +24,10 @@
 cp swebench/config/minimax-m2.5.env.example swebench/config/minimax-m2.5.env
 cp swebench/config/mini-swe-agent.minimax-m2.5.yaml.example \
   swebench/config/mini-swe-agent.minimax-m2.5.local.yaml
+
+cp swebench/config/gemini-3-flash.env.example swebench/config/gemini-3-flash.env
+cp swebench/config/mini-swe-agent.gemini-3-flash.yaml.example \
+  swebench/config/mini-swe-agent.gemini-3-flash.local.yaml
 ```
 
 `*.env` 和 `*.local.yaml` 已被 gitignore。不要提交真实 endpoint provider、API key 或 Authorization。
@@ -57,6 +61,12 @@ env:
   GIT_CONFIG_VALUE_0: "false"
 ```
 
+Gemini 系列模型在 mini-SWE-agent 默认 tool-call 模式下会触发 `thought_signature` 相关 function call 错误。当前已验证的接入方式是：
+
+- mini private config 设置 `model_class: litellm_textbased`。
+- `run-mini` 使用 `--base-config swebench_xml.yaml`。
+- action 通过 XML/text block 输出，不走默认 function calling bash tool。
+
 ## Go CLI
 
 第一版 baseline 复现编排放在：
@@ -65,7 +75,7 @@ env:
 swebench/trpc-agent-go-impl/
 ```
 
-当前提供六个命令：
+当前提供七个命令：
 
 - `doctor`：检查 Python、mini-SWE-agent、swebench、Docker、dataset 和模型 endpoint。
 - `prepare-data`：生成安全 case manifest、case list hash 和 manifest 元信息。
@@ -73,6 +83,7 @@ swebench/trpc-agent-go-impl/
 - `verify`：调用 SWE-Bench official local harness。
 - `import`：导入 baseline predictions、trajectory 和 harness report，输出统一 `cases.jsonl`、patches、scrubbed traces 和 summary。
 - `run-config`：聚合 dataset、runner、verifier、import summary 等产物，写出本次 run 的总 manifest。
+- `plan-batches`：基于安全 case manifest 生成固定 batch 和 mini-SWE-agent `--filter` 文件。
 
 第一版 `import` 只支持 baseline；native agent 接入后再扩展 native 字段。
 
@@ -88,6 +99,38 @@ swebench/data/
 `cases.jsonl` 只包含 agent 可见安全字段：`instance_id`、`repo`、`base_commit`、`problem_statement`，以及显式开启时的 `hints_text`。默认不包含 `patch`、`test_patch`、`FAIL_TO_PASS`、`PASS_TO_PASS`。
 
 当前口径下 `hints_text` 不使用，`cases.manifest.json` 中记录为 `hints_text_policy=not-used`。
+
+## Baseline batch 策略
+
+当前公共 `minimax-m2.5` endpoint 的可用并发会随时间波动，full run 不直接采用单个 500-case 进程。baseline 生成按固定 case list 切成小 batch，每个 batch 独立运行、独立归档、可单独重跑。
+
+生成 batch plan：
+
+```bash
+go run . plan-batches \
+  --cases /data/swebench-verified/data/cases.jsonl \
+  --output-dir /data/swebench-verified/data/batches/baseline-full-5 \
+  --run-prefix baseline-full-b5 \
+  --batch-size 5
+```
+
+产物：
+
+```text
+plan.json
+batch-000.json
+batch-000.filter
+...
+```
+
+低并发动态规则：
+
+- 默认从 `agent-workers=1` 开始。
+- 最近一个 batch 无 `RateLimitError` / `ServiceUnavailableError` 且完成时间稳定时，可以尝试下一批升到 `2`。
+- 出现明显限流、worker unavailable 或长时间无进展时，下一批降回 `1`，问题 batch 单独重跑。
+- 当前公共 endpoint 不使用 `3+` 作为默认档位；此前 `agent-workers=3` 已可推进但不健康，`agent-workers=15` 会持续限流。
+- 每个 batch 必须记录实际 workers、timeout、服务错误计数、submitted 数、耗时和 run artifact 路径。
+- 每个 batch 必须配置 `run-mini --timeout` 作为外层 wall timeout。模型请求 `timeout=120` 只能约束单次 LLM call，不能防止整个 case 或 batch 长尾；超时 batch 应单独重跑或进一步拆小。
 
 ## Smoke 命令
 
@@ -162,6 +205,8 @@ go run . run-config \
 - mini-SWE-agent 5-case cross-repo smoke：5/5 submitted，local harness completed 5/5，resolved 3/5，unresolved 2/5，error 0。该 run 中观测到公开模型服务 `30/min` 限流和 worker unavailable 重试，full run 前需要基于正式 endpoint 能力重新确认实际吞吐。
 - mini-SWE-agent timeout 校准：`agent-workers=1`、`timeout=120` 时，5-case run submitted 5/5，local harness completed 5/5，resolved 3/5，unresolved 2/5，error 0。
 - 当前公共 endpoint 吞吐结论：`agent-workers=15` 会触发持续限流和 worker unavailable；`agent-workers=3` 可推进但不健康；full run 应使用更高容量 endpoint，或采用低并发并保留 request timeout。
+- `gemini-3-flash` endpoint smoke：HTTP 200；默认 tool-call 模式会因 Gemini function call `thought_signature` 要求失败。
+- `gemini-3-flash` XML/text smoke：`swebench_xml.yaml` + `model_class=litellm_textbased` 时，`astropy__astropy-12907` submitted 1/1，local harness resolved 1/1，error 0。
 
 ## Devcloud Docker 注意事项
 
