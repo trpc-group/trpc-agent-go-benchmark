@@ -6,6 +6,7 @@
 
 - 数据集：`princeton-nlp/SWE-bench_Verified`，`test` split，500 cases。
 - 已观测 dataset revision：`c104f840cc67f8b6eec6f759ebc8b2693d585d4a`。
+- 当前 case list hash：`a6b0fd7c8c2969a0eef892e032250adcfa6d32362d395c246930e61b575ac9b9`。
 - baseline：mini-SWE-agent `v2.0.0`。
 - smoke 模型：`minimax-m2.5`，通过 OpenAI-compatible endpoint 接入。
 - mini 模型名：`openai/minimax-m2.5`。
@@ -63,14 +64,28 @@ env:
 swebench/trpc-agent-go-impl/
 ```
 
-当前提供四个命令：
+当前提供五个命令：
 
 - `doctor`：检查 Python、mini-SWE-agent、swebench、Docker、dataset 和模型 endpoint。
+- `prepare-data`：生成安全 case manifest、case list hash 和 manifest 元信息。
 - `run-mini`：调用 mini-SWE-agent batch runner，保存 raw predictions、trajectory 和日志。
 - `verify`：调用 SWE-Bench official local harness。
 - `import`：导入 baseline predictions、trajectory 和 harness report，输出统一 `cases.jsonl`、patches、scrubbed traces 和 summary。
 
 第一版 `import` 只支持 baseline；native agent 接入后再扩展 native 字段。
+
+`prepare-data` 产物：
+
+```text
+swebench/data/
+  cases.jsonl
+  cases.sha256
+  cases.manifest.json
+```
+
+`cases.jsonl` 只包含 agent 可见安全字段：`instance_id`、`repo`、`base_commit`、`problem_statement`，以及显式开启时的 `hints_text`。默认不包含 `patch`、`test_patch`、`FAIL_TO_PASS`、`PASS_TO_PASS`。
+
+当前口径下 `hints_text` 不使用，`cases.manifest.json` 中记录为 `hints_text_policy=not-used`。
 
 ## Smoke 命令
 
@@ -86,6 +101,10 @@ go run . doctor \
   --run-id mini-batch-astropy-12907-smoke \
   --output /data/swebench-verified/results/baseline-smoke/doctor \
   --model-config /data/swebench-verified/config/minimax-m2.5.env
+
+go run . prepare-data \
+  --output /data/swebench-verified/data \
+  --python /data/swebench-verified/.venv/bin/python
 
 go run . run-mini \
   --run-id mini-batch-astropy-12907-smoke \
@@ -112,6 +131,7 @@ go run . verify \
 
 go run . import \
   --target baseline \
+  --cases /data/swebench-verified/data/cases.jsonl \
   --predictions /data/swebench-verified/results/baseline-smoke/mini-batch-astropy-12907/preds.json \
   --raw-dir /data/swebench-verified/results/baseline-smoke/mini-batch-astropy-12907 \
   --harness-report /data/swebench-verified/openai__minimax-m2.5.mini-batch-astropy-12907-smoke.json \

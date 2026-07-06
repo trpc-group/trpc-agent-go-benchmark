@@ -32,6 +32,7 @@ type caseManifest struct {
 	Repo             string `json:"repo,omitempty"`
 	BaseCommit       string `json:"base_commit,omitempty"`
 	ProblemStatement string `json:"problem_statement,omitempty"`
+	HintsText        string `json:"hints_text,omitempty"`
 }
 
 type importedCase struct {
@@ -105,6 +106,11 @@ func runImport(args []string) error {
 	if err != nil {
 		return err
 	}
+	if strings.TrimSpace(*casesPath) != "" {
+		if err := validateImportInputs(cases, preds); err != nil {
+			return err
+		}
+	}
 	harness, err := readHarnessReport(*harnessReport)
 	if err != nil {
 		return err
@@ -137,7 +143,7 @@ func runImport(args []string) error {
 
 	for _, c := range cases {
 		pred, hasPred := preds[c.InstanceID]
-		result := targetResult{}
+		result := targetResult{PatchStats: patchStats{ChangedFiles: []string{}}}
 		if hasPred {
 			result.ModelNameOrPath = pred.ModelNameOrPath
 			if strings.TrimSpace(pred.ModelPatch) != "" {
@@ -257,6 +263,25 @@ func readCases(path string, preds map[string]prediction) ([]caseManifest, error)
 	return cases, scanner.Err()
 }
 
+func validateImportInputs(cases []caseManifest, preds map[string]prediction) error {
+	seenCases := map[string]bool{}
+	for _, c := range cases {
+		if strings.TrimSpace(c.InstanceID) == "" {
+			return fmt.Errorf("case with empty instance_id")
+		}
+		if seenCases[c.InstanceID] {
+			return fmt.Errorf("duplicate case instance_id %q", c.InstanceID)
+		}
+		seenCases[c.InstanceID] = true
+	}
+	for id := range preds {
+		if !seenCases[id] {
+			return fmt.Errorf("prediction %q is not present in case manifest", id)
+		}
+	}
+	return nil
+}
+
 type harnessIndex struct {
 	Resolved   map[string]bool
 	Unresolved map[string]bool
@@ -327,7 +352,7 @@ func classify(instanceID string, hasPred bool, patch string, harness harnessInde
 }
 
 func computePatchStats(patch string) patchStats {
-	stats := patchStats{}
+	stats := patchStats{ChangedFiles: []string{}}
 	seen := map[string]bool{}
 	for _, line := range strings.Split(patch, "\n") {
 		if line == "" {

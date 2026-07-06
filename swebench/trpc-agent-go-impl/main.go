@@ -31,6 +31,8 @@ func main() {
 	switch os.Args[1] {
 	case "doctor":
 		err = runDoctor(ctx, os.Args[2:])
+	case "prepare-data":
+		err = runPrepareData(ctx, os.Args[2:])
 	case "run-mini":
 		err = runMini(ctx, os.Args[2:])
 	case "verify":
@@ -51,12 +53,14 @@ func main() {
 func usage() {
 	fmt.Fprintf(os.Stderr, `Usage:
   swebench doctor   [flags]
+  swebench prepare-data [flags]
   swebench run-mini [flags]
   swebench verify   [flags]
   swebench import   [flags]
 
 Commands:
   doctor    Probe local benchmark environment and model endpoint.
+  prepare-data  Generate safe SWE-Bench case manifest and case-list hash.
   run-mini  Run mini-SWE-agent batch runner for a filter/slice.
   verify    Run SWE-Bench official local harness for predictions.
   import    Normalize mini predictions, trajectories, and harness report.
