@@ -55,38 +55,67 @@ env:
   GIT_CONFIG_VALUE_0: "false"
 ```
 
+## Go CLI
+
+第一版 baseline 复现编排放在：
+
+```text
+swebench/trpc-agent-go-impl/
+```
+
+当前提供四个命令：
+
+- `doctor`：检查 Python、mini-SWE-agent、swebench、Docker、dataset 和模型 endpoint。
+- `run-mini`：调用 mini-SWE-agent batch runner，保存 raw predictions、trajectory 和日志。
+- `verify`：调用 SWE-Bench official local harness。
+- `import`：导入 baseline predictions、trajectory 和 harness report，输出统一 `cases.jsonl`、patches、scrubbed traces 和 summary。
+
+第一版 `import` 只支持 baseline；native agent 接入后再扩展 native 字段。
+
 ## Smoke 命令
 
-以下命令用于验证 baseline 生成链路。正式实现会封装到统一 CLI 中。
+以下命令用于验证 baseline 生成链路。
 
 ```bash
+cd swebench/trpc-agent-go-impl
+
 export HF_HOME=/data/swebench-verified/cache/hf
 export DOCKER_HOST=tcp://localhost:2375
 
-mini-extra swebench \
+go run . doctor \
+  --run-id mini-batch-astropy-12907-smoke \
+  --output /data/swebench-verified/results/baseline-smoke/doctor \
+  --model-config /data/swebench-verified/config/minimax-m2.5.env
+
+go run . run-mini \
+  --run-id mini-batch-astropy-12907-smoke \
   --subset verified \
   --split test \
   --filter '^astropy__astropy-12907$' \
-  --workers 1 \
+  --agent-workers 1 \
   --output /data/swebench-verified/results/baseline-smoke/mini-batch-astropy-12907 \
-  --config swebench.yaml \
-  --config /data/swebench-verified/config/mini-minimax-m2.5.yaml \
+  --mini-config /data/swebench-verified/config/mini-minimax-m2.5.yaml \
   --redo-existing
 ```
 
 用 official local harness 验证 smoke prediction：
 
 ```bash
-python -m swebench.harness.run_evaluation \
-  -d princeton-nlp/SWE-bench_Verified \
-  -s test \
-  -i astropy__astropy-12907 \
-  -p /data/swebench-verified/results/baseline-smoke/mini-batch-astropy-12907/preds.json \
-  --max_workers 1 \
-  --cache_level instance \
-  --clean false \
-  --report_dir /data/swebench-verified/results/baseline-smoke/mini-batch-astropy-12907/harness-report \
-  -id mini-batch-astropy-12907-smoke
+go run . verify \
+  --run-id mini-batch-astropy-12907-smoke \
+  --target baseline \
+  --instance astropy__astropy-12907 \
+  --predictions /data/swebench-verified/results/baseline-smoke/mini-batch-astropy-12907/preds.json \
+  --output /data/swebench-verified/results/baseline-smoke/mini-batch-astropy-12907/harness-report \
+  --harness-workers 1 \
+  --apply-harness-compat
+
+go run . import \
+  --target baseline \
+  --predictions /data/swebench-verified/results/baseline-smoke/mini-batch-astropy-12907/preds.json \
+  --raw-dir /data/swebench-verified/results/baseline-smoke/mini-batch-astropy-12907 \
+  --harness-report /data/swebench-verified/openai__minimax-m2.5.mini-batch-astropy-12907-smoke.json \
+  --output /data/swebench-verified/results/baseline-smoke/mini-batch-astropy-12907/imported
 ```
 
 当前已完成的 smoke 结果：
