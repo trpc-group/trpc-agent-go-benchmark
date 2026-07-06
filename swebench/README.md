@@ -100,4 +100,6 @@ python -m swebench.harness.run_evaluation \
 
 在本次临时环境中采用了一个最小兼容补丁：仅当 Docker API `<1.41` 时省略 `platform`。该补丁不改变测试语义，但必须写入 run manifest。更理想的 full run 环境是直接提供 Docker API `>=1.41` 且能正常运行 SWE-Bench instance image。
 
+同一旧 Docker/seccomp 环境下，official local harness 创建的评测容器也需要注入上述线程和 Git 环境变量；否则 gold patch 会因 `pthread_create` / threaded lstat 权限错误被误判为 unresolved。该环境注入只规避平台限制，不改变测试列表或 patch 判定逻辑，也必须写入 run manifest。
+
 同一环境中自启动 Docker 29.3.1 daemon 不可作为主路径：overlayfs/vfs 都受容器权限限制，分别在 layer extract 或 `unshare` 阶段失败。
