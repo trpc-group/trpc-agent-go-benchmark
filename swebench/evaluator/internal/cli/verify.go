@@ -301,14 +301,14 @@ new_create = '''        environment = {
         }
         volumes = {}
         extra_hosts = {}
-        if os.environ.get("SWEBENCH_HTTPBIN_URL"):
+        use_httpbin = test_spec.instance_id.startswith("psf__requests-")
+        if use_httpbin and os.environ.get("SWEBENCH_HTTPBIN_URL"):
             environment["HTTPBIN_URL"] = os.environ["SWEBENCH_HTTPBIN_URL"]
             extra_hosts["host.docker.internal"] = "host-gateway"
-            if test_spec.instance_id.startswith("psf__requests-"):
-                extra_hosts["httpbin.org"] = "host-gateway"
-        if os.environ.get("SWEBENCH_HTTPBIN_CA_BUNDLE"):
+            extra_hosts["httpbin.org"] = "host-gateway"
+        if use_httpbin and os.environ.get("SWEBENCH_HTTPBIN_CA_BUNDLE"):
             ca_bundle = os.environ["SWEBENCH_HTTPBIN_CA_BUNDLE"]
-            ca_target = "/testbed/requests/cacert.pem" if test_spec.instance_id.startswith("psf__requests-") else "/tmp/swebench-httpbin-ca.crt"
+            ca_target = "/testbed/requests/cacert.pem"
             volumes[ca_bundle] = {"bind": ca_target, "mode": "ro"}
             environment["REQUESTS_CA_BUNDLE"] = ca_target
             environment["SSL_CERT_FILE"] = ca_target
