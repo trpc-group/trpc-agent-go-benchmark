@@ -103,7 +103,7 @@ func runVerify(ctx context.Context, args []string) error {
 		"-m", "swebench.harness.run_evaluation",
 		"-d", *dataset,
 		"-s", *split,
-		"-p", absPath(*predictions),
+		"-p", harnessPredictionsArg(*predictions),
 		"--max_workers", strconv.Itoa(*workers),
 		"--cache_level", *cacheLevel,
 		"--clean", strconv.FormatBool(*clean),
@@ -138,7 +138,7 @@ func runVerify(ctx context.Context, args []string) error {
 			Split:       *split,
 			Instance:    *instance,
 			InstanceIDs: instanceIDs,
-			Predictions: absPath(*predictions),
+			Predictions: harnessPredictionsArg(*predictions),
 			OutputDir:   outputAbs,
 			Workers:     *workers,
 			CacheLevel:  *cacheLevel,
@@ -156,6 +156,13 @@ func runVerify(ctx context.Context, args []string) error {
 		return fmt.Errorf("swebench harness failed with exit code %d; see %s", result.ExitCode, logPath)
 	}
 	return nil
+}
+
+func harnessPredictionsArg(predictions string) string {
+	if strings.TrimSpace(predictions) == "gold" {
+		return "gold"
+	}
+	return absPath(predictions)
 }
 
 func verifyInstanceIDs(predictionsPath, instance string, instancesFromPredictions bool) ([]string, error) {
