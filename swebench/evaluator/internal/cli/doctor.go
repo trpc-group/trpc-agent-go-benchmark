@@ -24,15 +24,17 @@ import (
 )
 
 type doctorReport struct {
-	RunID       string                   `json:"run_id"`
-	StartedAt   time.Time                `json:"started_at"`
-	FinishedAt  time.Time                `json:"finished_at"`
-	OutputDir   string                   `json:"output_dir"`
-	DockerHost  string                   `json:"docker_host"`
-	Checks      map[string]doctorCheck   `json:"checks"`
-	ModelConfig map[string]string        `json:"model_config,omitempty"`
-	Commands    map[string]commandResult `json:"commands"`
-	Notes       []string                 `json:"notes,omitempty"`
+	RunID           string                   `json:"run_id"`
+	StartedAt       time.Time                `json:"started_at"`
+	FinishedAt      time.Time                `json:"finished_at"`
+	OutputDir       string                   `json:"output_dir"`
+	DockerHost      string                   `json:"docker_host"`
+	HTTPBinURL      string                   `json:"httpbin_url,omitempty"`
+	HTTPBinCABundle string                   `json:"httpbin_ca_bundle,omitempty"`
+	Checks          map[string]doctorCheck   `json:"checks"`
+	ModelConfig     map[string]string        `json:"model_config,omitempty"`
+	Commands        map[string]commandResult `json:"commands"`
+	Notes           []string                 `json:"notes,omitempty"`
 }
 
 type doctorCheck struct {
@@ -48,6 +50,8 @@ func runDoctor(ctx context.Context, args []string) error {
 	miniExtra := fs.String("mini-extra", envOrDefault("MINI_EXTRA", "mini-extra"), "mini-extra executable")
 	docker := fs.String("docker", envOrDefault("DOCKER", "docker"), "docker executable")
 	dockerHost := fs.String("docker-host", envOrDefault("DOCKER_HOST", defaultDockerHost), "Docker host")
+	httpbinURL := fs.String("httpbin-url", os.Getenv("SWEBENCH_HTTPBIN_URL"), "optional HTTPBin-compatible endpoint for calibrated verifier checks")
+	httpbinCABundle := fs.String("httpbin-ca-bundle", os.Getenv("SWEBENCH_HTTPBIN_CA_BUNDLE"), "optional CA bundle for calibrated verifier containers")
 	modelConfig := fs.String("model-config", "../config/models/glm-5.2.local.yaml", "ignored model YAML config for model smoke")
 	timeout := fs.Duration("model-timeout", 60*time.Second, "model smoke timeout")
 	if err := fs.Parse(args); err != nil {
@@ -58,12 +62,14 @@ func runDoctor(ctx context.Context, args []string) error {
 	}
 
 	report := doctorReport{
-		RunID:      *runID,
-		StartedAt:  time.Now().UTC(),
-		OutputDir:  absPath(*output),
-		DockerHost: *dockerHost,
-		Checks:     map[string]doctorCheck{},
-		Commands:   map[string]commandResult{},
+		RunID:           *runID,
+		StartedAt:       time.Now().UTC(),
+		OutputDir:       absPath(*output),
+		DockerHost:      *dockerHost,
+		HTTPBinURL:      strings.TrimSpace(*httpbinURL),
+		HTTPBinCABundle: strings.TrimSpace(*httpbinCABundle),
+		Checks:          map[string]doctorCheck{},
+		Commands:        map[string]commandResult{},
 	}
 
 	env := []string{"DOCKER_HOST=" + *dockerHost}
@@ -73,6 +79,11 @@ func runDoctor(ctx context.Context, args []string) error {
 	report.Commands["docker_info"] = runCapture(ctx, "", env, *docker, "info", "--format", "server={{.ServerVersion}} root={{.DockerRootDir}} driver={{.Driver}} arch={{.Architecture}}")
 	report.Commands["docker_version"] = runCapture(ctx, "", env, *docker, "version", "--format", "client={{.Client.Version}} server={{.Server.Version}} api={{.Server.APIVersion}}")
 	report.Commands["dataset_load"] = runCapture(ctx, "", nil, *python, "-c", "from datasets import load_dataset; ds=load_dataset('"+defaultDatasetName+"', split='"+defaultSplit+"'); print(len(ds)); print(ds[0]['instance_id'])")
+	if strings.TrimSpace(*httpbinURL) != "" {
+		report.Commands["httpbin_smoke"] = httpbinSmoke(ctx, *httpbinURL, *timeout)
+	} else {
+		report.Checks["httpbin_smoke"] = doctorCheck{Status: "skip", Detail: "not configured"}
+	}
 
 	for name, cmd := range report.Commands {
 		if cmd.ExitCode == 0 {
@@ -212,6 +223,7 @@ func printDoctorSummary(report doctorReport) {
 		"docker_version",
 		"dataset_load",
 		"mini_extra_help",
+		"httpbin_smoke",
 		"model_smoke",
 	}
 	ok := 0
@@ -225,6 +237,7 @@ func printDoctorSummary(report doctorReport) {
 		switch check.Status {
 		case "ok":
 			ok++
+		case "skip":
 		default:
 			fail++
 		}
@@ -246,4 +259,42 @@ func firstLine(s string) string {
 		return s[:i]
 	}
 	return s
+}
+
+func httpbinSmoke(ctx context.Context, url string, timeout time.Duration) commandResult {
+	start := time.Now()
+	res := commandResult{
+		Command:   []string{"HTTP", "GET", strings.TrimRight(url, "/") + "/get"},
+		StartedAt: start.UTC(),
+	}
+	reqCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	req, err := http.NewRequestWithContext(reqCtx, http.MethodGet, strings.TrimRight(url, "/")+"/get", nil)
+	if err != nil {
+		res.ExitCode = -1
+		res.Error = err.Error()
+		res.FinishedAt = time.Now().UTC()
+		res.DurationMS = res.FinishedAt.Sub(start).Milliseconds()
+		return res
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		res.ExitCode = -1
+		res.Error = err.Error()
+		res.FinishedAt = time.Now().UTC()
+		res.DurationMS = res.FinishedAt.Sub(start).Milliseconds()
+		return res
+	}
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
+	res.FinishedAt = time.Now().UTC()
+	res.DurationMS = res.FinishedAt.Sub(start).Milliseconds()
+	res.Stdout = fmt.Sprintf("status=%d body=%s", resp.StatusCode, string(body))
+	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
+		res.ExitCode = 0
+	} else {
+		res.ExitCode = resp.StatusCode
+		res.Error = resp.Status
+	}
+	return res
 }

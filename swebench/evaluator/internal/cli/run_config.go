@@ -76,17 +76,21 @@ type runConfigConcurrency struct {
 }
 
 type runConfigVerifier struct {
-	Type            string `json:"type"`
-	Python          string `json:"python,omitempty"`
-	SWEBenchVersion string `json:"swebench_version,omitempty"`
-	DockerHost      string `json:"docker_host,omitempty"`
-	CacheLevel      string `json:"cache_level,omitempty"`
-	Clean           bool   `json:"clean"`
-	HarnessPatched  bool   `json:"harness_patched"`
-	CompatPatch     bool   `json:"compat_patch"`
-	StartedAt       string `json:"started_at,omitempty"`
-	FinishedAt      string `json:"finished_at,omitempty"`
-	DurationMS      int64  `json:"duration_ms,omitempty"`
+	Type               string   `json:"type"`
+	Mode               string   `json:"mode,omitempty"`
+	Python             string   `json:"python,omitempty"`
+	SWEBenchVersion    string   `json:"swebench_version,omitempty"`
+	DockerHost         string   `json:"docker_host,omitempty"`
+	HTTPBinURL         string   `json:"httpbin_url,omitempty"`
+	HTTPBinCABundle    string   `json:"httpbin_ca_bundle,omitempty"`
+	CacheLevel         string   `json:"cache_level,omitempty"`
+	Clean              bool     `json:"clean"`
+	HarnessPatched     bool     `json:"harness_patched"`
+	CompatPatch        bool     `json:"compat_patch"`
+	CalibrationPatches []string `json:"calibration_patches,omitempty"`
+	StartedAt          string   `json:"started_at,omitempty"`
+	FinishedAt         string   `json:"finished_at,omitempty"`
+	DurationMS         int64    `json:"duration_ms,omitempty"`
 }
 
 type runConfigArtifacts struct {
@@ -230,17 +234,21 @@ func runRunConfig(args []string) error {
 			HarnessWorkers:         verifierManifest.Config.Workers,
 		},
 		Verifier: runConfigVerifier{
-			Type:            "official-local-harness",
-			Python:          verifierManifest.Config.Python,
-			SWEBenchVersion: sweBenchVersion(doctor),
-			DockerHost:      verifierManifest.Config.DockerHost,
-			CacheLevel:      verifierManifest.Config.CacheLevel,
-			Clean:           verifierManifest.Config.Clean,
-			HarnessPatched:  verifierManifest.HarnessPatched,
-			CompatPatch:     verifierManifest.Config.CompatPatch,
-			StartedAt:       formatTime(verifierManifest.StartedAt),
-			FinishedAt:      formatTime(verifierManifest.FinishedAt),
-			DurationMS:      verifierManifest.DurationMS,
+			Type:               "official-local-harness",
+			Mode:               verifierManifest.Config.VerifierMode,
+			Python:             verifierManifest.Config.Python,
+			SWEBenchVersion:    sweBenchVersion(doctor),
+			DockerHost:         verifierManifest.Config.DockerHost,
+			HTTPBinURL:         verifierManifest.Config.HTTPBinURL,
+			HTTPBinCABundle:    verifierManifest.Config.HTTPBinCABundle,
+			CacheLevel:         verifierManifest.Config.CacheLevel,
+			Clean:              verifierManifest.Config.Clean,
+			HarnessPatched:     verifierManifest.HarnessPatched,
+			CompatPatch:        verifierManifest.Config.CompatPatch,
+			CalibrationPatches: verifierManifest.CalibrationPatches,
+			StartedAt:          formatTime(verifierManifest.StartedAt),
+			FinishedAt:         formatTime(verifierManifest.FinishedAt),
+			DurationMS:         verifierManifest.DurationMS,
 		},
 		Artifacts: runConfigArtifacts{
 			CasesManifest:     absPath(*casesManifestPath),
