@@ -7,7 +7,7 @@
 // trpc-agent-go is licensed under the Apache License Version 2.0.
 //
 
-package main
+package cli
 
 import (
 	"context"
@@ -15,6 +15,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -32,18 +33,19 @@ type verifyManifest struct {
 }
 
 type verifyConfig struct {
-	Dataset     string `json:"dataset"`
-	Split       string `json:"split"`
-	Instance    string `json:"instance,omitempty"`
-	Predictions string `json:"predictions"`
-	OutputDir   string `json:"output_dir"`
-	Workers     int    `json:"workers"`
-	CacheLevel  string `json:"cache_level"`
-	Clean       bool   `json:"clean"`
-	Python      string `json:"python"`
-	DockerHost  string `json:"docker_host"`
-	HFHome      string `json:"hf_home,omitempty"`
-	CompatPatch bool   `json:"compat_patch"`
+	Dataset     string   `json:"dataset"`
+	Split       string   `json:"split"`
+	Instance    string   `json:"instance,omitempty"`
+	InstanceIDs []string `json:"instance_ids,omitempty"`
+	Predictions string   `json:"predictions"`
+	OutputDir   string   `json:"output_dir"`
+	Workers     int      `json:"workers"`
+	CacheLevel  string   `json:"cache_level"`
+	Clean       bool     `json:"clean"`
+	Python      string   `json:"python"`
+	DockerHost  string   `json:"docker_host"`
+	HFHome      string   `json:"hf_home,omitempty"`
+	CompatPatch bool     `json:"compat_patch"`
 }
 
 func runVerify(ctx context.Context, args []string) error {
@@ -55,13 +57,14 @@ func runVerify(ctx context.Context, args []string) error {
 	dataset := fs.String("dataset", defaultDatasetName, "SWE-Bench dataset name")
 	split := fs.String("split", defaultSplit, "dataset split")
 	instance := fs.String("instance", "", "optional single instance id")
+	instancesFromPredictions := fs.Bool("instances-from-predictions", true, "restrict harness dataset to instance ids found in predictions")
 	workers := fs.Int("harness-workers", 1, "SWE-Bench harness max workers")
 	cacheLevel := fs.String("cache-level", "instance", "SWE-Bench harness cache level")
 	clean := fs.Bool("clean", false, "clean harness images/containers")
 	python := fs.String("python", envOrDefault("PYTHON", "python"), "python executable")
 	dockerHost := fs.String("docker-host", envOrDefault("DOCKER_HOST", defaultDockerHost), "Docker host")
 	hfHome := fs.String("hf-home", os.Getenv("HF_HOME"), "HF_HOME cache path")
-	compatPatch := fs.Bool("apply-harness-compat", false, "patch installed swebench harness for Docker API<1.41 and seccomp-limited containers")
+	compatPatch := fs.Bool("apply-harness-compat", true, "patch installed swebench harness for Docker API<1.41 and seccomp-limited containers; set false for clean-upstream comparison")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -77,6 +80,7 @@ func runVerify(ctx context.Context, args []string) error {
 	if *output == "" {
 		*output = filepath.Join("..", "results", "runs", *runID, "local-harness-report", *target)
 	}
+	outputAbs := absPath(*output)
 	if err := ensureDir(*output); err != nil {
 		return err
 	}
@@ -89,20 +93,26 @@ func runVerify(ctx context.Context, args []string) error {
 		patched = true
 	}
 
+	instanceIDs, err := verifyInstanceIDs(*predictions, *instance, *instancesFromPredictions)
+	if err != nil {
+		return err
+	}
+
 	harnessRunID := *runID + "-" + *target
 	cmdArgs := []string{
 		"-m", "swebench.harness.run_evaluation",
 		"-d", *dataset,
 		"-s", *split,
-		"-p", *predictions,
+		"-p", absPath(*predictions),
 		"--max_workers", strconv.Itoa(*workers),
 		"--cache_level", *cacheLevel,
 		"--clean", strconv.FormatBool(*clean),
-		"--report_dir", *output,
+		"--report_dir", outputAbs,
 		"-id", harnessRunID,
 	}
-	if strings.TrimSpace(*instance) != "" {
-		cmdArgs = append(cmdArgs, "-i", *instance)
+	if len(instanceIDs) > 0 {
+		cmdArgs = append(cmdArgs, "-i")
+		cmdArgs = append(cmdArgs, instanceIDs...)
 	}
 
 	env := []string{"DOCKER_HOST=" + *dockerHost}
@@ -111,8 +121,8 @@ func runVerify(ctx context.Context, args []string) error {
 	}
 
 	start := time.Now()
-	logPath := filepath.Join(*output, "verify.log")
-	result := runLogged(ctx, "", env, logPath, *python, cmdArgs...)
+	logPath := filepath.Join(outputAbs, "verify.log")
+	result := runLogged(ctx, outputAbs, env, logPath, *python, cmdArgs...)
 	finish := time.Now()
 
 	manifest := verifyManifest{
@@ -127,8 +137,9 @@ func runVerify(ctx context.Context, args []string) error {
 			Dataset:     *dataset,
 			Split:       *split,
 			Instance:    *instance,
+			InstanceIDs: instanceIDs,
 			Predictions: absPath(*predictions),
-			OutputDir:   absPath(*output),
+			OutputDir:   outputAbs,
 			Workers:     *workers,
 			CacheLevel:  *cacheLevel,
 			Clean:       *clean,
@@ -138,13 +149,34 @@ func runVerify(ctx context.Context, args []string) error {
 			CompatPatch: *compatPatch,
 		},
 	}
-	if err := writeJSON(filepath.Join(*output, "verifier_manifest.json"), manifest); err != nil {
+	if err := writeJSON(filepath.Join(outputAbs, "verifier_manifest.json"), manifest); err != nil {
 		return err
 	}
 	if result.ExitCode != 0 {
 		return fmt.Errorf("swebench harness failed with exit code %d; see %s", result.ExitCode, logPath)
 	}
 	return nil
+}
+
+func verifyInstanceIDs(predictionsPath, instance string, instancesFromPredictions bool) ([]string, error) {
+	if strings.TrimSpace(instance) != "" {
+		return []string{strings.TrimSpace(instance)}, nil
+	}
+	if !instancesFromPredictions || strings.TrimSpace(predictionsPath) == "gold" {
+		return nil, nil
+	}
+	preds, err := readPredictions(predictionsPath)
+	if err != nil {
+		return nil, fmt.Errorf("read predictions for instance_ids: %w", err)
+	}
+	ids := make([]string, 0, len(preds))
+	for id := range preds {
+		if strings.TrimSpace(id) != "" {
+			ids = append(ids, id)
+		}
+	}
+	sort.Strings(ids)
+	return ids, nil
 }
 
 func applyHarnessCompat(ctx context.Context, python string) error {

@@ -7,7 +7,7 @@
 // trpc-agent-go is licensed under the Apache License Version 2.0.
 //
 
-package main
+package cli
 
 import (
 	"bytes"
@@ -48,7 +48,7 @@ func runDoctor(ctx context.Context, args []string) error {
 	miniExtra := fs.String("mini-extra", envOrDefault("MINI_EXTRA", "mini-extra"), "mini-extra executable")
 	docker := fs.String("docker", envOrDefault("DOCKER", "docker"), "docker executable")
 	dockerHost := fs.String("docker-host", envOrDefault("DOCKER_HOST", defaultDockerHost), "Docker host")
-	modelConfig := fs.String("model-config", "../config/minimax-m2.5.env", "ignored env config for model smoke")
+	modelConfig := fs.String("model-config", "../config/models/glm-5.2.local.yaml", "ignored model YAML config for model smoke")
 	timeout := fs.Duration("model-timeout", 60*time.Second, "model smoke timeout")
 	if err := fs.Parse(args); err != nil {
 		return err
@@ -97,12 +97,16 @@ func runDoctor(ctx context.Context, args []string) error {
 	if err := writeJSON(filepath.Join(*output, "doctor.json"), report); err != nil {
 		return err
 	}
-	return writeDoctorLog(filepath.Join(*output, "doctor.log"), report)
+	if err := writeDoctorLog(filepath.Join(*output, "doctor.log"), report); err != nil {
+		return err
+	}
+	printDoctorSummary(report)
+	return nil
 }
 
 func modelSmoke(ctx context.Context, configPath string, timeout time.Duration) (commandResult, map[string]string) {
 	start := time.Now()
-	cfg, err := loadEnvFile(configPath)
+	cfg, err := loadModelConfig(configPath)
 	safe := map[string]string{}
 	for k, v := range cfg {
 		if isSecretKey(k) {
@@ -198,6 +202,39 @@ func writeDoctorLog(path string, report doctorReport) error {
 		fmt.Fprintf(&b, "[%s] %s\n%s\n\n", check.Status, name, check.Detail)
 	}
 	return os.WriteFile(path, []byte(b.String()), 0o644)
+}
+
+func printDoctorSummary(report doctorReport) {
+	names := []string{
+		"python_version",
+		"swebench_version",
+		"docker_info",
+		"docker_version",
+		"dataset_load",
+		"mini_extra_help",
+		"model_smoke",
+	}
+	ok := 0
+	fail := 0
+	fmt.Printf("doctor: %s\n", report.RunID)
+	for _, name := range names {
+		check, exists := report.Checks[name]
+		if !exists {
+			continue
+		}
+		switch check.Status {
+		case "ok":
+			ok++
+		default:
+			fail++
+		}
+		if check.Detail != "" {
+			fmt.Printf("[%s] %s: %s\n", check.Status, name, check.Detail)
+		} else {
+			fmt.Printf("[%s] %s\n", check.Status, name)
+		}
+	}
+	fmt.Printf("summary: ok=%d fail=%d report=%s\n", ok, fail, filepath.Join(report.OutputDir, "doctor.json"))
 }
 
 func firstLine(s string) string {

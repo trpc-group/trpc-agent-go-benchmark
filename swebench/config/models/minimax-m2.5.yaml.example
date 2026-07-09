@@ -1,0 +1,14 @@
+model:
+  model_name: openai/minimax-m2.5
+  cost_tracking: ignore_errors
+  model_kwargs:
+    api_base: http://03-llm.woa.com/gateway/v1
+    api_key: ""
+    timeout: 120
+    drop_params: true
+    parallel_tool_calls: true
+    reasoning_effort: high
+    extra_headers:
+      X-SMG-Routing-Key: haoranchang
+      X-SMG-Agent-Name: BenchSWE
+      X-SMG-Provider: ""

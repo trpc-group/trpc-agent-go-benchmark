@@ -1,0 +1,39 @@
+{
+  "run_id": "m2.5-high-full-500-mini210",
+  "target": "baseline",
+  "agent": "mini-SWE-agent",
+  "agent_version": "2.1.0",
+  "model": "minimax-m2.5",
+  "model_reasoning_effort": "high",
+  "dataset": "princeton-nlp/SWE-bench_Verified",
+  "split": "test",
+  "total_instances": 500,
+  "case_list_sha256": "a6b0fd7c8c2969a0eef892e032250adcfa6d32362d395c246930e61b575ac9b9",
+  "verifier": "calibrated official local harness",
+  "raw_report": {
+    "resolved": 381,
+    "unresolved": 114,
+    "empty_patch": 1,
+    "error": 4,
+    "completed": 495
+  },
+  "final_report": {
+    "resolved": 382,
+    "unresolved": 117,
+    "empty_patch": 1,
+    "infra_error": 0,
+    "incomplete": 0,
+    "resolved_rate": 0.764
+  },
+  "adjudication": {
+    "sympy__sympy-24213": "full-run Docker API transient timeout; same calibrated verifier single-case retry resolved",
+    "django__django-10554": "invalid non-unified-diff patch; counted as unresolved",
+    "sphinx-doc__sphinx-9230": "invalid non-unified-diff patch; counted as unresolved",
+    "sympy__sympy-21612": "invalid non-unified-diff patch; counted as unresolved"
+  },
+  "artifacts": {
+    "predictions": "/data/swebench-verified/results/baseline-full/m2.5-high-full-500-mini210/raw/mini/preds.json",
+    "calibrated_verifier_report": "/data/swebench-verified/openai__minimax-m2.5.m2.5-high-full-500-mini210-calibrated-verifier.json",
+    "transient_retry_report": "/data/swebench-verified/openai__minimax-m2.5.m2.5-high-full-500-mini210-calibrated-verifier-retry-sympy-24213.json"
+  }
+}

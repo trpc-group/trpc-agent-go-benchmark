@@ -7,7 +7,7 @@
 // trpc-agent-go is licensed under the Apache License Version 2.0.
 //
 
-package main
+package cli
 
 import (
 	"context"
@@ -30,19 +30,21 @@ type runMiniManifest struct {
 }
 
 type runMiniConfig struct {
-	Subset       string `json:"subset"`
-	Split        string `json:"split"`
-	Filter       string `json:"filter,omitempty"`
-	Slice        string `json:"slice,omitempty"`
-	Workers      int    `json:"workers"`
-	OutputDir    string `json:"output_dir"`
-	MiniConfig   string `json:"mini_config"`
-	BaseConfig   string `json:"base_config"`
-	MiniExtra    string `json:"mini_extra"`
-	DockerHost   string `json:"docker_host"`
-	HFHome       string `json:"hf_home,omitempty"`
-	RedoExisting bool   `json:"redo_existing"`
-	Timeout      string `json:"timeout,omitempty"`
+	Subset            string `json:"subset"`
+	Split             string `json:"split"`
+	Filter            string `json:"filter,omitempty"`
+	Slice             string `json:"slice,omitempty"`
+	Workers           int    `json:"workers"`
+	OutputDir         string `json:"output_dir"`
+	ModelConfig       string `json:"model_config"`
+	EnvironmentConfig string `json:"environment_config"`
+	MiniConfig        string `json:"mini_config,omitempty"`
+	BaseConfig        string `json:"base_config"`
+	MiniExtra         string `json:"mini_extra"`
+	DockerHost        string `json:"docker_host"`
+	HFHome            string `json:"hf_home,omitempty"`
+	RedoExisting      bool   `json:"redo_existing"`
+	Timeout           string `json:"timeout,omitempty"`
 }
 
 func runMini(ctx context.Context, args []string) error {
@@ -55,7 +57,9 @@ func runMini(ctx context.Context, args []string) error {
 	sliceSpec := fs.String("slice", "", "slice expression")
 	workers := fs.Int("agent-workers", 15, "mini-SWE-agent worker count")
 	baseConfig := fs.String("base-config", "swebench.yaml", "mini-SWE-agent base config")
-	miniConfig := fs.String("mini-config", "../config/mini-swe-agent.minimax-m2.5.local.yaml", "private mini-SWE-agent YAML config")
+	modelConfig := fs.String("model-config", "../config/models/glm-5.2.local.yaml", "private mini-SWE-agent model YAML config")
+	environmentConfig := fs.String("environment-config", "../config/environments/swebench-testbed.yaml", "mini-SWE-agent environment YAML config")
+	miniConfig := fs.String("mini-config", "", "deprecated combined mini-SWE-agent YAML config")
 	miniExtra := fs.String("mini-extra", envOrDefault("MINI_EXTRA", "mini-extra"), "mini-extra executable")
 	dockerHost := fs.String("docker-host", envOrDefault("DOCKER_HOST", defaultDockerHost), "Docker host")
 	hfHome := fs.String("hf-home", os.Getenv("HF_HOME"), "HF_HOME cache path")
@@ -84,7 +88,15 @@ func runMini(ctx context.Context, args []string) error {
 		"--workers", strconv.Itoa(*workers),
 		"--output", *output,
 		"--config", *baseConfig,
-		"--config", *miniConfig,
+	}
+	if strings.TrimSpace(*environmentConfig) != "" {
+		cmdArgs = append(cmdArgs, "--config", *environmentConfig)
+	}
+	if strings.TrimSpace(*modelConfig) != "" {
+		cmdArgs = append(cmdArgs, "--config", *modelConfig)
+	}
+	if strings.TrimSpace(*miniConfig) != "" {
+		cmdArgs = append(cmdArgs, "--config", *miniConfig)
 	}
 	if strings.TrimSpace(*filterSpec) != "" {
 		cmdArgs = append(cmdArgs, "--filter", *filterSpec)
@@ -120,19 +132,21 @@ func runMini(ctx context.Context, args []string) error {
 		DurationMS: finish.Sub(start).Milliseconds(),
 		Command:    result,
 		Config: runMiniConfig{
-			Subset:       *subset,
-			Split:        *split,
-			Filter:       *filterSpec,
-			Slice:        *sliceSpec,
-			Workers:      *workers,
-			OutputDir:    absPath(*output),
-			MiniConfig:   absPath(*miniConfig),
-			BaseConfig:   *baseConfig,
-			MiniExtra:    *miniExtra,
-			DockerHost:   *dockerHost,
-			HFHome:       *hfHome,
-			RedoExisting: *redoExisting,
-			Timeout:      timeoutString(*timeout),
+			Subset:            *subset,
+			Split:             *split,
+			Filter:            *filterSpec,
+			Slice:             *sliceSpec,
+			Workers:           *workers,
+			OutputDir:         absPath(*output),
+			ModelConfig:       absPath(*modelConfig),
+			EnvironmentConfig: absPath(*environmentConfig),
+			MiniConfig:        absPath(*miniConfig),
+			BaseConfig:        *baseConfig,
+			MiniExtra:         *miniExtra,
+			DockerHost:        *dockerHost,
+			HFHome:            *hfHome,
+			RedoExisting:      *redoExisting,
+			Timeout:           timeoutString(*timeout),
 		},
 	}
 	if err := writeJSON(filepath.Join(*output, "run-mini-manifest.json"), manifest); err != nil {

@@ -1,0 +1,14 @@
+model:
+  model_name: openai/glm-5.2
+  cost_tracking: ignore_errors
+  model_kwargs:
+    api_base: ""
+    api_key: ""
+    timeout: 120
+    drop_params: true
+    parallel_tool_calls: true
+    reasoning_effort: high
+    extra_headers:
+      X-SMG-Routing-Key: ""
+      X-SMG-Agent-Name: BenchSWE
+      X-SMG-Provider: ""

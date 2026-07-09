@@ -7,7 +7,7 @@
 // trpc-agent-go is licensed under the Apache License Version 2.0.
 //
 
-package main
+package cli
 
 import (
 	"context"
@@ -44,11 +44,13 @@ type prepareDataManifest struct {
 
 func runPrepareData(ctx context.Context, args []string) error {
 	fs := flag.NewFlagSet("prepare-data", flag.ExitOnError)
-	output := fs.String("output", "../data", "output directory for cases.jsonl and cases.sha256")
+	output := fs.String("output", "../data/generated", "output directory for cases.jsonl and cases.sha256")
 	dataset := fs.String("dataset", defaultDatasetName, "SWE-Bench dataset name")
 	split := fs.String("split", defaultSplit, "dataset split")
 	python := fs.String("python", envOrDefault("PYTHON", "python"), "python executable")
 	includeHints := fs.Bool("include-hints", false, "include hints_text when present")
+	expectedCaseIDs := fs.String("expected-case-ids", "", "optional expected case id list; defaults to sibling data/case-lists/verified-test-500.case_ids.txt when present")
+	expectedCaseHash := fs.String("expected-case-hash", "", "optional expected case id list hash; defaults to sibling data/case-lists/verified-test-500.case_ids.sha256 when present")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -71,6 +73,18 @@ func runPrepareData(ctx context.Context, args []string) error {
 	}
 
 	hash := caseListHash(loaded.Cases)
+	expectedIDsPath := defaultIfEmpty(*expectedCaseIDs, defaultCaseListPath(*output, "verified-test-500.case_ids.txt"))
+	if fileExists(expectedIDsPath) {
+		if err := validateExpectedCaseIDs(expectedIDsPath, loaded.Cases); err != nil {
+			return err
+		}
+	}
+	expectedHashPath := defaultIfEmpty(*expectedCaseHash, defaultCaseListPath(*output, "verified-test-500.case_ids.sha256"))
+	if fileExists(expectedHashPath) {
+		if err := validateExpectedCaseHash(expectedHashPath, hash); err != nil {
+			return err
+		}
+	}
 	casesPath := filepath.Join(*output, "cases.jsonl")
 	if err := writeCasesJSONL(casesPath, loaded.Cases); err != nil {
 		return err
@@ -168,6 +182,75 @@ func caseListHash(cases []caseManifest) string {
 	sort.Strings(ids)
 	sum := sha256.Sum256([]byte(strings.Join(ids, "\n") + "\n"))
 	return hex.EncodeToString(sum[:])
+}
+
+func validateExpectedCaseIDs(path string, cases []caseManifest) error {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return fmt.Errorf("read expected case ids: %w", err)
+	}
+	expected := nonEmptyLines(string(data))
+	actual := make([]string, 0, len(cases))
+	for _, c := range cases {
+		actual = append(actual, c.InstanceID)
+	}
+	sort.Strings(expected)
+	sort.Strings(actual)
+	if len(expected) != len(actual) {
+		return fmt.Errorf("case id list mismatch: expected %d cases from %s, got %d", len(expected), path, len(actual))
+	}
+	for i := range expected {
+		if expected[i] != actual[i] {
+			return fmt.Errorf("case id list mismatch at sorted index %d: expected %q, got %q", i, expected[i], actual[i])
+		}
+	}
+	return nil
+}
+
+func validateExpectedCaseHash(path, actual string) error {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return fmt.Errorf("read expected case hash: %w", err)
+	}
+	expected := strings.TrimSpace(string(data))
+	if expected != actual {
+		return fmt.Errorf("case list hash mismatch: expected %s from %s, got %s", expected, path, actual)
+	}
+	return nil
+}
+
+func nonEmptyLines(s string) []string {
+	lines := []string{}
+	for _, line := range strings.Split(s, "\n") {
+		line = strings.TrimSpace(line)
+		if line != "" {
+			lines = append(lines, line)
+		}
+	}
+	return lines
+}
+
+func defaultIfEmpty(value, fallback string) string {
+	if strings.TrimSpace(value) != "" {
+		return value
+	}
+	return fallback
+}
+
+func defaultCaseListPath(output, name string) string {
+	inOutput := filepath.Clean(filepath.Join(output, "case-lists", name))
+	if fileExists(inOutput) {
+		return inOutput
+	}
+	return filepath.Clean(filepath.Join(output, "..", "case-lists", name))
+}
+
+func fileExists(path string) bool {
+	if strings.TrimSpace(path) == "" {
+		return false
+	}
+	info, err := os.Stat(path)
+	return err == nil && !info.IsDir()
 }
 
 func writeCasesJSONL(path string, cases []caseManifest) error {
