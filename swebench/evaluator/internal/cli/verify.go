@@ -388,10 +388,11 @@ if mode == "calibrated":
 '''
     injection = '''    if "install" in specs:
         eval_commands.append(specs["install"])
+    pip_trusted_hosts = "--trusted-host pypi.org --trusted-host files.pythonhosted.org"
     if instance["repo"] == "psf/requests":
-        eval_commands.append("python -m pip install pytest-httpbin trustme")
+        eval_commands.append(f"python -m pip install {pip_trusted_hosts} pytest-httpbin trustme")
     if instance["repo"] == "astropy/astropy" and instance["version"] == "3.1":
-        eval_commands.append("python -m pip install pytest==6.2.5 setuptools==59.8.0")
+        eval_commands.append(f"python -m pip install {pip_trusted_hosts} pytest==6.2.5 setuptools==59.8.0")
     if instance["repo"] == "django/django" and instance["version"] == "2.2":
         shim = (
             "import sqlite3 as _sqlite3\\n"
@@ -418,7 +419,7 @@ if mode == "calibrated":
             "PY"
         )
 '''
-    if "pytest-httpbin trustme" in spec_text and "legacy_alter_table" in spec_text and "pytest==6.2.5" in spec_text:
+    if "pytest-httpbin trustme" in spec_text and "legacy_alter_table" in spec_text and "pytest==6.2.5" in spec_text and "files.pythonhosted.org" in spec_text:
         patches.extend(["requests_httpbin_runtime_deps", "astropy31_pytest_setuptools_pin", "django22_sqlite_legacy_alter_table"])
     elif anchor in spec_text:
         spec_text = spec_text.replace(anchor, injection, 1)
