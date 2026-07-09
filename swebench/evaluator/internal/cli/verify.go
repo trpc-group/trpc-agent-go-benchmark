@@ -347,11 +347,10 @@ if old_create in docker_text:
     docker_text = docker_text.replace(old_create, new_create)
     patches.append("docker_container_env")
 elif "create_kwargs = dict(" in docker_text and "OPENBLAS_NUM_THREADS" in docker_text:
-    if "SWEBENCH_HTTPBIN_URL" not in docker_text:
-        start = docker_text.index("        create_kwargs = dict(")
-        marker = "        container = client.containers.create(**create_kwargs)\n"
-        end = docker_text.index(marker, start) + len(marker)
-        docker_text = docker_text[:start] + new_create + docker_text[end:]
+    start = docker_text.index("        create_kwargs = dict(")
+    marker = "        container = client.containers.create(**create_kwargs)\n"
+    end = docker_text.index(marker, start) + len(marker)
+    docker_text = docker_text[:start] + new_create + docker_text[end:]
     patches.append("docker_container_env")
 else:
     raise SystemExit("unsupported swebench docker_build.py layout; compat patch not applied")
