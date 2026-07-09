@@ -22,7 +22,7 @@ import (
 const (
 	defaultDatasetName = "princeton-nlp/SWE-bench_Verified"
 	defaultSplit       = "test"
-	defaultDockerHost  = "tcp://localhost:2375"
+	defaultDockerHost  = "unix:///var/run/docker.sock"
 )
 
 type envConfig map[string]string
