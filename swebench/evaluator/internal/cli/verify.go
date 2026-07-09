@@ -28,34 +28,34 @@ const (
 )
 
 type verifyManifest struct {
-	RunID              string        `json:"run_id"`
-	Target             string        `json:"target"`
-	StartedAt          time.Time     `json:"started_at"`
-	FinishedAt         time.Time     `json:"finished_at"`
-	DurationMS         int64         `json:"duration_ms"`
-	Command            commandResult `json:"command"`
-	Config             verifyConfig  `json:"config"`
-	HarnessPatched     bool          `json:"harness_patched"`
-	CalibrationPatches []string      `json:"calibration_patches,omitempty"`
+	RunID              string              `json:"run_id"`
+	Target             string              `json:"target"`
+	StartedAt          time.Time           `json:"started_at"`
+	FinishedAt         time.Time           `json:"finished_at"`
+	DurationMS         int64               `json:"duration_ms"`
+	Command            commandResult       `json:"command"`
+	Config             verifyConfig        `json:"config"`
+	HarnessPatched     bool                `json:"harness_patched"`
+	CalibrationPatches []string            `json:"calibration_patches,omitempty"`
+	ManagedHTTPBin     *managedHTTPBinInfo `json:"managed_httpbin,omitempty"`
 }
 
 type verifyConfig struct {
-	Dataset         string   `json:"dataset"`
-	Split           string   `json:"split"`
-	Instance        string   `json:"instance,omitempty"`
-	InstanceIDs     []string `json:"instance_ids,omitempty"`
-	Predictions     string   `json:"predictions"`
-	OutputDir       string   `json:"output_dir"`
-	Workers         int      `json:"workers"`
-	CacheLevel      string   `json:"cache_level"`
-	Clean           bool     `json:"clean"`
-	Python          string   `json:"python"`
-	DockerHost      string   `json:"docker_host"`
-	HFHome          string   `json:"hf_home,omitempty"`
-	VerifierMode    string   `json:"verifier_mode"`
-	CompatPatch     bool     `json:"compat_patch"`
-	HTTPBinURL      string   `json:"httpbin_url,omitempty"`
-	HTTPBinCABundle string   `json:"httpbin_ca_bundle,omitempty"`
+	Dataset      string   `json:"dataset"`
+	Split        string   `json:"split"`
+	Instance     string   `json:"instance,omitempty"`
+	InstanceIDs  []string `json:"instance_ids,omitempty"`
+	Predictions  string   `json:"predictions"`
+	OutputDir    string   `json:"output_dir"`
+	Workers      int      `json:"workers"`
+	CacheLevel   string   `json:"cache_level"`
+	Clean        bool     `json:"clean"`
+	Python       string   `json:"python"`
+	Docker       string   `json:"docker"`
+	DockerHost   string   `json:"docker_host"`
+	HFHome       string   `json:"hf_home,omitempty"`
+	VerifierMode string   `json:"verifier_mode"`
+	CompatPatch  bool     `json:"compat_patch"`
 }
 
 func runVerify(ctx context.Context, args []string) error {
@@ -72,11 +72,10 @@ func runVerify(ctx context.Context, args []string) error {
 	cacheLevel := fs.String("cache-level", "instance", "SWE-Bench harness cache level")
 	clean := fs.Bool("clean", false, "clean harness images/containers")
 	python := fs.String("python", envOrDefault("PYTHON", "python"), "python executable")
+	docker := fs.String("docker", envOrDefault("DOCKER", "docker"), "docker executable")
 	dockerHost := fs.String("docker-host", envOrDefault("DOCKER_HOST", defaultDockerHost), "Docker host")
 	hfHome := fs.String("hf-home", os.Getenv("HF_HOME"), "HF_HOME cache path")
 	verifierMode := fs.String("verifier-mode", verifierModeCalibrated, "verifier mode: upstream, compat, or calibrated")
-	httpbinURL := fs.String("httpbin-url", os.Getenv("SWEBENCH_HTTPBIN_URL"), "HTTPBin-compatible endpoint passed to calibrated harness containers")
-	httpbinCABundle := fs.String("httpbin-ca-bundle", os.Getenv("SWEBENCH_HTTPBIN_CA_BUNDLE"), "optional CA bundle mounted into calibrated harness containers")
 	compatPatch := fs.Bool("apply-harness-compat", true, "deprecated compatibility flag; set false for clean-upstream comparison")
 	if err := fs.Parse(args); err != nil {
 		return err
@@ -100,6 +99,15 @@ func runVerify(ctx context.Context, args []string) error {
 	outputAbs := absPath(*output)
 	if err := ensureDir(*output); err != nil {
 		return err
+	}
+
+	var managedHTTPBin *managedHTTPBin
+	if mode == verifierModeCalibrated {
+		managedHTTPBin, err = ensureManagedHTTPBin(ctx, *docker, *dockerHost)
+		if err != nil {
+			return err
+		}
+		defer managedHTTPBin.Close(context.Background())
 	}
 
 	patches, err := applyHarnessPatch(ctx, *python, mode)
@@ -130,7 +138,7 @@ func runVerify(ctx context.Context, args []string) error {
 		cmdArgs = append(cmdArgs, instanceIDs...)
 	}
 
-	env := verifyEnvironment(*dockerHost, *hfHome, *httpbinURL, *httpbinCABundle, mode)
+	env := verifyEnvironment(*dockerHost, *hfHome, managedHTTPBin)
 
 	start := time.Now()
 	logPath := filepath.Join(outputAbs, "verify.log")
@@ -146,23 +154,23 @@ func runVerify(ctx context.Context, args []string) error {
 		Command:            result,
 		HarnessPatched:     patched,
 		CalibrationPatches: patches,
+		ManagedHTTPBin:     managedHTTPBinInfoPtr(managedHTTPBin),
 		Config: verifyConfig{
-			Dataset:         *dataset,
-			Split:           *split,
-			Instance:        *instance,
-			InstanceIDs:     instanceIDs,
-			Predictions:     harnessPredictionsArg(*predictions),
-			OutputDir:       outputAbs,
-			Workers:         *workers,
-			CacheLevel:      *cacheLevel,
-			Clean:           *clean,
-			Python:          *python,
-			DockerHost:      *dockerHost,
-			HFHome:          *hfHome,
-			VerifierMode:    mode,
-			CompatPatch:     mode != verifierModeUpstream,
-			HTTPBinURL:      strings.TrimSpace(*httpbinURL),
-			HTTPBinCABundle: strings.TrimSpace(*httpbinCABundle),
+			Dataset:      *dataset,
+			Split:        *split,
+			Instance:     *instance,
+			InstanceIDs:  instanceIDs,
+			Predictions:  harnessPredictionsArg(*predictions),
+			OutputDir:    outputAbs,
+			Workers:      *workers,
+			CacheLevel:   *cacheLevel,
+			Clean:        *clean,
+			Python:       *python,
+			Docker:       *docker,
+			DockerHost:   *dockerHost,
+			HFHome:       *hfHome,
+			VerifierMode: mode,
+			CompatPatch:  mode != verifierModeUpstream,
 		},
 	}
 	if err := writeJSON(filepath.Join(outputAbs, "verifier_manifest.json"), manifest); err != nil {
@@ -203,20 +211,28 @@ func resolveVerifierMode(mode string, compatPatch bool, modeSet bool, compatPatc
 	return mode, nil
 }
 
-func verifyEnvironment(dockerHost, hfHome, httpbinURL, httpbinCABundle, mode string) []string {
-	env := []string{"DOCKER_HOST=" + dockerHost}
+func verifyEnvironment(dockerHost, hfHome string, managedHTTPBin *managedHTTPBin) []string {
+	env := []string{
+		"DOCKER_HOST=" + dockerHost,
+		"SWEBENCH_HTTPBIN_URL=",
+		"SWEBENCH_HTTPBIN_CA_BUNDLE=",
+	}
+	if managedHTTPBin != nil {
+		env[1] = "SWEBENCH_HTTPBIN_URL=http://" + managedHTTPBin.Info.PublicHost
+		env[2] = "SWEBENCH_HTTPBIN_CA_BUNDLE=" + managedHTTPBin.Info.CABundle
+	}
 	if strings.TrimSpace(hfHome) != "" {
 		env = append(env, "HF_HOME="+hfHome)
 	}
-	if mode == verifierModeCalibrated {
-		if strings.TrimSpace(httpbinURL) != "" {
-			env = append(env, "SWEBENCH_HTTPBIN_URL="+strings.TrimSpace(httpbinURL))
-		}
-		if strings.TrimSpace(httpbinCABundle) != "" {
-			env = append(env, "SWEBENCH_HTTPBIN_CA_BUNDLE="+strings.TrimSpace(httpbinCABundle))
-		}
-	}
 	return env
+}
+
+func managedHTTPBinInfoPtr(managed *managedHTTPBin) *managedHTTPBinInfo {
+	if managed == nil {
+		return nil
+	}
+	info := managed.Info
+	return &info
 }
 
 func harnessPredictionsArg(predictions string) string {

@@ -23,7 +23,7 @@ The `internal/cli` package contains implementation details.
 
 | Command | Purpose |
 | --- | --- |
-| `doctor` | Check Python, Docker, SWE-Bench, mini-SWE-agent, dataset loading, model access, and optional httpbin access. |
+| `doctor` | Check Python, Docker, SWE-Bench, mini-SWE-agent, dataset loading, model access, and managed httpbin readiness. |
 | `prepare-data` | Download/load SWE-Bench Verified, validate the committed 500-case list, and write generated dataset metadata. |
 | `run-mini` | Run mini-SWE-agent and write raw predictions/traces. |
 | `verify` | Run the official local SWE-Bench harness. |
@@ -60,35 +60,34 @@ Current calibrated verifier behavior:
 | astropy log parser calibration | Yes | Maps pytest names ending in `[unit0]` back to the corresponding `[]` form used by some historical expected-test names. |
 | astropy 3.1 runtime pin | Yes | Installs `pytest==6.2.5` and `setuptools==59.8.0` for astropy 3.1 eval commands. |
 | Django 2.2 SQLite shim | Yes | Injects `PRAGMA legacy_alter_table=ON` through `sitecustomize.py` for Django 2.2 eval commands. |
-| requests httpbin runtime deps | Yes | Installs `pytest-httpbin` and `trustme` for requests eval commands. If an internal httpbin proxy is required, keep the agent-visible host as `httpbin.org`, for example `--httpbin-url http://httpbin.org`; pass `--httpbin-ca-bundle` or `SWEBENCH_HTTPBIN_CA_BUNDLE` when the proxy uses a private CA. |
+| managed requests httpbin | Yes | Starts a local managed httpbin backend and HTTP/HTTPS proxy, keeps the in-container host as `httpbin.org`, and mounts the evaluator-managed CA bundle into requests containers. |
 
 These changes do not expose gold patches, hidden tests, or test lists to the
 agent. They only affect local harness execution after a prediction has already
 been produced.
 
-### Internal httpbin proxy
+### Managed httpbin
 
-Most environments should run `verify` without httpbin-specific flags. Use the
-flags below only when the machine cannot reliably reach public `httpbin.org`
-and you have already started an internal httpbin-compatible proxy:
+Public `httpbin.org` is not part of the calibrated verifier path. When
+`verify` runs in `calibrated` mode, the evaluator manages this dependency
+itself:
 
-```bash
-go run . verify \
-  --run-id <run-id> \
-  --target <baseline-or-native> \
-  --predictions <path-to-preds.json> \
-  --httpbin-url http://httpbin.org \
-  --httpbin-ca-bundle <path-to-ca-bundle>
+```text
+results/runs/managed-httpbin/
+  certs/
+    ca.crt
+    ca.key
+    server.crt
+    server.key
+    ca-bundle.pem
 ```
 
-`--httpbin-url` intentionally keeps the host as `httpbin.org`. Some old
-`psf/requests` tests switch the URL between `http://` and `https://` while
-keeping the same host. In calibrated mode, the harness container maps
-`httpbin.org` to Docker's host gateway, so both schemes are served by the local
-proxy instead of the public internet.
+The backend container is named `swebench-managed-httpbin` and listens on
+`127.0.0.1:18081`. During `doctor` or `verify`, the evaluator process starts a
+temporary local proxy on ports `80` and `443`. For `psf/requests-*` harness
+containers, the calibrated Docker patch maps `httpbin.org` to Docker's host
+gateway and mounts `ca-bundle.pem` at the requests CA path. This preserves the
+old tests' expected host string while keeping all traffic local.
 
-`<path-to-ca-bundle>` is a path on the verifier machine to a PEM CA bundle that
-trusts the internal HTTPS proxy certificate. The evaluator mounts that file into
-the harness container and wires it into requests' CA lookup. It cannot be
-hard-coded in `verify` because the proxy address, certificate, and CA path are
-deployment-specific.
+If ports `80` or `443` are already occupied by another service, `doctor` and
+`verify` fail rather than falling back to public `httpbin.org`.
