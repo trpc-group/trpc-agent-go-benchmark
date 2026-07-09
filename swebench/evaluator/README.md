@@ -65,3 +65,30 @@ Current calibrated verifier behavior:
 These changes do not expose gold patches, hidden tests, or test lists to the
 agent. They only affect local harness execution after a prediction has already
 been produced.
+
+### Internal httpbin proxy
+
+Most environments should run `verify` without httpbin-specific flags. Use the
+flags below only when the machine cannot reliably reach public `httpbin.org`
+and you have already started an internal httpbin-compatible proxy:
+
+```bash
+go run . verify \
+  --run-id <run-id> \
+  --target <baseline-or-native> \
+  --predictions <path-to-preds.json> \
+  --httpbin-url http://httpbin.org \
+  --httpbin-ca-bundle <path-to-ca-bundle>
+```
+
+`--httpbin-url` intentionally keeps the host as `httpbin.org`. Some old
+`psf/requests` tests switch the URL between `http://` and `https://` while
+keeping the same host. In calibrated mode, the harness container maps
+`httpbin.org` to Docker's host gateway, so both schemes are served by the local
+proxy instead of the public internet.
+
+`<path-to-ca-bundle>` is a path on the verifier machine to a PEM CA bundle that
+trusts the internal HTTPS proxy certificate. The evaluator mounts that file into
+the harness container and wires it into requests' CA lookup. It cannot be
+hard-coded in `verify` because the proxy address, certificate, and CA path are
+deployment-specific.

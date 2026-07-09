@@ -132,14 +132,6 @@ go run . verify \
   --harness-workers 1
 ```
 
-If the environment uses an internal httpbin proxy for `psf/requests` cases,
-keep the verifier URL host as `httpbin.org` and let Docker `extra_hosts` route
-it to the local proxy. Add these flags to the `verify` command:
-
-```bash
---httpbin-url http://httpbin.org --httpbin-ca-bundle <path-to-ca-bundle>
-```
-
 For subset predictions, `verify` restricts the official harness to the
 prediction instance ids by default.
 

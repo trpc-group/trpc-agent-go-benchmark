@@ -129,14 +129,6 @@ go run . verify \
   --harness-workers 1
 ```
 
-如果环境为 `psf/requests` case 使用内部 httpbin proxy，verifier URL 仍应保留
-`httpbin.org` 这个 host，再由 Docker `extra_hosts` 路由到本地 proxy。将这些
-参数追加到 `verify` 命令中：
-
-```bash
---httpbin-url http://httpbin.org --httpbin-ca-bundle <path-to-ca-bundle>
-```
-
 对于 subset predictions，`verify` 默认会将官方 harness 限定到 predictions
 中的 instance ids。
 
