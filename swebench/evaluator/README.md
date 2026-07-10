@@ -4,7 +4,8 @@ This Go module is the shared evaluation layer for SWE-Bench Verified runs.
 
 It owns dataset manifest generation, official local harness invocation, result
 import, status normalization, secret scrubbing, batch planning, and run
-manifest assembly.
+manifest assembly. For long runs, it also supports shard coverage checks and
+prediction merging.
 
 ## File Layout
 
@@ -30,6 +31,32 @@ The `internal/cli` package contains implementation details.
 | `import` | Normalize predictions, traces, and verifier output into case-level results. |
 | `run-config` | Build a run-level manifest from generated artifacts. |
 | `plan-batches` | Build fixed case batches and mini-SWE-agent filters. |
+| `summarize-shards` | Summarize shard outputs, accepted case coverage, missing cases, and total runtime. |
+| `merge-predictions` | Merge accepted shard predictions into one canonical predictions file. |
+
+## Sharded Full Runs
+
+Long 500-case runs should be split into fixed shards. `plan-batches` writes the
+case filters for each shard. After running the shards with an implementation,
+use `summarize-shards` to produce a `shards.json` manifest:
+
+```bash
+go run . summarize-shards --plan ../data/generated/batches/plan.json --runs-root ../results/runs --output ../results/runs/<full-run-id>/shards.json
+```
+
+The manifest treats case-level agent outcomes as valid results when a trajectory
+and prediction exist. `LimitsExceeded`, empty patches, and unresolved patches do
+not force a shard rerun. Missing trajectories, corrupt JSON, missing
+predictions, or duplicated accepted cases are reported for targeted recovery.
+
+After coverage is complete, merge accepted predictions:
+
+```bash
+go run . merge-predictions --shards ../results/runs/<full-run-id>/shards.json --cases ../data/generated/cases.jsonl --output ../results/runs/<full-run-id>/preds.json
+```
+
+The merge command fails if any canonical case is missing unless
+`--allow-missing` is explicitly set.
 
 ## Local Compatibility Notes
 
