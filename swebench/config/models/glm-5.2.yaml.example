@@ -8,6 +8,8 @@ model:
     drop_params: true
     parallel_tool_calls: true
     reasoning_effort: high
+    allowed_openai_params:
+      - reasoning_effort
     extra_headers:
       X-SMG-Routing-Key: ""
       X-SMG-Agent-Name: BenchSWE
