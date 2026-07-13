@@ -14,6 +14,7 @@ mkdir -p swebench/results/runs/repos
 git clone https://github.com/SWE-agent/mini-swe-agent.git swebench/results/runs/repos/mini-swe-agent
 git -C swebench/results/runs/repos/mini-swe-agent checkout v2.1.0
 pip install -e swebench/results/runs/repos/mini-swe-agent
+pip install fastapi orjson
 ```
 
 Record the actual commit in `run_config.json`.
