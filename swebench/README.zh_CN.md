@@ -70,6 +70,8 @@ git clone https://github.com/SWE-bench/SWE-bench.git swebench/results/runs/repos
 pip install -e swebench/results/runs/repos/SWE-bench
 ```
 
+后续 quick start 命令默认继续使用这个已激活的虚拟环境。
+
 mini-SWE-agent baseline runner 的安装和运行见
 [`mini-swe-agent-impl/README.md`](mini-swe-agent-impl/README.md)。
 
@@ -96,6 +98,11 @@ go run ./evaluator doctor \
 
 命令会在终端输出简洁的 `ok/fail` 摘要，并将完整细节写入
 `results/runs/doctor/doctor.json`。
+
+健康的 evaluator 环境下，`doctor` 应在 Python、SWE-Bench、Docker、数据集
+加载、managed httpbin 和模型 smoke 检查上返回 `ok`。按
+`mini-swe-agent-impl/README.md` 安装 baseline runner 后，mini-SWE-agent
+检查也应返回 `ok`。
 
 ### 4. 下载数据
 

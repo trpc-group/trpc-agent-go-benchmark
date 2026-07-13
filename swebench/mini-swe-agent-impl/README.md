@@ -24,8 +24,10 @@ Record the actual commit in `run_config.json`.
 ```bash
 cd swebench
 
-RUN_ID=baseline-mini-glm50-smoke
-MODEL_CONFIG=config/models/glm-5.0.local.yaml
+RUN_ID=baseline-mini-glm52-smoke
+MODEL_CONFIG=config/models/glm-5.2.local.yaml
+MODEL_NAME=glm-5.2
+MINI_MODEL_NAME=openai/glm-5.2
 
 go run ./evaluator run-mini \
   --run-id "$RUN_ID" \
@@ -33,6 +35,7 @@ go run ./evaluator run-mini \
   --split test \
   --filter '^astropy__astropy-12907$' \
   --agent-workers 1 \
+  --timeout 30m \
   --output "results/runs/$RUN_ID/raw/mini" \
   --model-config "$MODEL_CONFIG" \
   --environment-config config/environments/swebench-testbed.yaml \
@@ -64,15 +67,20 @@ go run ./evaluator run-config \
   --import-summary "results/runs/$RUN_ID/imported/summary/baseline.json" \
   --harness-report "$HARNESS_REPORT" \
   --doctor results/runs/doctor/doctor.json \
-  --model-name glm-5.0 \
-  --mini-model-name openai/glm-5.0 \
+  --model-name "$MODEL_NAME" \
+  --mini-model-name "$MINI_MODEL_NAME" \
   --reasoning-effort high \
-  --timeout 120 \
+  --timeout 1800 \
   --output "results/runs/$RUN_ID/run_config.json"
 ```
 
 The smoke run should write `preds.json`, a trajectory, a verifier report,
 normalized imported results, and `run_config.json`.
+
+`doctor` sends a small model request. This smoke run sends the real SWE-Bench
+prompt through mini-SWE-agent, so it can take several minutes before the first
+trajectory is written. Keep the `--timeout` flag so the run fails explicitly if
+the endpoint stalls.
 
 ## Full 500-Case Run
 
@@ -82,9 +90,11 @@ recommended because it makes endpoint failures recoverable at batch granularity.
 ```bash
 cd swebench
 
-RUN_PREFIX=baseline-mini-glm50-full
+RUN_PREFIX=baseline-mini-glm52-full
 PLAN_DIR=data/generated/batches/$RUN_PREFIX
-MODEL_CONFIG=config/models/glm-5.0.local.yaml
+MODEL_CONFIG=config/models/glm-5.2.local.yaml
+MODEL_NAME=glm-5.2
+MINI_MODEL_NAME=openai/glm-5.2
 
 go run ./evaluator plan-batches \
   --cases data/generated/cases.jsonl \
@@ -107,6 +117,7 @@ for filter_file in "$PLAN_DIR"/batch-*.filter; do
     --split test \
     --filter "$(cat "$filter_file")" \
     --agent-workers 15 \
+    --timeout 2h \
     --output "results/runs/$run_id/raw/mini" \
     --model-config "$MODEL_CONFIG" \
     --environment-config config/environments/swebench-testbed.yaml \
@@ -157,10 +168,10 @@ go run ./evaluator run-config \
   --import-summary "results/runs/$RUN_PREFIX/imported/summary/baseline.json" \
   --harness-report "$HARNESS_REPORT" \
   --doctor results/runs/doctor/doctor.json \
-  --model-name glm-5.0 \
-  --mini-model-name openai/glm-5.0 \
+  --model-name "$MODEL_NAME" \
+  --mini-model-name "$MINI_MODEL_NAME" \
   --reasoning-effort high \
-  --timeout 120 \
+  --timeout 7200 \
   --output "results/runs/$RUN_PREFIX/run_config.json"
 ```
 

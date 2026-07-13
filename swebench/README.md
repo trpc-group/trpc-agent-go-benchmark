@@ -72,6 +72,9 @@ git clone https://github.com/SWE-bench/SWE-bench.git swebench/results/runs/repos
 pip install -e swebench/results/runs/repos/SWE-bench
 ```
 
+Keep this virtual environment activated for the remaining commands in this
+quick start.
+
 For the mini-SWE-agent baseline runner, see
 [`mini-swe-agent-impl/README.md`](mini-swe-agent-impl/README.md).
 
@@ -99,6 +102,11 @@ go run ./evaluator doctor \
 
 The command prints a concise `ok/fail` summary and writes the full details to
 `results/runs/doctor/doctor.json`.
+
+For a healthy evaluator setup, `doctor` should report `ok` for Python,
+SWE-Bench, Docker, dataset loading, managed httpbin, and model smoke checks.
+The mini-SWE-agent check is also expected to be `ok` after installing the
+baseline runner from `mini-swe-agent-impl/README.md`.
 
 ### 4. Download dataset
 
