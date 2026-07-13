@@ -21,11 +21,14 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"trpc.group/trpc-go/trpc-agent-go-benchmark/swebench/internal/artifact"
+	"trpc.group/trpc-go/trpc-agent-go-benchmark/swebench/internal/contract"
 )
 
 type prepareDataOutput struct {
-	Revision string         `json:"revision"`
-	Cases    []caseManifest `json:"cases"`
+	Revision string          `json:"revision"`
+	Cases    []contract.Case `json:"cases"`
 }
 
 type prepareDataManifest struct {
@@ -44,7 +47,7 @@ type prepareDataManifest struct {
 
 func runPrepareData(ctx context.Context, args []string) error {
 	fs := flag.NewFlagSet("prepare-data", flag.ExitOnError)
-	output := fs.String("output", "../data/generated", "output directory for cases.jsonl and cases.sha256")
+	output := fs.String("output", "data/generated", "output directory for cases.jsonl and cases.sha256")
 	dataset := fs.String("dataset", defaultDatasetName, "SWE-Bench dataset name")
 	split := fs.String("split", defaultSplit, "dataset split")
 	python := fs.String("python", envOrDefault("PYTHON", "python"), "python executable")
@@ -86,7 +89,7 @@ func runPrepareData(ctx context.Context, args []string) error {
 		}
 	}
 	casesPath := filepath.Join(*output, "cases.jsonl")
-	if err := writeCasesJSONL(casesPath, loaded.Cases); err != nil {
+	if err := artifact.WriteCasesJSONL(casesPath, loaded.Cases); err != nil {
 		return err
 	}
 	if err := os.WriteFile(filepath.Join(*output, "cases.sha256"), []byte(hash+"\n"), 0o644); err != nil {
@@ -157,7 +160,7 @@ print(json.dumps({"revision": revision, "cases": cases}, ensure_ascii=False))
 	return out, nil
 }
 
-func validateCaseList(cases []caseManifest) error {
+func validateCaseList(cases []contract.Case) error {
 	seen := map[string]bool{}
 	for _, c := range cases {
 		if strings.TrimSpace(c.InstanceID) == "" {
@@ -174,7 +177,7 @@ func validateCaseList(cases []caseManifest) error {
 	return nil
 }
 
-func caseListHash(cases []caseManifest) string {
+func caseListHash(cases []contract.Case) string {
 	ids := make([]string, 0, len(cases))
 	for _, c := range cases {
 		ids = append(ids, c.InstanceID)
@@ -184,7 +187,7 @@ func caseListHash(cases []caseManifest) string {
 	return hex.EncodeToString(sum[:])
 }
 
-func validateExpectedCaseIDs(path string, cases []caseManifest) error {
+func validateExpectedCaseIDs(path string, cases []contract.Case) error {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return fmt.Errorf("read expected case ids: %w", err)
@@ -251,22 +254,6 @@ func fileExists(path string) bool {
 	}
 	info, err := os.Stat(path)
 	return err == nil && !info.IsDir()
-}
-
-func writeCasesJSONL(path string, cases []caseManifest) error {
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return err
-	}
-	var b strings.Builder
-	for _, c := range cases {
-		data, err := json.Marshal(c)
-		if err != nil {
-			return err
-		}
-		b.Write(data)
-		b.WriteByte('\n')
-	}
-	return os.WriteFile(path, []byte(b.String()), 0o644)
 }
 
 func hintsPolicy(includeHints bool) string {

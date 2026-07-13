@@ -44,12 +44,12 @@ type doctorCheck struct {
 func runDoctor(ctx context.Context, args []string) error {
 	fs := flag.NewFlagSet("doctor", flag.ExitOnError)
 	runID := fs.String("run-id", "doctor-smoke", "run id for output paths")
-	output := fs.String("output", "../results/runs/doctor-smoke", "output directory")
+	output := fs.String("output", "results/runs/doctor-smoke", "output directory")
 	python := fs.String("python", envOrDefault("PYTHON", "python"), "python executable")
 	miniExtra := fs.String("mini-extra", envOrDefault("MINI_EXTRA", "mini-extra"), "mini-extra executable")
 	docker := fs.String("docker", envOrDefault("DOCKER", "docker"), "docker executable")
 	dockerHost := fs.String("docker-host", envOrDefault("DOCKER_HOST", defaultDockerHost), "Docker host")
-	modelConfig := fs.String("model-config", "../config/models/glm-5.2.local.yaml", "ignored model YAML config for model smoke")
+	modelConfig := fs.String("model-config", "config/models/glm-5.2.local.yaml", "ignored model YAML config for model smoke")
 	timeout := fs.Duration("model-timeout", 60*time.Second, "model smoke timeout")
 	if err := fs.Parse(args); err != nil {
 		return err

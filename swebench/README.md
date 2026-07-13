@@ -81,27 +81,29 @@ For the mini-SWE-agent baseline runner, see
 cp swebench/config/models/glm-5.2.yaml.example swebench/config/models/glm-5.2.local.yaml
 ```
 
-Fill in the endpoint, API key, and required gateway headers in the local YAML.
-Local model config is ignored by git.
+Use the matching template for other models, for example
+`config/models/glm-5.0.yaml.example`. Fill in the endpoint, API key, and
+required gateway headers in the local YAML. Local model config is ignored by
+git.
 
 ### 3. Check evaluator and model access
 
 ```bash
-cd swebench/evaluator
+cd swebench
 
-go run . doctor \
+go run ./evaluator doctor \
   --run-id swebench-doctor \
-  --output ../results/runs/doctor \
-  --model-config ../config/models/glm-5.2.local.yaml
+  --output results/runs/doctor \
+  --model-config config/models/glm-5.2.local.yaml
 ```
 
 The command prints a concise `ok/fail` summary and writes the full details to
-`../results/runs/doctor/doctor.json`.
+`results/runs/doctor/doctor.json`.
 
 ### 4. Download dataset
 
 ```bash
-go run . prepare-data --python python
+go run ./evaluator prepare-data --python python
 ```
 
 This downloads SWE-Bench Verified if needed, checks it against the committed
@@ -124,11 +126,11 @@ After an implementation produces SWE-Bench predictions, verify them with the
 official local harness:
 
 ```bash
-go run . verify \
+go run ./evaluator verify \
   --run-id <run-id> \
-  --target baseline \
+  --target <baseline-or-native> \
   --predictions <path-to-preds.json> \
-  --output ../results/runs/<run-id>/local-harness-report/baseline \
+  --output results/runs/<run-id>/local-harness-report/<baseline-or-native> \
   --harness-workers 1
 ```
 
@@ -138,14 +140,34 @@ prediction instance ids by default.
 ### 7. Normalize results
 
 ```bash
-go run . import \
-  --target baseline \
-  --cases ../data/generated/cases.jsonl \
+go run ./evaluator import \
+  --target <baseline-or-native> \
+  --cases data/generated/cases.jsonl \
   --predictions <path-to-preds.json> \
   --raw-dir <path-to-raw-run-dir> \
   --harness-report <path-to-harness-report.json> \
-  --output ../results/runs/<run-id>/imported
+  --output results/runs/<run-id>/imported
 ```
 
 This converts predictions and verifier output into the common case-level result
 format used by reports.
+
+### 8. Write run config
+
+For a single runner manifest:
+
+```bash
+go run ./evaluator run-config \
+  --run-id <run-id> \
+  --target <baseline-or-native> \
+  --cases-manifest data/generated/cases.manifest.json \
+  --runner-manifest <path-to-runner-manifest.json> \
+  --verifier-manifest results/runs/<run-id>/local-harness-report/<baseline-or-native>/verifier_manifest.json \
+  --import-summary results/runs/<run-id>/imported/summary/<baseline-or-native>.json \
+  --harness-report <path-to-harness-report.json> \
+  --model-name <model-name> \
+  --output results/runs/<run-id>/run_config.json
+```
+
+For a sharded mini-SWE-agent full run, use `--shards-manifest` instead of
+`--runner-manifest`.

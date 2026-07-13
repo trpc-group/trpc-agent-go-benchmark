@@ -59,7 +59,7 @@ type managedHTTPBin struct {
 }
 
 func ensureManagedHTTPBin(ctx context.Context, docker, dockerHost string) (*managedHTTPBin, error) {
-	baseDir := absPath(filepath.Join("..", "results", "runs", "managed-httpbin"))
+	baseDir := absPath(filepath.Join("results", "runs", "managed-httpbin"))
 	certDir := filepath.Join(baseDir, "certs")
 	certs, err := ensureManagedHTTPBinCerts(certDir)
 	if err != nil {

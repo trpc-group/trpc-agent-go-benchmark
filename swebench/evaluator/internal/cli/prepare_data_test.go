@@ -13,10 +13,12 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"trpc.group/trpc-go/trpc-agent-go-benchmark/swebench/internal/contract"
 )
 
 func TestValidateExpectedCaseIDsAndHash(t *testing.T) {
-	cases := []caseManifest{
+	cases := []contract.Case{
 		{InstanceID: "b"},
 		{InstanceID: "a"},
 	}

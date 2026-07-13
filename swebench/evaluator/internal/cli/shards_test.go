@@ -15,6 +15,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"trpc.group/trpc-go/trpc-agent-go-benchmark/swebench/internal/contract"
 )
 
 func TestSummarizeShardPlanAcceptsCaseLevelResults(t *testing.T) {
@@ -29,7 +31,7 @@ func TestSummarizeShardPlanAcceptsCaseLevelResults(t *testing.T) {
 	})
 	rawDir := filepath.Join(dir, "run-000", "raw", "mini")
 	writeTestRunMiniManifest(t, rawDir, 15)
-	writeTestPreds(t, rawDir, map[string]prediction{
+	writeTestPreds(t, rawDir, map[string]contract.Prediction{
 		"case-a": {ModelNameOrPath: "model", InstanceID: "case-a", ModelPatch: "diff --git a/a b/a\n+++ b/a\n+ok\n"},
 		"case-b": {ModelNameOrPath: "model", InstanceID: "case-b", ModelPatch: ""},
 	})
@@ -61,7 +63,7 @@ func TestAcceptedPredictionsRejectsDuplicateCases(t *testing.T) {
 	dir := t.TempDir()
 	for _, runID := range []string{"run-000", "run-001"} {
 		rawDir := filepath.Join(dir, runID, "raw", "mini")
-		writeTestPreds(t, rawDir, map[string]prediction{
+		writeTestPreds(t, rawDir, map[string]contract.Prediction{
 			"case-a": {ModelNameOrPath: "model", InstanceID: "case-a", ModelPatch: "patch"},
 		})
 	}
@@ -95,7 +97,7 @@ func TestOrderPredictionsRequiresCanonicalCompleteness(t *testing.T) {
 	if err := os.WriteFile(casesPath, []byte(`{"instance_id":"case-a"}`+"\n"+`{"instance_id":"case-b"}`+"\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	_, err := orderPredictions(map[string]prediction{
+	_, err := orderPredictions(map[string]contract.Prediction{
 		"case-a": {InstanceID: "case-a"},
 	}, casesPath, false)
 	if err == nil || !strings.Contains(err.Error(), "missing 1 canonical predictions") {
@@ -131,7 +133,7 @@ func writeTestRunMiniManifest(t *testing.T, rawDir string, workers int) {
 	}
 }
 
-func writeTestPreds(t *testing.T, rawDir string, preds map[string]prediction) {
+func writeTestPreds(t *testing.T, rawDir string, preds map[string]contract.Prediction) {
 	t.Helper()
 	if err := writeJSON(filepath.Join(rawDir, "preds.json"), preds); err != nil {
 		t.Fatal(err)

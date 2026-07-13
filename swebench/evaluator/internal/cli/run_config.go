@@ -95,6 +95,8 @@ type runConfigVerifier struct {
 type runConfigArtifacts struct {
 	CasesManifest     string `json:"cases_manifest"`
 	CasesJSONL        string `json:"cases_jsonl,omitempty"`
+	RunnerOutputDir   string `json:"runner_output_dir,omitempty"`
+	RunnerLog         string `json:"runner_log,omitempty"`
 	MiniRawDir        string `json:"mini_raw_dir,omitempty"`
 	MiniLog           string `json:"mini_log,omitempty"`
 	Predictions       string `json:"predictions,omitempty"`
@@ -114,18 +116,35 @@ type runConfigServiceFindings struct {
 type runConfigSourceFiles struct {
 	DoctorManifest   string `json:"doctor_manifest,omitempty"`
 	CasesManifest    string `json:"cases_manifest"`
-	RunMiniManifest  string `json:"run_mini_manifest"`
+	RunMiniManifest  string `json:"run_mini_manifest,omitempty"`
+	RunnerManifest   string `json:"runner_manifest,omitempty"`
+	ShardsManifest   string `json:"shards_manifest,omitempty"`
 	VerifierManifest string `json:"verifier_manifest"`
 	ImportSummary    string `json:"import_summary"`
+}
+
+type runnerManifest struct {
+	RunID       string            `json:"run_id"`
+	RunnerType  string            `json:"runner_type"`
+	StartedAt   time.Time         `json:"started_at"`
+	FinishedAt  time.Time         `json:"finished_at"`
+	DurationMS  int64             `json:"duration_ms"`
+	OutputDir   string            `json:"output_dir"`
+	CaseCount   int               `json:"case_count"`
+	Predictions string            `json:"predictions"`
+	ModelConfig map[string]string `json:"model_config,omitempty"`
+	Status      string            `json:"status,omitempty"`
 }
 
 func runRunConfig(args []string) error {
 	fs := flag.NewFlagSet("run-config", flag.ExitOnError)
 	runID := fs.String("run-id", "", "run id")
 	target := fs.String("target", "baseline", "baseline or native")
-	output := fs.String("output", "", "output run_config.json path; defaults to ../results/runs/<run-id>/run_config.json")
+	output := fs.String("output", "", "output run_config.json path; defaults to results/runs/<run-id>/run_config.json")
 	casesManifestPath := fs.String("cases-manifest", "", "cases.manifest.json path")
-	runMiniManifestPath := fs.String("run-mini-manifest", "", "run-mini-manifest.json path")
+	runMiniManifestPath := fs.String("run-mini-manifest", "", "run-mini-manifest.json path; deprecated alias for mini baseline")
+	runnerManifestPath := fs.String("runner-manifest", "", "generic runner manifest path")
+	shardsManifestPath := fs.String("shards-manifest", "", "summarize-shards output path for sharded mini baseline")
 	verifierManifestPath := fs.String("verifier-manifest", "", "verifier_manifest.json path")
 	importSummaryPath := fs.String("import-summary", "", "normalized import summary JSON path")
 	harnessReportPath := fs.String("harness-report", "", "optional official harness report JSON path")
@@ -143,7 +162,6 @@ func runRunConfig(args []string) error {
 	for name, value := range map[string]string{
 		"run-id":            *runID,
 		"cases-manifest":    *casesManifestPath,
-		"run-mini-manifest": *runMiniManifestPath,
 		"verifier-manifest": *verifierManifestPath,
 		"import-summary":    *importSummaryPath,
 		"model-name":        *modelName,
@@ -152,8 +170,14 @@ func runRunConfig(args []string) error {
 			return err
 		}
 	}
+	if strings.TrimSpace(*runnerManifestPath) == "" && strings.TrimSpace(*shardsManifestPath) == "" {
+		*runnerManifestPath = *runMiniManifestPath
+	}
+	if strings.TrimSpace(*runnerManifestPath) == "" && strings.TrimSpace(*shardsManifestPath) == "" {
+		return fmt.Errorf("missing required flag -runner-manifest, -run-mini-manifest, or -shards-manifest")
+	}
 	if *output == "" {
-		*output = filepath.Join("..", "results", "runs", *runID, "run_config.json")
+		*output = filepath.Join("results", "runs", *runID, "run_config.json")
 	}
 
 	var casesManifest prepareDataManifest
@@ -161,8 +185,25 @@ func runRunConfig(args []string) error {
 		return fmt.Errorf("read cases manifest: %w", err)
 	}
 	var miniManifest runMiniManifest
-	if err := readJSONFile(*runMiniManifestPath, &miniManifest); err != nil {
-		return fmt.Errorf("read run-mini manifest: %w", err)
+	hasShardsManifest := strings.TrimSpace(*shardsManifestPath) != ""
+	hasMiniManifest := strings.TrimSpace(*runMiniManifestPath) != "" || strings.Contains(filepath.Base(*runnerManifestPath), "run-mini")
+	if hasMiniManifest {
+		if err := readJSONFile(*runnerManifestPath, &miniManifest); err != nil {
+			return fmt.Errorf("read run-mini manifest: %w", err)
+		}
+	}
+	var genericManifest runnerManifest
+	if !hasMiniManifest && !hasShardsManifest {
+		if err := readJSONFile(*runnerManifestPath, &genericManifest); err != nil {
+			return fmt.Errorf("read runner manifest: %w", err)
+		}
+	}
+	var shardManifest shardsManifest
+	if hasShardsManifest {
+		hasMiniManifest = false
+		if err := readJSONFile(*shardsManifestPath, &shardManifest); err != nil {
+			return fmt.Errorf("read shards manifest: %w", err)
+		}
 	}
 	var verifierManifest verifyManifest
 	if err := readJSONFile(*verifierManifestPath, &verifierManifest); err != nil {
@@ -196,6 +237,50 @@ func runRunConfig(args []string) error {
 		parameters = nil
 	}
 
+	runnerType := "mini-swe-agent"
+	runnerStartedAt := formatTime(miniManifest.StartedAt)
+	runnerFinishedAt := formatTime(miniManifest.FinishedAt)
+	runnerDurationMS := miniManifest.DurationMS
+	agentWorkers := miniManifest.Config.Workers
+	configReference := miniManifest.Config.MiniConfig
+	predictionsPath := filepath.Join(miniManifest.Config.OutputDir, "preds.json")
+	outputDir := miniManifest.Config.OutputDir
+	runnerLog := miniManifest.Command.LogPath
+	miniExtra := miniManifest.Config.MiniExtra
+	baseConfig := miniManifest.Config.BaseConfig
+	privateConfig := miniManifest.Config.MiniConfig
+	serviceFindings := scanServiceFindings(runnerLog)
+	miniRawDir := outputDir
+	miniLog := runnerLog
+	if !hasMiniManifest {
+		runnerType = defaultIfEmpty(genericManifest.RunnerType, "unknown")
+		runnerStartedAt = formatTime(genericManifest.StartedAt)
+		runnerFinishedAt = formatTime(genericManifest.FinishedAt)
+		runnerDurationMS = genericManifest.DurationMS
+		predictionsPath = genericManifest.Predictions
+		outputDir = genericManifest.OutputDir
+		serviceFindings = runConfigServiceFindings{}
+		miniRawDir = ""
+		miniLog = ""
+	}
+	if hasShardsManifest {
+		runnerType = "mini-swe-agent-sharded"
+		runnerStartedAt = shardManifest.StartedAt
+		runnerFinishedAt = shardManifest.FinishedAt
+		runnerDurationMS = shardManifest.WallDurationMS
+		agentWorkers = maxShardWorkers(shardManifest)
+		configReference = ""
+		predictionsPath = verifierManifest.Config.Predictions
+		outputDir = filepath.Dir(absPath(*shardsManifestPath))
+		runnerLog = ""
+		miniExtra = ""
+		baseConfig = ""
+		privateConfig = ""
+		serviceFindings = runConfigServiceFindings{}
+		miniRawDir = ""
+		miniLog = ""
+	}
+
 	doc := runConfigDocument{
 		RunID:       *runID,
 		Target:      *target,
@@ -216,20 +301,20 @@ func runRunConfig(args []string) error {
 			MiniModelName:   *miniModelName,
 			EndpointID:      *endpointID,
 			Parameters:      parameters,
-			ConfigReference: miniManifest.Config.MiniConfig,
+			ConfigReference: configReference,
 		},
 		Runner: runConfigRunner{
-			Type:                "mini-swe-agent",
+			Type:                runnerType,
 			MiniSWEAgentVersion: miniSWEAgentVersion(doctor),
-			MiniExtra:           miniManifest.Config.MiniExtra,
-			BaseConfig:          miniManifest.Config.BaseConfig,
-			PrivateConfig:       miniManifest.Config.MiniConfig,
-			StartedAt:           formatTime(miniManifest.StartedAt),
-			FinishedAt:          formatTime(miniManifest.FinishedAt),
-			DurationMS:          miniManifest.DurationMS,
+			MiniExtra:           miniExtra,
+			BaseConfig:          baseConfig,
+			PrivateConfig:       privateConfig,
+			StartedAt:           runnerStartedAt,
+			FinishedAt:          runnerFinishedAt,
+			DurationMS:          runnerDurationMS,
 		},
 		Concurrency: runConfigConcurrency{
-			AgentGenerationWorkers: miniManifest.Config.Workers,
+			AgentGenerationWorkers: agentWorkers,
 			HarnessWorkers:         verifierManifest.Config.Workers,
 		},
 		Verifier: runConfigVerifier{
@@ -251,9 +336,11 @@ func runRunConfig(args []string) error {
 		Artifacts: runConfigArtifacts{
 			CasesManifest:     absPath(*casesManifestPath),
 			CasesJSONL:        filepath.Join(casesManifest.OutputDir, "cases.jsonl"),
-			MiniRawDir:        miniManifest.Config.OutputDir,
-			MiniLog:           miniManifest.Command.LogPath,
-			Predictions:       filepath.Join(miniManifest.Config.OutputDir, "preds.json"),
+			RunnerOutputDir:   outputDir,
+			RunnerLog:         runnerLog,
+			MiniRawDir:        miniRawDir,
+			MiniLog:           miniLog,
+			Predictions:       predictionsPath,
 			VerifierReportDir: verifierManifest.Config.OutputDir,
 			HarnessReport:     absPath(*harnessReportPath),
 			ImportedDir:       filepath.Dir(filepath.Dir(absPath(*importSummaryPath))),
@@ -261,12 +348,14 @@ func runRunConfig(args []string) error {
 			ImportSummary:     absPath(*importSummaryPath),
 		},
 		ResultSummary:   summary,
-		ServiceFindings: scanServiceFindings(miniManifest.Command.LogPath),
+		ServiceFindings: serviceFindings,
 		Notes:           splitNotes(*notes),
 		SourceFiles: runConfigSourceFiles{
 			DoctorManifest:   absPath(*doctorPath),
 			CasesManifest:    absPath(*casesManifestPath),
 			RunMiniManifest:  absPath(*runMiniManifestPath),
+			RunnerManifest:   absPath(*runnerManifestPath),
+			ShardsManifest:   absPath(*shardsManifestPath),
 			VerifierManifest: absPath(*verifierManifestPath),
 			ImportSummary:    absPath(*importSummaryPath),
 		},
@@ -283,6 +372,16 @@ func runRunConfig(args []string) error {
 		}
 	}
 	return writeJSON(*output, doc)
+}
+
+func maxShardWorkers(manifest shardsManifest) int {
+	maxWorkers := 0
+	for _, shard := range manifest.Shards {
+		if shard.Workers > maxWorkers {
+			maxWorkers = shard.Workers
+		}
+	}
+	return maxWorkers
 }
 
 func readJSONFile(path string, v any) error {

@@ -1,6 +1,6 @@
 # SWE-Bench Evaluator
 
-This Go module is the shared evaluation layer for SWE-Bench Verified runs.
+This package is the shared evaluation layer for SWE-Bench Verified runs.
 
 It owns dataset manifest generation, official local harness invocation, result
 import, status normalization, secret scrubbing, batch planning, and run
@@ -12,13 +12,14 @@ prediction merging.
 ```text
 evaluator/
   README.md
-  go.mod
   main.go              # Thin CLI entrypoint.
   internal/cli/        # Command implementations and helpers.
 ```
 
 Most readers only need the commands documented in the root SWE-Bench README.
 The `internal/cli` package contains implementation details.
+
+Run evaluator commands from the `swebench/` root with `go run ./evaluator ...`.
 
 ## Commands
 
@@ -41,7 +42,7 @@ case filters for each shard. After running the shards with an implementation,
 use `summarize-shards` to produce a `shards.json` manifest:
 
 ```bash
-go run . summarize-shards --plan ../data/generated/batches/plan.json --runs-root ../results/runs --output ../results/runs/<full-run-id>/shards.json
+go run ./evaluator summarize-shards --plan data/generated/batches/plan.json --runs-root results/runs --output results/runs/<full-run-id>/shards.json
 ```
 
 The manifest treats case-level agent outcomes as valid results when a trajectory
@@ -52,7 +53,7 @@ predictions, or duplicated accepted cases are reported for targeted recovery.
 After coverage is complete, merge accepted predictions:
 
 ```bash
-go run . merge-predictions --shards ../results/runs/<full-run-id>/shards.json --cases ../data/generated/cases.jsonl --output ../results/runs/<full-run-id>/preds.json
+go run ./evaluator merge-predictions --shards results/runs/<full-run-id>/shards.json --cases data/generated/cases.jsonl --output results/runs/<full-run-id>/preds.json
 ```
 
 The merge command fails if any canonical case is missing unless
@@ -62,7 +63,7 @@ The merge command fails if any canonical case is missing unless
 
 Some SWE-Bench repositories are old projects with dependency stacks that live in
 the official `testbed` conda environment. The mini-SWE-agent environment config
-at `../config/environments/swebench-testbed.yaml` makes agent shell commands run
+at `config/environments/swebench-testbed.yaml` makes agent shell commands run
 inside that environment instead of the container default Python.
 
 `verify` has three verifier modes:
@@ -82,7 +83,7 @@ Current calibrated verifier behavior:
 
 | Compatibility item | Applied in `calibrated`? | Notes |
 | --- | --- | --- |
-| mini-SWE-agent command environment | Yes | `run-mini` passes `../config/environments/swebench-testbed.yaml`, so agent shell commands run inside the official `testbed` conda environment. |
+| mini-SWE-agent command environment | Yes | `run-mini` passes `config/environments/swebench-testbed.yaml`, so agent shell commands run inside the official `testbed` conda environment. |
 | Docker API / seccomp harness patch | Yes | Enabled by default through `--verifier-mode=calibrated`. |
 | astropy log parser calibration | Yes | Maps pytest names ending in `[unit0]` back to the corresponding `[]` form used by some historical expected-test names. |
 | astropy 3.1 runtime pin | Yes | Installs `pytest==6.2.5` and `setuptools==59.8.0` for astropy 3.1 eval commands. |

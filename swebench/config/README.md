@@ -8,6 +8,12 @@ Shared benchmark configuration templates live here.
 cp swebench/config/models/glm-5.2.yaml.example swebench/config/models/glm-5.2.local.yaml
 ```
 
+For GLM-5.0 baseline runs:
+
+```bash
+cp swebench/config/models/glm-5.0.yaml.example swebench/config/models/glm-5.0.local.yaml
+```
+
 The committed MiniMax M2.5 baseline used this config name:
 
 ```bash

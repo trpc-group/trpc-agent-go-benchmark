@@ -19,45 +19,28 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"trpc.group/trpc-go/trpc-agent-go-benchmark/swebench/internal/artifact"
+	"trpc.group/trpc-go/trpc-agent-go-benchmark/swebench/internal/contract"
 )
 
-type prediction struct {
-	ModelNameOrPath string `json:"model_name_or_path"`
-	InstanceID      string `json:"instance_id"`
-	ModelPatch      string `json:"model_patch"`
-}
-
-type caseManifest struct {
-	InstanceID       string `json:"instance_id"`
-	Repo             string `json:"repo,omitempty"`
-	BaseCommit       string `json:"base_commit,omitempty"`
-	ProblemStatement string `json:"problem_statement,omitempty"`
-	HintsText        string `json:"hints_text,omitempty"`
-}
-
 type importedCase struct {
-	InstanceID string       `json:"instance_id"`
-	Repo       string       `json:"repo,omitempty"`
-	BaseCommit string       `json:"base_commit,omitempty"`
-	Baseline   targetResult `json:"baseline"`
+	InstanceID string        `json:"instance_id"`
+	Repo       string        `json:"repo,omitempty"`
+	BaseCommit string        `json:"base_commit,omitempty"`
+	Baseline   *targetResult `json:"baseline,omitempty"`
+	Native     *targetResult `json:"native,omitempty"`
 }
 
 type targetResult struct {
-	MainStatus        string     `json:"main_status"`
-	FailureReason     string     `json:"failure_reason,omitempty"`
-	ModelNameOrPath   string     `json:"model_name_or_path,omitempty"`
-	PatchPath         string     `json:"patch_path,omitempty"`
-	TracePath         string     `json:"trace_path,omitempty"`
-	VerifierResultRef string     `json:"verifier_result_ref,omitempty"`
-	PatchStats        patchStats `json:"patch_stats"`
-	Usage             usageStats `json:"usage"`
-}
-
-type patchStats struct {
-	ChangedFiles []string `json:"changed_files"`
-	AddedLines   int      `json:"added_lines"`
-	DeletedLines int      `json:"deleted_lines"`
-	PatchLines   int      `json:"patch_lines"`
+	MainStatus        string              `json:"main_status"`
+	FailureReason     string              `json:"failure_reason,omitempty"`
+	ModelNameOrPath   string              `json:"model_name_or_path,omitempty"`
+	PatchPath         string              `json:"patch_path,omitempty"`
+	TracePath         string              `json:"trace_path,omitempty"`
+	VerifierResultRef string              `json:"verifier_result_ref,omitempty"`
+	PatchStats        artifact.PatchStats `json:"patch_stats"`
+	Usage             usageStats          `json:"usage"`
 }
 
 type usageStats struct {
@@ -80,6 +63,7 @@ func runImport(args []string) error {
 	casesPath := fs.String("cases", "", "optional canonical cases.jsonl")
 	predsPath := fs.String("predictions", "", "mini preds.json path")
 	rawDir := fs.String("raw-dir", "", "mini raw output directory containing per-case trajectories")
+	shardsManifestPath := fs.String("shards-manifest", "", "optional summarize-shards output path for sharded trajectories")
 	harnessReport := fs.String("harness-report", "", "SWE-Bench harness report JSON path")
 	output := fs.String("output", "", "normalized output directory")
 	if err := fs.Parse(args); err != nil {
@@ -91,8 +75,8 @@ func runImport(args []string) error {
 	if err := required(fs, "output", *output); err != nil {
 		return err
 	}
-	if *target != "baseline" {
-		return fmt.Errorf("only -target baseline is supported in this first importer")
+	if *target != "baseline" && *target != "native" {
+		return fmt.Errorf("-target must be baseline or native")
 	}
 	if err := ensureDir(*output); err != nil {
 		return err
@@ -110,6 +94,10 @@ func runImport(args []string) error {
 		if err := validateImportInputs(cases, preds); err != nil {
 			return err
 		}
+	}
+	traceRawDirs, err := traceRawDirsByCase(*shardsManifestPath)
+	if err != nil {
+		return err
 	}
 	harness, err := readHarnessReport(*harnessReport)
 	if err != nil {
@@ -143,7 +131,7 @@ func runImport(args []string) error {
 
 	for _, c := range cases {
 		pred, hasPred := preds[c.InstanceID]
-		result := targetResult{PatchStats: patchStats{ChangedFiles: []string{}}}
+		result := targetResult{PatchStats: artifact.PatchStats{ChangedFiles: []string{}}}
 		if hasPred {
 			result.ModelNameOrPath = pred.ModelNameOrPath
 			if strings.TrimSpace(pred.ModelPatch) != "" {
@@ -152,10 +140,14 @@ func runImport(args []string) error {
 					return err
 				}
 				result.PatchPath = relPath(*output, patchPath)
-				result.PatchStats = computePatchStats(pred.ModelPatch)
+				result.PatchStats = artifact.ComputePatchStats(pred.ModelPatch)
 			}
-			if *rawDir != "" {
-				tracePath, usage, err := copyScrubbedTrace(*rawDir, traceDir, c.InstanceID)
+			caseRawDir := *rawDir
+			if strings.TrimSpace(caseRawDir) == "" {
+				caseRawDir = traceRawDirs[c.InstanceID]
+			}
+			if caseRawDir != "" {
+				tracePath, usage, err := copyScrubbedTrace(caseRawDir, traceDir, c.InstanceID)
 				if err == nil && tracePath != "" {
 					result.TracePath = relPath(*output, tracePath)
 					result.Usage = usage
@@ -174,7 +166,12 @@ func runImport(args []string) error {
 			InstanceID: c.InstanceID,
 			Repo:       c.Repo,
 			BaseCommit: c.BaseCommit,
-			Baseline:   result,
+		}
+		switch *target {
+		case "baseline":
+			row.Baseline = &result
+		case "native":
+			row.Native = &result
 		}
 		data, err := json.Marshal(row)
 		if err != nil {
@@ -187,83 +184,36 @@ func runImport(args []string) error {
 	return writeJSON(filepath.Join(*output, "summary", *target+".json"), summary)
 }
 
-func readPredictions(path string) (map[string]prediction, error) {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return nil, err
-	}
-	var byID map[string]prediction
-	if err := json.Unmarshal(data, &byID); err == nil && byID != nil {
-		for id, pred := range byID {
-			if pred.InstanceID == "" {
-				pred.InstanceID = id
-				byID[id] = pred
-			}
-		}
-		return byID, nil
-	}
-	var rows []prediction
-	if err := json.Unmarshal(data, &rows); err == nil {
-		out := map[string]prediction{}
-		for _, row := range rows {
-			out[row.InstanceID] = row
-		}
-		return out, nil
-	}
-	out := map[string]prediction{}
-	scanner := bufio.NewScanner(strings.NewReader(string(data)))
-	for scanner.Scan() {
-		line := strings.TrimSpace(scanner.Text())
-		if line == "" {
-			continue
-		}
-		var row prediction
-		if err := json.Unmarshal([]byte(line), &row); err != nil {
-			return nil, err
-		}
-		out[row.InstanceID] = row
-	}
-	return out, scanner.Err()
+func readPredictions(path string) (map[string]contract.Prediction, error) {
+	return artifact.ReadPredictions(path)
 }
 
-func readCases(path string, preds map[string]prediction) ([]caseManifest, error) {
+func readCases(path string, preds map[string]contract.Prediction) ([]contract.Case, error) {
 	if strings.TrimSpace(path) == "" {
 		ids := make([]string, 0, len(preds))
 		for id := range preds {
 			ids = append(ids, id)
 		}
 		sort.Strings(ids)
-		cases := make([]caseManifest, 0, len(ids))
+		cases := make([]contract.Case, 0, len(ids))
 		for _, id := range ids {
-			cases = append(cases, caseManifest{InstanceID: id})
+			cases = append(cases, contract.Case{InstanceID: id})
 		}
 		return cases, nil
 	}
-	f, err := os.Open(path)
+	cases, err := artifact.ReadCasesJSONL(path)
 	if err != nil {
 		return nil, err
 	}
-	defer f.Close()
-	var cases []caseManifest
-	scanner := bufio.NewScanner(f)
-	for scanner.Scan() {
-		line := strings.TrimSpace(scanner.Text())
-		if line == "" {
-			continue
-		}
-		var c caseManifest
-		if err := json.Unmarshal([]byte(line), &c); err != nil {
-			return nil, err
-		}
+	for _, c := range cases {
 		if c.InstanceID == "" {
 			return nil, fmt.Errorf("case without instance_id in %s", path)
 		}
-		cases = append(cases, c)
 	}
-	return cases, scanner.Err()
+	return cases, nil
 }
 
-func validateImportInputs(cases []caseManifest, preds map[string]prediction) error {
+func validateImportInputs(cases []contract.Case, preds map[string]contract.Prediction) error {
 	seenCases := map[string]bool{}
 	for _, c := range cases {
 		if strings.TrimSpace(c.InstanceID) == "" {
@@ -282,20 +232,30 @@ func validateImportInputs(cases []caseManifest, preds map[string]prediction) err
 	return nil
 }
 
-type harnessIndex struct {
-	Resolved   map[string]bool
-	Unresolved map[string]bool
-	Errors     map[string]bool
-	Completed  map[string]bool
+func traceRawDirsByCase(path string) (map[string]string, error) {
+	out := map[string]string{}
+	if strings.TrimSpace(path) == "" {
+		return out, nil
+	}
+	var manifest shardsManifest
+	if err := readJSONFile(path, &manifest); err != nil {
+		return nil, fmt.Errorf("read shards manifest: %w", err)
+	}
+	for _, shard := range manifest.Shards {
+		if strings.TrimSpace(shard.RawDir) == "" {
+			continue
+		}
+		for _, c := range shard.Cases {
+			if c.Status == "accepted" && c.InstanceID != "" {
+				out[c.InstanceID] = shard.RawDir
+			}
+		}
+	}
+	return out, nil
 }
 
-func readHarnessReport(path string) (harnessIndex, error) {
-	idx := harnessIndex{
-		Resolved:   map[string]bool{},
-		Unresolved: map[string]bool{},
-		Errors:     map[string]bool{},
-		Completed:  map[string]bool{},
-	}
+func readHarnessReport(path string) (contract.HarnessIndex, error) {
+	idx := contract.NewHarnessIndex()
 	if strings.TrimSpace(path) == "" {
 		return idx, nil
 	}
@@ -332,7 +292,7 @@ func readHarnessReport(path string) (harnessIndex, error) {
 	return idx, nil
 }
 
-func classify(instanceID string, hasPred bool, patch string, harness harnessIndex) (string, string) {
+func classify(instanceID string, hasPred bool, patch string, harness contract.HarnessIndex) (string, string) {
 	if !hasPred {
 		return "incomplete", "missing prediction"
 	}
@@ -349,33 +309,6 @@ func classify(instanceID string, hasPred bool, patch string, harness harnessInde
 		return "unresolved", "failed official harness"
 	}
 	return "incomplete", "missing harness result"
-}
-
-func computePatchStats(patch string) patchStats {
-	stats := patchStats{ChangedFiles: []string{}}
-	seen := map[string]bool{}
-	for _, line := range strings.Split(patch, "\n") {
-		if line == "" {
-			continue
-		}
-		stats.PatchLines++
-		if strings.HasPrefix(line, "+++ b/") {
-			file := strings.TrimPrefix(line, "+++ b/")
-			if file != "/dev/null" && !seen[file] {
-				seen[file] = true
-				stats.ChangedFiles = append(stats.ChangedFiles, file)
-			}
-			continue
-		}
-		if strings.HasPrefix(line, "+") && !strings.HasPrefix(line, "+++") {
-			stats.AddedLines++
-		}
-		if strings.HasPrefix(line, "-") && !strings.HasPrefix(line, "---") {
-			stats.DeletedLines++
-		}
-	}
-	sort.Strings(stats.ChangedFiles)
-	return stats
 }
 
 func copyScrubbedTrace(rawDir, traceDir, instanceID string) (string, usageStats, error) {

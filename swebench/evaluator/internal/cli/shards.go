@@ -18,6 +18,8 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"trpc.group/trpc-go/trpc-agent-go-benchmark/swebench/internal/contract"
 )
 
 type shardsManifest struct {
@@ -77,7 +79,7 @@ type shardCaseSummary struct {
 func runSummarizeShards(args []string) error {
 	fs := flag.NewFlagSet("summarize-shards", flag.ExitOnError)
 	planPath := fs.String("plan", "", "batch plan.json path")
-	runsRoot := fs.String("runs-root", "../results/runs", "directory containing shard run directories")
+	runsRoot := fs.String("runs-root", "results/runs", "directory containing shard run directories")
 	rawSubdir := fs.String("raw-subdir", filepath.Join("raw", "mini"), "raw output subdirectory under each run")
 	output := fs.String("output", "", "output shards manifest path")
 	if err := fs.Parse(args); err != nil {
@@ -233,7 +235,7 @@ func summarizeShard(batch batchPlanItem, runsRoot, rawSubdir string) shardSummar
 	return shard
 }
 
-func summarizeShardCase(rawDir, instanceID string, preds map[string]prediction) shardCaseSummary {
+func summarizeShardCase(rawDir, instanceID string, preds map[string]contract.Prediction) shardCaseSummary {
 	tracePath := filepath.Join(rawDir, instanceID, instanceID+".traj.json")
 	relTrace := relPath(rawDir, tracePath)
 	data, err := os.ReadFile(tracePath)
@@ -324,7 +326,7 @@ func runMergePredictions(args []string) error {
 	if err != nil {
 		return err
 	}
-	out := map[string]prediction{}
+	out := map[string]contract.Prediction{}
 	for _, pred := range ordered {
 		out[pred.InstanceID] = pred
 	}
@@ -335,8 +337,8 @@ func runMergePredictions(args []string) error {
 	return nil
 }
 
-func acceptedPredictions(manifest shardsManifest) (map[string]prediction, error) {
-	out := map[string]prediction{}
+func acceptedPredictions(manifest shardsManifest) (map[string]contract.Prediction, error) {
+	out := map[string]contract.Prediction{}
 	for _, shard := range manifest.Shards {
 		if shard.Status == "superseded" {
 			continue
@@ -365,14 +367,14 @@ func acceptedPredictions(manifest shardsManifest) (map[string]prediction, error)
 	return out, nil
 }
 
-func orderPredictions(preds map[string]prediction, casesPath string, allowMissing bool) ([]prediction, error) {
+func orderPredictions(preds map[string]contract.Prediction, casesPath string, allowMissing bool) ([]contract.Prediction, error) {
 	if strings.TrimSpace(casesPath) == "" {
 		ids := make([]string, 0, len(preds))
 		for id := range preds {
 			ids = append(ids, id)
 		}
 		sort.Strings(ids)
-		out := make([]prediction, 0, len(ids))
+		out := make([]contract.Prediction, 0, len(ids))
 		for _, id := range ids {
 			out = append(out, preds[id])
 		}
@@ -382,7 +384,7 @@ func orderPredictions(preds map[string]prediction, casesPath string, allowMissin
 	if err != nil {
 		return nil, err
 	}
-	out := make([]prediction, 0, len(cases))
+	out := make([]contract.Prediction, 0, len(cases))
 	missing := []string{}
 	for _, c := range cases {
 		pred, ok := preds[c.InstanceID]

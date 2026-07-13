@@ -63,7 +63,7 @@ func runVerify(ctx context.Context, args []string) error {
 	runID := fs.String("run-id", "", "run id")
 	target := fs.String("target", "baseline", "baseline or native")
 	predictions := fs.String("predictions", "", "predictions JSON/JSONL path")
-	output := fs.String("output", "", "output directory; defaults to ../results/runs/<run-id>/local-harness-report/<target>")
+	output := fs.String("output", "", "output directory; defaults to results/runs/<run-id>/local-harness-report/<target>")
 	dataset := fs.String("dataset", defaultDatasetName, "SWE-Bench dataset name")
 	split := fs.String("split", defaultSplit, "dataset split")
 	instance := fs.String("instance", "", "optional single instance id")
@@ -94,7 +94,7 @@ func runVerify(ctx context.Context, args []string) error {
 		return err
 	}
 	if *output == "" {
-		*output = filepath.Join("..", "results", "runs", *runID, "local-harness-report", *target)
+		*output = filepath.Join("results", "runs", *runID, "local-harness-report", *target)
 	}
 	outputAbs := absPath(*output)
 	if err := ensureDir(*output); err != nil {

@@ -79,27 +79,28 @@ mini-SWE-agent baseline runner 的安装和运行见
 cp swebench/config/models/glm-5.2.yaml.example swebench/config/models/glm-5.2.local.yaml
 ```
 
-在本地 YAML 中填写 endpoint、API key 和必要的网关 header。本地模型配置已被
+其他模型使用对应模板，例如 `config/models/glm-5.0.yaml.example`。在本地
+YAML 中填写 endpoint、API key 和必要的网关 header。本地模型配置已被
 gitignore。
 
 ### 3. 检查 evaluator 和模型访问
 
 ```bash
-cd swebench/evaluator
+cd swebench
 
-go run . doctor \
+go run ./evaluator doctor \
   --run-id swebench-doctor \
-  --output ../results/runs/doctor \
-  --model-config ../config/models/glm-5.2.local.yaml
+  --output results/runs/doctor \
+  --model-config config/models/glm-5.2.local.yaml
 ```
 
 命令会在终端输出简洁的 `ok/fail` 摘要，并将完整细节写入
-`../results/runs/doctor/doctor.json`。
+`results/runs/doctor/doctor.json`。
 
 ### 4. 下载数据
 
 ```bash
-go run . prepare-data --python python
+go run ./evaluator prepare-data --python python
 ```
 
 该命令会按需下载 SWE-Bench Verified，校验它是否匹配仓库提交的 500 case
@@ -121,11 +122,11 @@ go run . prepare-data --python python
 某个实现产出 SWE-Bench predictions 后，使用官方 local harness 验证：
 
 ```bash
-go run . verify \
+go run ./evaluator verify \
   --run-id <run-id> \
-  --target baseline \
+  --target <baseline-or-native> \
   --predictions <path-to-preds.json> \
-  --output ../results/runs/<run-id>/local-harness-report/baseline \
+  --output results/runs/<run-id>/local-harness-report/<baseline-or-native> \
   --harness-workers 1
 ```
 
@@ -135,13 +136,33 @@ go run . verify \
 ### 7. 整理结果
 
 ```bash
-go run . import \
-  --target baseline \
-  --cases ../data/generated/cases.jsonl \
+go run ./evaluator import \
+  --target <baseline-or-native> \
+  --cases data/generated/cases.jsonl \
   --predictions <path-to-preds.json> \
   --raw-dir <path-to-raw-run-dir> \
   --harness-report <path-to-harness-report.json> \
-  --output ../results/runs/<run-id>/imported
+  --output results/runs/<run-id>/imported
 ```
 
 这一步会把 predictions 和 verifier 输出转换成报告使用的逐 case 统一结果。
+
+### 8. 写入 run config
+
+对于单个 runner manifest：
+
+```bash
+go run ./evaluator run-config \
+  --run-id <run-id> \
+  --target <baseline-or-native> \
+  --cases-manifest data/generated/cases.manifest.json \
+  --runner-manifest <path-to-runner-manifest.json> \
+  --verifier-manifest results/runs/<run-id>/local-harness-report/<baseline-or-native>/verifier_manifest.json \
+  --import-summary results/runs/<run-id>/imported/summary/<baseline-or-native>.json \
+  --harness-report <path-to-harness-report.json> \
+  --model-name <model-name> \
+  --output results/runs/<run-id>/run_config.json
+```
+
+对于 sharded mini-SWE-agent full run，使用 `--shards-manifest` 替代
+`--runner-manifest`。

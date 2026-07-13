@@ -50,15 +50,15 @@ type runMiniConfig struct {
 func runMini(ctx context.Context, args []string) error {
 	fs := flag.NewFlagSet("run-mini", flag.ExitOnError)
 	runID := fs.String("run-id", "", "run id")
-	output := fs.String("output", "", "output directory; defaults to ../results/runs/<run-id>/raw/mini")
+	output := fs.String("output", "", "output directory; defaults to results/runs/<run-id>/raw/mini")
 	subset := fs.String("subset", "verified", "SWE-Bench subset for mini-extra")
 	split := fs.String("split", defaultSplit, "dataset split")
 	filterSpec := fs.String("filter", "", "instance regex filter")
 	sliceSpec := fs.String("slice", "", "slice expression")
 	workers := fs.Int("agent-workers", 15, "mini-SWE-agent worker count")
 	baseConfig := fs.String("base-config", "swebench.yaml", "mini-SWE-agent base config")
-	modelConfig := fs.String("model-config", "../config/models/glm-5.2.local.yaml", "private mini-SWE-agent model YAML config")
-	environmentConfig := fs.String("environment-config", "../config/environments/swebench-testbed.yaml", "mini-SWE-agent environment YAML config")
+	modelConfig := fs.String("model-config", "config/models/glm-5.2.local.yaml", "private mini-SWE-agent model YAML config")
+	environmentConfig := fs.String("environment-config", "config/environments/swebench-testbed.yaml", "mini-SWE-agent environment YAML config")
 	miniConfig := fs.String("mini-config", "", "deprecated combined mini-SWE-agent YAML config")
 	miniExtra := fs.String("mini-extra", envOrDefault("MINI_EXTRA", "mini-extra"), "mini-extra executable")
 	dockerHost := fs.String("docker-host", envOrDefault("DOCKER_HOST", defaultDockerHost), "Docker host")
@@ -72,7 +72,7 @@ func runMini(ctx context.Context, args []string) error {
 		return err
 	}
 	if *output == "" {
-		*output = filepath.Join("..", "results", "runs", *runID, "raw", "mini")
+		*output = filepath.Join("results", "runs", *runID, "raw", "mini")
 	}
 	if *workers < 1 {
 		return fmt.Errorf("agent-workers must be >= 1")

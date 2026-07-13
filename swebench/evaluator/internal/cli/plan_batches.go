@@ -44,7 +44,7 @@ type batchPlanItem struct {
 func runPlanBatches(args []string) error {
 	fs := flag.NewFlagSet("plan-batches", flag.ExitOnError)
 	casesPath := fs.String("cases", "", "canonical cases.jsonl path")
-	outputDir := fs.String("output-dir", "../data/batches", "output directory for plan and batch files")
+	outputDir := fs.String("output-dir", "data/batches", "output directory for plan and batch files")
 	runPrefix := fs.String("run-prefix", "baseline-full", "run id prefix")
 	batchSize := fs.Int("batch-size", 20, "cases per batch")
 	if err := fs.Parse(args); err != nil {
