@@ -28,26 +28,37 @@ import (
 )
 
 type manifest struct {
-	RunID            string            `json:"run_id"`
-	RunnerType       string            `json:"runner_type"`
-	FrameworkVersion string            `json:"framework_version"`
-	AgentProtocol    string            `json:"agent_protocol"`
-	StartedAt        time.Time         `json:"started_at"`
-	FinishedAt       time.Time         `json:"finished_at"`
-	DurationMS       int64             `json:"duration_ms"`
-	Cases            string            `json:"cases"`
-	OutputDir        string            `json:"output_dir"`
-	Filter           string            `json:"filter,omitempty"`
-	CaseCount        int               `json:"case_count"`
-	Workers          int               `json:"workers"`
-	Predictions      string            `json:"predictions"`
-	ModelConfig      map[string]string `json:"model_config,omitempty"`
-	Environment      string            `json:"environment_config"`
-	CommandTimeout   string            `json:"command_timeout"`
-	CaseTimeout      string            `json:"case_timeout"`
-	ExitStatusCounts map[string]int    `json:"exit_status_counts"`
-	Status           string            `json:"status"`
-	Notes            []string          `json:"notes,omitempty"`
+	RunID                      string            `json:"run_id"`
+	RunnerType                 string            `json:"runner_type"`
+	FrameworkVersion           string            `json:"framework_version"`
+	AgentProtocol              string            `json:"agent_protocol"`
+	StartedAt                  time.Time         `json:"started_at"`
+	FinishedAt                 time.Time         `json:"finished_at"`
+	DurationMS                 int64             `json:"duration_ms"`
+	Cases                      string            `json:"cases"`
+	OutputDir                  string            `json:"output_dir"`
+	Filter                     string            `json:"filter,omitempty"`
+	CaseCount                  int               `json:"case_count"`
+	AttemptedCount             int               `json:"attempted_count"`
+	SkippedExisting            int               `json:"skipped_existing"`
+	CompletedCount             int               `json:"completed_count"`
+	PredictionCount            int               `json:"prediction_count"`
+	Workers                    int               `json:"workers"`
+	RedoExisting               bool              `json:"redo_existing"`
+	Predictions                string            `json:"predictions"`
+	Progress                   string            `json:"progress"`
+	ModelConfig                map[string]string `json:"model_config,omitempty"`
+	Environment                string            `json:"environment_config"`
+	CommandTimeout             string            `json:"command_timeout"`
+	CaseTimeout                string            `json:"case_timeout"`
+	ExitStatusCounts           map[string]int    `json:"exit_status_counts"`
+	ErrorCategories            map[string]int    `json:"error_category_counts,omitempty"`
+	ServiceErrors              map[string]int    `json:"service_error_counts,omitempty"`
+	CumulativeExitStatusCounts map[string]int    `json:"cumulative_exit_status_counts"`
+	CumulativeErrorCategories  map[string]int    `json:"cumulative_error_category_counts,omitempty"`
+	CumulativeServiceErrors    map[string]int    `json:"cumulative_service_error_counts,omitempty"`
+	Status                     string            `json:"status"`
+	Notes                      []string          `json:"notes,omitempty"`
 }
 
 // Run executes the native runner CLI.
@@ -63,6 +74,7 @@ func Run(args []string) error {
 	commandTimeout := fs.Duration("command-timeout", time.Minute, "timeout for each bash tool call")
 	caseTimeout := fs.Duration("case-timeout", 2*time.Hour, "timeout for each case")
 	dockerHost := fs.String("docker-host", "", "optional Docker daemon endpoint")
+	redoExisting := fs.Bool("redo-existing", false, "rerun selected cases even when complete artifacts exist")
 	if err := fs.Parse(args[1:]); err != nil {
 		return err
 	}
@@ -110,12 +122,31 @@ func Run(args []string) error {
 		DockerHost:     *dockerHost,
 		CommandTimeout: *commandTimeout,
 		CaseTimeout:    *caseTimeout,
+		Labels:         map[string]string{"trpc-agent-go.run_id": *runID},
 	}
-	executor := sweagent.Executor{Factory: factory, ModelConfig: modelCfg, CaseTimeout: *caseTimeout}
-
 	predictionsPath := filepath.Join(*output, "preds.json")
-	preds := map[string]contract.Prediction{}
+	resume, err := prepareResume(*output, predictionsPath, selected, *redoExisting)
+	if err != nil {
+		return fmt.Errorf("prepare resume state: %w", err)
+	}
+	preds := resume.Predictions
+	if err := artifact.WriteJSONAtomic(predictionsPath, preds); err != nil {
+		return err
+	}
+	progressPath := filepath.Join(*output, "native-runner-progress.json")
+	progress := newProgressReporter(progressPath, *runID)
+	for id, result := range resume.Skipped {
+		progress.MarkSkipped(id, result)
+	}
+	executor := sweagent.Executor{
+		Factory: factory, ModelConfig: modelCfg, CaseTimeout: *caseTimeout, Progress: progress.Update,
+	}
 	exitCounts := map[string]int{}
+	errorCategories := map[string]int{}
+	serviceErrors := map[string]int{}
+	for _, result := range resume.Skipped {
+		countResult(result, exitCounts, errorCategories, serviceErrors)
+	}
 	var mu sync.Mutex
 	jobs := make(chan contract.Case)
 	var wg sync.WaitGroup
@@ -130,6 +161,8 @@ func Run(args []string) error {
 				if writeErr := artifact.WriteJSON(tracePath, caseResult); writeErr != nil {
 					caseResult.Info.ExitStatus = "ArtifactError"
 					caseResult.Info.Error = writeErr.Error()
+					caseResult.Info.ErrorCategory = sweagent.ErrorCategoryArtifact
+					caseResult.Info.Retryable = true
 				}
 				mu.Lock()
 				preds[c.InstanceID] = contract.Prediction{
@@ -137,7 +170,7 @@ func Run(args []string) error {
 					InstanceID:      c.InstanceID,
 					ModelPatch:      caseResult.ModelPatch,
 				}
-				exitCounts[caseResult.Info.ExitStatus]++
+				countResult(caseResult, exitCounts, errorCategories, serviceErrors)
 				writeErr := artifact.WriteJSONAtomic(predictionsPath, preds)
 				mu.Unlock()
 				if writeErr != nil {
@@ -148,53 +181,93 @@ func Run(args []string) error {
 			}
 		}()
 	}
-	for _, c := range selected {
+	for _, c := range resume.Pending {
 		jobs <- c
 	}
 	close(jobs)
 	wg.Wait()
-	if len(selected) == 0 {
-		if err := artifact.WriteJSONAtomic(predictionsPath, preds); err != nil {
-			return err
-		}
-	}
-
 	finish := time.Now()
 	status := "completed"
-	if exitCounts["Error"] > 0 || exitCounts["ArtifactError"] > 0 {
+	if exitCounts["Error"] > 0 || exitCounts["ArtifactError"] > 0 || len(serviceErrors) > 0 {
 		status = "completed_with_errors"
 	}
+	completedCount := 0
+	for _, c := range selected {
+		if _, ok := preds[c.InstanceID]; ok {
+			completedCount++
+		}
+	}
+	cumulativeExitCounts, cumulativeErrorCategories, cumulativeServiceErrors := aggregateResultCounts(*output, preds)
 	doc := manifest{
-		RunID:            *runID,
-		RunnerType:       "trpc-agent-go-native",
-		FrameworkVersion: "v1.10.1-0.20260616104537-c6c3bb29ab60",
-		AgentProtocol:    "mini-swe-agent-v2.1-compatible",
-		StartedAt:        start.UTC(),
-		FinishedAt:       finish.UTC(),
-		DurationMS:       finish.Sub(start).Milliseconds(),
-		Cases:            artifact.AbsPath(*casesPath),
-		OutputDir:        artifact.AbsPath(*output),
-		Filter:           *filter,
-		CaseCount:        len(selected),
-		Workers:          *workers,
-		Predictions:      artifact.AbsPath(predictionsPath),
-		ModelConfig:      modelconfig.RedactSecrets(modelCfg),
-		Environment:      artifact.AbsPath(*environmentConfigPath),
-		CommandTimeout:   commandTimeout.String(),
-		CaseTimeout:      caseTimeout.String(),
-		ExitStatusCounts: exitCounts,
-		Status:           status,
+		RunID:                      *runID,
+		RunnerType:                 "trpc-agent-go-native",
+		FrameworkVersion:           "v1.10.1-0.20260616104537-c6c3bb29ab60",
+		AgentProtocol:              "mini-swe-agent-v2.1-compatible",
+		StartedAt:                  start.UTC(),
+		FinishedAt:                 finish.UTC(),
+		DurationMS:                 finish.Sub(start).Milliseconds(),
+		Cases:                      artifact.AbsPath(*casesPath),
+		OutputDir:                  artifact.AbsPath(*output),
+		Filter:                     *filter,
+		CaseCount:                  len(selected),
+		AttemptedCount:             len(resume.Pending),
+		SkippedExisting:            len(resume.Skipped),
+		CompletedCount:             completedCount,
+		PredictionCount:            len(preds),
+		Workers:                    *workers,
+		RedoExisting:               *redoExisting,
+		Predictions:                artifact.AbsPath(predictionsPath),
+		Progress:                   artifact.AbsPath(progressPath),
+		ModelConfig:                modelconfig.RedactSecrets(modelCfg),
+		Environment:                artifact.AbsPath(*environmentConfigPath),
+		CommandTimeout:             commandTimeout.String(),
+		CaseTimeout:                caseTimeout.String(),
+		ExitStatusCounts:           exitCounts,
+		ErrorCategories:            errorCategories,
+		ServiceErrors:              serviceErrors,
+		CumulativeExitStatusCounts: cumulativeExitCounts,
+		CumulativeErrorCategories:  cumulativeErrorCategories,
+		CumulativeServiceErrors:    cumulativeServiceErrors,
+		Status:                     status,
 		Notes: []string{
 			"Each case uses an official SWE-Bench Docker image and an independent tRPC agent runner.",
 			"Predictions are updated atomically after every completed case.",
+			"Existing complete non-retryable cases are skipped by default; use --redo-existing to rerun selected cases.",
 		},
 	}
 	manifestPath := filepath.Join(*output, "native-runner-manifest.json")
 	if err := artifact.WriteJSON(manifestPath, doc); err != nil {
 		return err
 	}
-	fmt.Printf("selected=%d\npredictions=%s\nmanifest=%s\n", len(selected), predictionsPath, manifestPath)
+	fmt.Printf("selected=%d attempted=%d skipped_existing=%d completed=%d\npredictions=%s\nprogress=%s\nmanifest=%s\n", len(selected), len(resume.Pending), len(resume.Skipped), completedCount, predictionsPath, progressPath, manifestPath)
 	return nil
+}
+
+func countResult(result sweagent.CaseResult, exitCounts, errorCategories, serviceErrors map[string]int) {
+	exitCounts[result.Info.ExitStatus]++
+	if result.Info.ErrorCategory == "" {
+		return
+	}
+	errorCategories[result.Info.ErrorCategory]++
+	if strings.HasPrefix(result.Info.ErrorCategory, "endpoint_") {
+		serviceErrors[result.Info.ErrorCategory]++
+	}
+}
+
+func aggregateResultCounts(output string, predictions map[string]contract.Prediction) (map[string]int, map[string]int, map[string]int) {
+	exitCounts := map[string]int{}
+	errorCategories := map[string]int{}
+	serviceErrors := map[string]int{}
+	for instanceID := range predictions {
+		var result sweagent.CaseResult
+		tracePath := filepath.Join(output, instanceID, instanceID+".traj.json")
+		if err := artifact.ReadJSONFile(tracePath, &result); err != nil {
+			result.Info.ExitStatus = "ArtifactError"
+			result.Info.ErrorCategory = sweagent.ErrorCategoryArtifact
+		}
+		countResult(result, exitCounts, errorCategories, serviceErrors)
+	}
+	return exitCounts, errorCategories, serviceErrors
 }
 
 func selectCases(cases []contract.Case, filter string) ([]contract.Case, error) {

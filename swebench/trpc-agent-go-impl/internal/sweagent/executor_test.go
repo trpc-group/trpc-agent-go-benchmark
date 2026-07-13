@@ -37,7 +37,8 @@ func (submissionModel) GenerateContent(_ context.Context, _ *model.Request) (<-c
 	finish := "tool_calls"
 	responses := make(chan *model.Response, 1)
 	responses <- &model.Response{
-		Done: true,
+		Done:   true,
+		Object: model.ObjectTypeChatCompletion,
 		Choices: []model.Choice{{
 			FinishReason: &finish,
 			Message: model.Message{
@@ -59,12 +60,16 @@ func (submissionModel) GenerateContent(_ context.Context, _ *model.Request) (<-c
 
 func TestExecutorRunsTRPCAgentWithMockModelAndFakeEnvironment(t *testing.T) {
 	env := &fakeEnvironment{patch: "diff --git a/a b/a\n--- a/a\n+++ b/a\n+fixed\n"}
+	var progress []ProgressUpdate
 	executor := Executor{
 		Factory:     fakeFactory{env: env},
 		ModelConfig: modelconfig.EnvConfig{"MODEL_NAME": "mock-model"},
 		CaseTimeout: time.Minute,
 		ModelFactory: func(modelconfig.EnvConfig) model.Model {
 			return submissionModel{}
+		},
+		Progress: func(update ProgressUpdate) {
+			progress = append(progress, update)
 		},
 	}
 	result := executor.Execute(context.Background(), contract.Case{InstanceID: "repo__repo-1", ProblemStatement: "fix it"})
@@ -79,6 +84,12 @@ func TestExecutorRunsTRPCAgentWithMockModelAndFakeEnvironment(t *testing.T) {
 	}
 	if len(result.Events) == 0 {
 		t.Fatal("expected tRPC runner events")
+	}
+	if result.LLMCalls != 1 || result.ToolCalls != 1 {
+		t.Fatalf("llm calls = %d, tool calls = %d", result.LLMCalls, result.ToolCalls)
+	}
+	if len(progress) == 0 || progress[len(progress)-1].Phase != "finished" || progress[len(progress)-1].ExitStatus != "Submitted" {
+		t.Fatalf("progress = %#v", progress)
 	}
 }
 

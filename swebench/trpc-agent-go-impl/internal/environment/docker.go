@@ -16,6 +16,7 @@ import (
 	"os"
 	"os/exec"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -45,6 +46,7 @@ type DockerFactory struct {
 	CommandTimeout time.Duration
 	CaseTimeout    time.Duration
 	Commander      Commander
+	Labels         map[string]string
 }
 
 // ImageForInstance returns the official SWE-Bench image name.
@@ -70,7 +72,16 @@ func (f DockerFactory) Start(ctx context.Context, instanceID string) (Environmen
 		name = name[:maxBase]
 	}
 	name += suffix
-	args := []string{"run", "-d", "--rm", "--name", name, "-w", "/testbed", ImageForInstance(instanceID), "sleep", strconv.Itoa(int(caseTimeout.Seconds()) + 60)}
+	args := []string{"run", "-d", "--rm", "--name", name}
+	labelKeys := make([]string, 0, len(f.Labels))
+	for key := range f.Labels {
+		labelKeys = append(labelKeys, key)
+	}
+	sort.Strings(labelKeys)
+	for _, key := range labelKeys {
+		args = append(args, "--label", key+"="+f.Labels[key])
+	}
+	args = append(args, "-w", "/testbed", ImageForInstance(instanceID), "sleep", strconv.Itoa(int(caseTimeout.Seconds())+60))
 	out, err := commander.Run(ctx, dockerEnv(f.DockerHost), "docker", args...)
 	if err != nil {
 		return nil, fmt.Errorf("start Docker testbed: %w: %s", err, strings.TrimSpace(string(out)))

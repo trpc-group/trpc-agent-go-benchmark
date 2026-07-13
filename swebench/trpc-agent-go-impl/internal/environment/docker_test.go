@@ -53,6 +53,7 @@ func TestDockerFactoryLifecycleBuildsMiniCompatibleCommands(t *testing.T) {
 		CommandTimeout: time.Minute,
 		CaseTimeout:    time.Hour,
 		Commander:      commander,
+		Labels:         map[string]string{"trpc-agent-go.run_id": "run-1"},
 	}
 	env, err := factory.Start(context.Background(), "repo__repo-1")
 	if err != nil {
@@ -69,7 +70,7 @@ func TestDockerFactoryLifecycleBuildsMiniCompatibleCommands(t *testing.T) {
 		t.Fatalf("commands = %d, want 3", len(commander.commands))
 	}
 	start := strings.Join(commander.commands[0].args, " ")
-	if !strings.Contains(start, "-w /testbed") || !strings.Contains(start, ImageForInstance("repo__repo-1")) {
+	if !strings.Contains(start, "--label trpc-agent-go.run_id=run-1") || !strings.Contains(start, "-w /testbed") || !strings.Contains(start, ImageForInstance("repo__repo-1")) {
 		t.Fatalf("start command = %q", start)
 	}
 	execute := strings.Join(commander.commands[1].args, " ")

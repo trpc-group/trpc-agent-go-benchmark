@@ -41,13 +41,33 @@ type CaseResult struct {
 	ModelPatch  string         `json:"-"`
 	DurationMS  int64          `json:"duration_ms"`
 	Environment string         `json:"environment"`
+	EventCount  int            `json:"event_count"`
+	LLMCalls    int            `json:"llm_calls"`
+	ToolCalls   int            `json:"tool_calls"`
 }
 
 // CaseInfo is compatible with the shared trajectory importer.
 type CaseInfo struct {
-	ExitStatus string `json:"exit_status"`
-	Submission string `json:"submission,omitempty"`
-	Error      string `json:"error,omitempty"`
+	ExitStatus    string `json:"exit_status"`
+	Submission    string `json:"submission,omitempty"`
+	Error         string `json:"error,omitempty"`
+	ErrorCategory string `json:"error_category,omitempty"`
+	Retryable     bool   `json:"retryable,omitempty"`
+}
+
+// ProgressUpdate is a compact, frequently updated view of an active case.
+type ProgressUpdate struct {
+	InstanceID      string     `json:"instance_id"`
+	Phase           string     `json:"phase"`
+	StartedAt       time.Time  `json:"started_at"`
+	LastEventAt     time.Time  `json:"last_event_at"`
+	LastLLMAt       *time.Time `json:"last_llm_at,omitempty"`
+	LastEventObject string     `json:"last_event_object,omitempty"`
+	EventCount      int        `json:"event_count"`
+	LLMCalls        int        `json:"llm_calls"`
+	ToolCalls       int        `json:"tool_calls"`
+	ExitStatus      string     `json:"exit_status,omitempty"`
+	ErrorCategory   string     `json:"error_category,omitempty"`
 }
 
 // TraceMessage provides a mini-compatible terminal message.
@@ -63,19 +83,51 @@ type Executor struct {
 	ModelConfig  modelconfig.EnvConfig
 	CaseTimeout  time.Duration
 	ModelFactory func(modelconfig.EnvConfig) model.Model
+	Progress     func(ProgressUpdate)
 }
 
 // Execute runs one safe SWE-Bench case and always attempts to collect git diff.
 func (e Executor) Execute(ctx context.Context, c contract.Case) (result CaseResult) {
 	started := time.Now()
+	lastEventAt := started
+	var lastLLMAt *time.Time
+	lastEventObject := ""
 	result.InstanceID = c.InstanceID
 	result.Environment = "docker"
 	result.Info.ExitStatus = "Error"
-	defer func() { result.DurationMS = time.Since(started).Milliseconds() }()
+	report := func(phase string) {
+		if e.Progress == nil {
+			return
+		}
+		exitStatus := ""
+		if phase == "finished" {
+			exitStatus = result.Info.ExitStatus
+		}
+		e.Progress(ProgressUpdate{
+			InstanceID:      c.InstanceID,
+			Phase:           phase,
+			StartedAt:       started.UTC(),
+			LastEventAt:     lastEventAt.UTC(),
+			LastLLMAt:       lastLLMAt,
+			LastEventObject: lastEventObject,
+			EventCount:      result.EventCount,
+			LLMCalls:        result.LLMCalls,
+			ToolCalls:       result.ToolCalls,
+			ExitStatus:      exitStatus,
+			ErrorCategory:   result.Info.ErrorCategory,
+		})
+	}
+	defer func() {
+		result.DurationMS = time.Since(started).Milliseconds()
+		report("finished")
+	}()
+	report("starting")
 
 	env, err := e.Factory.Start(ctx, c.InstanceID)
 	if err != nil {
 		result.Info.Error = err.Error()
+		result.Info.ErrorCategory = ErrorCategoryEnvironment
+		result.Info.Retryable = true
 		result.finishMessage()
 		return result
 	}
@@ -84,8 +136,11 @@ func (e Executor) Execute(ctx context.Context, c contract.Case) (result CaseResu
 		defer cancel()
 		if closeErr := env.Close(closeCtx); closeErr != nil && result.Info.Error == "" {
 			result.Info.Error = closeErr.Error()
+			result.Info.ErrorCategory = ErrorCategoryEnvironment
+			result.Info.Retryable = true
 		}
 	}()
+	report("running")
 
 	caseTimeout := e.CaseTimeout
 	if caseTimeout <= 0 {
@@ -117,27 +172,50 @@ func (e Executor) Execute(ctx context.Context, c contract.Case) (result CaseResu
 	} else {
 		for ev := range events {
 			result.Events = append(result.Events, ev)
+			result.EventCount++
+			lastEventAt = time.Now()
+			if ev != nil && ev.Response != nil {
+				lastEventObject = ev.Object
+				switch ev.Object {
+				case model.ObjectTypeChatCompletion:
+					result.LLMCalls++
+					completedAt := lastEventAt.UTC()
+					lastLLMAt = &completedAt
+				case model.ObjectTypeToolResponse:
+					result.ToolCalls++
+				}
+			}
 			if ev != nil && ev.Response != nil && ev.Error != nil {
 				result.Info.Error = ev.Error.Message
 			}
+			report("running")
 		}
 	}
 	if text, ok := submission.Value(); ok {
 		result.Info.ExitStatus = "Submitted"
 		result.Info.Submission = text
+		result.Info.ErrorCategory = ""
+		result.Info.Retryable = false
 	} else if caseCtx.Err() == context.DeadlineExceeded {
 		result.Info.ExitStatus = "Timeout"
 		result.Info.Error = caseCtx.Err().Error()
+		result.Info.ErrorCategory = ErrorCategoryCaseTimeout
 	} else if strings.Contains(strings.ToLower(result.Info.Error), "limit") {
 		result.Info.ExitStatus = "LimitsExceeded"
+		result.Info.ErrorCategory = ErrorCategoryAgentLimit
 	} else if result.Info.Error == "" {
 		result.Info.ExitStatus = "NoSubmission"
+	}
+	if result.Info.Error != "" && result.Info.ErrorCategory == "" {
+		result.Info.ErrorCategory, result.Info.Retryable = ClassifyError(result.Info.Error)
 	}
 	patch := env.Execute(context.Background(), "git add -N . >/dev/null 2>&1; git diff --binary --no-ext-diff")
 	if patch.ReturnCode == 0 {
 		result.ModelPatch = patch.Output
 	} else if result.Info.Error == "" {
 		result.Info.Error = fmt.Sprintf("collect patch: %s", patch.ExceptionInfo)
+		result.Info.ErrorCategory = ErrorCategoryEnvironment
+		result.Info.Retryable = true
 	}
 	result.finishMessage()
 	return result
