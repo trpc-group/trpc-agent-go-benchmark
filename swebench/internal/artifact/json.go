@@ -30,6 +30,37 @@ func WriteJSON(path string, v any) error {
 	return os.WriteFile(path, data, 0o644)
 }
 
+// WriteJSONAtomic writes JSON through a temporary file so readers never see
+// a partially-written long-running benchmark artifact.
+func WriteJSONAtomic(path string, v any) error {
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return err
+	}
+	data, err := json.MarshalIndent(v, "", "  ")
+	if err != nil {
+		return err
+	}
+	data = append(data, '\n')
+	tmp, err := os.CreateTemp(filepath.Dir(path), ".preds-*.json")
+	if err != nil {
+		return err
+	}
+	tmpPath := tmp.Name()
+	defer os.Remove(tmpPath)
+	if err := tmp.Chmod(0o644); err != nil {
+		tmp.Close()
+		return err
+	}
+	if _, err := tmp.Write(data); err != nil {
+		tmp.Close()
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		return err
+	}
+	return os.Rename(tmpPath, path)
+}
+
 // ReadJSONFile reads a JSON file into v.
 func ReadJSONFile(path string, v any) error {
 	data, err := os.ReadFile(path)

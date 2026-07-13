@@ -91,6 +91,32 @@ func TestAcceptedPredictionsRejectsDuplicateCases(t *testing.T) {
 	}
 }
 
+func TestSummarizeShardAcceptsNativeRunnerManifest(t *testing.T) {
+	dir := t.TempDir()
+	rawDir := filepath.Join(dir, "run-native", "raw", "native")
+	start := time.Date(2026, 7, 13, 1, 0, 0, 0, time.UTC)
+	if err := writeJSON(filepath.Join(rawDir, "native-runner-manifest.json"), runnerManifest{
+		RunID:      "run-native",
+		RunnerType: "trpc-agent-go-native",
+		StartedAt:  start,
+		FinishedAt: start.Add(time.Minute),
+		DurationMS: int64(time.Minute / time.Millisecond),
+		CaseCount:  1,
+		Workers:    3,
+		Status:     "completed",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	writeTestPreds(t, rawDir, map[string]contract.Prediction{
+		"case-a": {ModelNameOrPath: "model", InstanceID: "case-a", ModelPatch: "patch"},
+	})
+	writeTestTrajectory(t, rawDir, "case-a", "Submitted")
+	shard := summarizeShard(batchPlanItem{RunID: "run-native", InstanceIDs: []string{"case-a"}}, dir, filepath.Join("raw", "native"))
+	if shard.Status != "accepted" || shard.Workers != 3 || shard.FailureReason != "" {
+		t.Fatalf("native shard = %+v", shard)
+	}
+}
+
 func TestOrderPredictionsRequiresCanonicalCompleteness(t *testing.T) {
 	dir := t.TempDir()
 	casesPath := filepath.Join(dir, "cases.jsonl")

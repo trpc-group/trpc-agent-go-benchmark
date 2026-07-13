@@ -10,43 +10,59 @@
 package runner
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"path/filepath"
 	"regexp"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"trpc.group/trpc-go/trpc-agent-go-benchmark/swebench/internal/artifact"
 	"trpc.group/trpc-go/trpc-agent-go-benchmark/swebench/internal/contract"
 	"trpc.group/trpc-go/trpc-agent-go-benchmark/swebench/internal/modelconfig"
+	"trpc.group/trpc-go/trpc-agent-go-benchmark/swebench/trpc-agent-go-impl/internal/environment"
+	"trpc.group/trpc-go/trpc-agent-go-benchmark/swebench/trpc-agent-go-impl/internal/sweagent"
 )
 
 type manifest struct {
-	RunID       string            `json:"run_id"`
-	RunnerType  string            `json:"runner_type"`
-	StartedAt   time.Time         `json:"started_at"`
-	FinishedAt  time.Time         `json:"finished_at"`
-	DurationMS  int64             `json:"duration_ms"`
-	Cases       string            `json:"cases"`
-	OutputDir   string            `json:"output_dir"`
-	Filter      string            `json:"filter,omitempty"`
-	CaseCount   int               `json:"case_count"`
-	Predictions string            `json:"predictions"`
-	ModelConfig map[string]string `json:"model_config,omitempty"`
-	Status      string            `json:"status"`
-	Notes       []string          `json:"notes,omitempty"`
+	RunID            string            `json:"run_id"`
+	RunnerType       string            `json:"runner_type"`
+	FrameworkVersion string            `json:"framework_version"`
+	AgentProtocol    string            `json:"agent_protocol"`
+	StartedAt        time.Time         `json:"started_at"`
+	FinishedAt       time.Time         `json:"finished_at"`
+	DurationMS       int64             `json:"duration_ms"`
+	Cases            string            `json:"cases"`
+	OutputDir        string            `json:"output_dir"`
+	Filter           string            `json:"filter,omitempty"`
+	CaseCount        int               `json:"case_count"`
+	Workers          int               `json:"workers"`
+	Predictions      string            `json:"predictions"`
+	ModelConfig      map[string]string `json:"model_config,omitempty"`
+	Environment      string            `json:"environment_config"`
+	CommandTimeout   string            `json:"command_timeout"`
+	CaseTimeout      string            `json:"case_timeout"`
+	ExitStatusCounts map[string]int    `json:"exit_status_counts"`
+	Status           string            `json:"status"`
+	Notes            []string          `json:"notes,omitempty"`
 }
 
 // Run executes the native runner CLI.
 func Run(args []string) error {
-	fs := flag.NewFlagSet("trpc-agent-go-impl", flag.ExitOnError)
+	fs := flag.NewFlagSet("trpc-agent-go-impl", flag.ContinueOnError)
 	runID := fs.String("run-id", "", "run id")
 	casesPath := fs.String("cases", "data/generated/cases.jsonl", "safe SWE-Bench cases.jsonl")
 	modelConfigPath := fs.String("model-config", "", "model config YAML/env path")
+	environmentConfigPath := fs.String("environment-config", "config/environments/swebench-testbed.yaml", "environment YAML path")
 	output := fs.String("output", "", "output directory; defaults to results/runs/<run-id>")
 	filter := fs.String("filter", "", "optional instance id regexp")
+	workers := fs.Int("agent-workers", 1, "parallel agent cases")
+	commandTimeout := fs.Duration("command-timeout", time.Minute, "timeout for each bash tool call")
+	caseTimeout := fs.Duration("case-timeout", 2*time.Hour, "timeout for each case")
+	dockerHost := fs.String("docker-host", "", "optional Docker daemon endpoint")
 	if err := fs.Parse(args[1:]); err != nil {
 		return err
 	}
@@ -55,6 +71,12 @@ func Run(args []string) error {
 	}
 	if strings.TrimSpace(*casesPath) == "" {
 		return fmt.Errorf("-cases is required")
+	}
+	if strings.TrimSpace(*modelConfigPath) == "" {
+		return fmt.Errorf("-model-config is required")
+	}
+	if *workers <= 0 {
+		return fmt.Errorf("-agent-workers must be positive")
 	}
 	if *output == "" {
 		*output = filepath.Join("results", "runs", *runID)
@@ -72,49 +94,106 @@ func Run(args []string) error {
 	if err != nil {
 		return err
 	}
-	preds := map[string]contract.Prediction{}
-	for _, c := range selected {
-		preds[c.InstanceID] = contract.Prediction{
-			ModelNameOrPath: "trpc-agent-go-native-skeleton",
-			InstanceID:      c.InstanceID,
-			ModelPatch:      "",
-		}
+	modelCfg, err := modelconfig.Load(*modelConfigPath)
+	if err != nil {
+		return fmt.Errorf("load model config: %w", err)
 	}
-	predictionsPath := filepath.Join(*output, "preds.json")
-	if err := artifact.WriteJSON(predictionsPath, preds); err != nil {
+	if strings.TrimSpace(modelCfg["MODEL_NAME"]) == "" {
+		return fmt.Errorf("model config has no model.model_name or MODEL_NAME")
+	}
+	envCfg, err := environment.LoadConfig(*environmentConfigPath)
+	if err != nil {
 		return err
+	}
+	factory := environment.DockerFactory{
+		Config:         envCfg,
+		DockerHost:     *dockerHost,
+		CommandTimeout: *commandTimeout,
+		CaseTimeout:    *caseTimeout,
+	}
+	executor := sweagent.Executor{Factory: factory, ModelConfig: modelCfg, CaseTimeout: *caseTimeout}
+
+	predictionsPath := filepath.Join(*output, "preds.json")
+	preds := map[string]contract.Prediction{}
+	exitCounts := map[string]int{}
+	var mu sync.Mutex
+	jobs := make(chan contract.Case)
+	var wg sync.WaitGroup
+	ctx := context.Background()
+	for worker := 0; worker < *workers; worker++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for c := range jobs {
+				caseResult := executor.Execute(ctx, c)
+				tracePath := filepath.Join(*output, c.InstanceID, c.InstanceID+".traj.json")
+				if writeErr := artifact.WriteJSON(tracePath, caseResult); writeErr != nil {
+					caseResult.Info.ExitStatus = "ArtifactError"
+					caseResult.Info.Error = writeErr.Error()
+				}
+				mu.Lock()
+				preds[c.InstanceID] = contract.Prediction{
+					ModelNameOrPath: "trpc-agent-go/" + modelCfg["MODEL_NAME"],
+					InstanceID:      c.InstanceID,
+					ModelPatch:      caseResult.ModelPatch,
+				}
+				exitCounts[caseResult.Info.ExitStatus]++
+				writeErr := artifact.WriteJSONAtomic(predictionsPath, preds)
+				mu.Unlock()
+				if writeErr != nil {
+					fmt.Printf("instance=%s status=ArtifactError error=%q\n", c.InstanceID, writeErr)
+					continue
+				}
+				fmt.Printf("instance=%s status=%s patch_bytes=%d\n", c.InstanceID, caseResult.Info.ExitStatus, len(caseResult.ModelPatch))
+			}
+		}()
+	}
+	for _, c := range selected {
+		jobs <- c
+	}
+	close(jobs)
+	wg.Wait()
+	if len(selected) == 0 {
+		if err := artifact.WriteJSONAtomic(predictionsPath, preds); err != nil {
+			return err
+		}
 	}
 
-	var redacted modelconfig.EnvConfig
-	if strings.TrimSpace(*modelConfigPath) != "" {
-		cfg, err := modelconfig.Load(*modelConfigPath)
-		if err != nil {
-			return fmt.Errorf("load model config: %w", err)
-		}
-		redacted = modelconfig.RedactSecrets(cfg)
-	}
 	finish := time.Now()
+	status := "completed"
+	if exitCounts["Error"] > 0 || exitCounts["ArtifactError"] > 0 {
+		status = "completed_with_errors"
+	}
 	doc := manifest{
-		RunID:       *runID,
-		RunnerType:  "trpc-agent-go-native",
-		StartedAt:   start.UTC(),
-		FinishedAt:  finish.UTC(),
-		DurationMS:  finish.Sub(start).Milliseconds(),
-		Cases:       artifact.AbsPath(*casesPath),
-		OutputDir:   artifact.AbsPath(*output),
-		Filter:      *filter,
-		CaseCount:   len(selected),
-		Predictions: artifact.AbsPath(predictionsPath),
-		ModelConfig: redacted,
-		Status:      "skeleton",
+		RunID:            *runID,
+		RunnerType:       "trpc-agent-go-native",
+		FrameworkVersion: "v1.10.1-0.20260616104537-c6c3bb29ab60",
+		AgentProtocol:    "mini-swe-agent-v2.1-compatible",
+		StartedAt:        start.UTC(),
+		FinishedAt:       finish.UTC(),
+		DurationMS:       finish.Sub(start).Milliseconds(),
+		Cases:            artifact.AbsPath(*casesPath),
+		OutputDir:        artifact.AbsPath(*output),
+		Filter:           *filter,
+		CaseCount:        len(selected),
+		Workers:          *workers,
+		Predictions:      artifact.AbsPath(predictionsPath),
+		ModelConfig:      modelconfig.RedactSecrets(modelCfg),
+		Environment:      artifact.AbsPath(*environmentConfigPath),
+		CommandTimeout:   commandTimeout.String(),
+		CaseTimeout:      caseTimeout.String(),
+		ExitStatusCounts: exitCounts,
+		Status:           status,
 		Notes: []string{
-			"Native agent loop is not implemented yet; predictions intentionally contain empty patches.",
+			"Each case uses an official SWE-Bench Docker image and an independent tRPC agent runner.",
+			"Predictions are updated atomically after every completed case.",
 		},
 	}
-	if err := artifact.WriteJSON(filepath.Join(*output, "native-runner-manifest.json"), doc); err != nil {
+	manifestPath := filepath.Join(*output, "native-runner-manifest.json")
+	if err := artifact.WriteJSON(manifestPath, doc); err != nil {
 		return err
 	}
-	fmt.Printf("selected=%d\npredictions=%s\nmanifest=%s\n", len(selected), predictionsPath, filepath.Join(*output, "native-runner-manifest.json"))
+	fmt.Printf("selected=%d\npredictions=%s\nmanifest=%s\n", len(selected), predictionsPath, manifestPath)
 	return nil
 }
 

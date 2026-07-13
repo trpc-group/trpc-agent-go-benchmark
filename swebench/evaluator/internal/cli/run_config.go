@@ -131,6 +131,7 @@ type runnerManifest struct {
 	DurationMS  int64             `json:"duration_ms"`
 	OutputDir   string            `json:"output_dir"`
 	CaseCount   int               `json:"case_count"`
+	Workers     int               `json:"workers,omitempty"`
 	Predictions string            `json:"predictions"`
 	ModelConfig map[string]string `json:"model_config,omitempty"`
 	Status      string            `json:"status,omitempty"`

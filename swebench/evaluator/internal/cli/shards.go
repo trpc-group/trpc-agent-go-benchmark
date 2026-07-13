@@ -200,7 +200,19 @@ func summarizeShard(batch batchPlanItem, runsRoot, rawSubdir string) shardSummar
 			shard.FailureReason = fmt.Sprintf("run-mini exit code %d", miniManifest.Command.ExitCode)
 		}
 	} else {
-		shard.FailureReason = "missing or invalid run-mini-manifest.json"
+		var nativeManifest runnerManifest
+		nativePath := filepath.Join(rawDir, "native-runner-manifest.json")
+		if nativeErr := readJSONFile(nativePath, &nativeManifest); nativeErr == nil {
+			shard.Workers = nativeManifest.Workers
+			shard.StartedAt = nativeManifest.StartedAt.UTC().Format(time.RFC3339Nano)
+			shard.FinishedAt = nativeManifest.FinishedAt.UTC().Format(time.RFC3339Nano)
+			shard.DurationMS = nativeManifest.DurationMS
+			if nativeManifest.Status == "completed_with_errors" {
+				shard.FailureReason = "native runner completed with errors"
+			}
+		} else {
+			shard.FailureReason = "missing or invalid run-mini-manifest.json and native-runner-manifest.json"
+		}
 	}
 	preds, err := readPredictions(filepath.Join(rawDir, "preds.json"))
 	if err == nil {
