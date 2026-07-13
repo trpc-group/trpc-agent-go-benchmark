@@ -23,7 +23,8 @@ import (
 const (
 	SubmissionMarker = "COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT"
 	maxObservation   = 10000
-	upstreamCommit   = "3a9b8e874d322a9cfb1f391ff4f4df67721c108c"
+	// UpstreamCommit pins the source target used by all parity fixtures.
+	UpstreamCommit = "3a9b8e874d322a9cfb1f391ff4f4df67721c108c"
 )
 
 const formatErrorTemplate = `Tool call error:

@@ -17,8 +17,11 @@ inside an explicit source-aligned control loop:
 - resumable runs, live LLM/tool progress, and endpoint-error classification.
 
 Docker is only required when cases are executed. Unit tests use fake
-environments and a mock model. Until the deterministic Docker smoke is checked,
-the manifest deliberately labels this runner `trpc-agent-go-native-experimental`.
+environments and a mock model. The source-generated text goldens, normalized
+Python/Go loop oracle, and opt-in official-image Docker smoke form the parity
+gate. Manifests identify a passing build as
+`mini-swe-agent-v2.1-source-aligned`; provider transport and orchestration stay
+explicitly separate adapters.
 
 ## Run
 
@@ -86,4 +89,13 @@ On completion it writes the shard summary and merged predictions under
 ```bash
 go test ./trpc-agent-go-impl/...
 go test -race ./trpc-agent-go-impl/...
+```
+
+On a Docker host, run the deterministic official-image smoke without sending a
+model request:
+
+```bash
+SWE_DOCKER_SMOKE_INSTANCE=astropy__astropy-12907 \
+  go test -count=1 -run TestDockerMiniAgentSmoke -v \
+  ./trpc-agent-go-impl/internal/sweagent
 ```

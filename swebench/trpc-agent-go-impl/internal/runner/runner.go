@@ -32,6 +32,7 @@ type manifest struct {
 	RunnerType                 string            `json:"runner_type"`
 	FrameworkVersion           string            `json:"framework_version"`
 	AgentProtocol              string            `json:"agent_protocol"`
+	UpstreamCommit             string            `json:"upstream_commit"`
 	StartedAt                  time.Time         `json:"started_at"`
 	FinishedAt                 time.Time         `json:"finished_at"`
 	DurationMS                 int64             `json:"duration_ms"`
@@ -221,9 +222,10 @@ func Run(args []string) error {
 	}
 	doc := manifest{
 		RunID:                      *runID,
-		RunnerType:                 "trpc-agent-go-native-experimental",
+		RunnerType:                 "trpc-agent-go-native",
 		FrameworkVersion:           "v1.10.1-0.20260616104537-c6c3bb29ab60",
-		AgentProtocol:              "mini-swe-agent-v2.1-source-parity-pending-docker-smoke",
+		AgentProtocol:              "mini-swe-agent-v2.1-source-aligned",
+		UpstreamCommit:             sweagent.UpstreamCommit,
 		StartedAt:                  start.UTC(),
 		FinishedAt:                 finish.UTC(),
 		DurationMS:                 finish.Sub(start).Milliseconds(),
