@@ -11,6 +11,9 @@ package sweagent
 
 import (
 	"context"
+	"errors"
+	"io"
+	"net/http"
 	"testing"
 	"time"
 
@@ -76,5 +79,61 @@ func TestExecutorRunsTRPCAgentWithMockModelAndFakeEnvironment(t *testing.T) {
 	}
 	if len(result.Events) == 0 {
 		t.Fatal("expected tRPC runner events")
+	}
+}
+
+type roundTripperFunc func(*http.Request) (*http.Response, error)
+
+func (f roundTripperFunc) RoundTrip(request *http.Request) (*http.Response, error) {
+	return f(request)
+}
+
+type contextAwareBody struct {
+	ctx  context.Context
+	done bool
+}
+
+func (b *contextAwareBody) Read(p []byte) (int, error) {
+	if err := b.ctx.Err(); err != nil {
+		return 0, err
+	}
+	if b.done {
+		return 0, io.EOF
+	}
+	b.done = true
+	return copy(p, "ok"), nil
+}
+
+func (*contextAwareBody) Close() error { return nil }
+
+func TestTimeoutTransportKeepsContextUntilResponseBodyCloses(t *testing.T) {
+	var body *contextAwareBody
+	transport := timeoutTransport{
+		timeout: time.Minute,
+		base: roundTripperFunc(func(request *http.Request) (*http.Response, error) {
+			body = &contextAwareBody{ctx: request.Context()}
+			return &http.Response{StatusCode: http.StatusOK, Body: body, Header: make(http.Header)}, nil
+		}),
+	}
+	request, err := http.NewRequest(http.MethodGet, "http://example.test", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	response, err := transport.RoundTrip(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	data, err := io.ReadAll(response.Body)
+	if err != nil {
+		t.Fatalf("read response body: %v", err)
+	}
+	if string(data) != "ok" {
+		t.Fatalf("body = %q", data)
+	}
+	if err := response.Body.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if !errors.Is(body.ctx.Err(), context.Canceled) {
+		t.Fatalf("body context error = %v, want canceled after Close", body.ctx.Err())
 	}
 }

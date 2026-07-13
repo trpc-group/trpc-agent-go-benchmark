@@ -12,6 +12,7 @@ package sweagent
 import (
 	"context"
 	"fmt"
+	"io"
 	"net/http"
 	"strconv"
 	"strings"
@@ -184,8 +185,24 @@ type timeoutTransport struct {
 
 func (t timeoutTransport) RoundTrip(request *http.Request) (*http.Response, error) {
 	ctx, cancel := context.WithTimeout(request.Context(), t.timeout)
-	defer cancel()
-	return t.base.RoundTrip(request.Clone(ctx))
+	response, err := t.base.RoundTrip(request.Clone(ctx))
+	if err != nil {
+		cancel()
+		return nil, err
+	}
+	response.Body = &cancelOnCloseBody{ReadCloser: response.Body, cancel: cancel}
+	return response, nil
+}
+
+type cancelOnCloseBody struct {
+	io.ReadCloser
+	cancel context.CancelFunc
+}
+
+func (b *cancelOnCloseBody) Close() error {
+	err := b.ReadCloser.Close()
+	b.cancel()
+	return err
 }
 
 func generationConfig(cfg modelconfig.EnvConfig) model.GenerationConfig {
