@@ -15,56 +15,111 @@ import (
 	"testing"
 
 	"trpc.group/trpc-go/trpc-agent-go-benchmark/swebench/trpc-agent-go-impl/internal/environment"
-	"trpc.group/trpc-go/trpc-agent-go/agent"
-	"trpc.group/trpc-go/trpc-agent-go/tool"
+	"trpc.group/trpc-go/trpc-agent-go/model"
 )
 
 type fakeEnvironment struct {
 	commands []string
-	patch    string
+	results  []environment.CommandResult
 }
 
 func (f *fakeEnvironment) Execute(_ context.Context, command string) environment.CommandResult {
 	f.commands = append(f.commands, command)
-	if strings.Contains(command, "git diff") {
-		return environment.CommandResult{Output: f.patch}
+	if len(f.results) == 0 {
+		return environment.CommandResult{Output: "executed"}
 	}
-	return environment.CommandResult{Output: "executed"}
+	result := f.results[0]
+	f.results = f.results[1:]
+	return result
 }
 
 func (*fakeEnvironment) Close(context.Context) error { return nil }
 
-func TestSubmissionMarkerStopsInvocationWithoutShellExecution(t *testing.T) {
-	env := &fakeEnvironment{}
-	submission := &Submission{}
-	callable := NewBashTool(env, submission).(tool.CallableTool)
-	invocation := agent.NewInvocation()
-	ctx := agent.NewInvocationContext(context.Background(), invocation)
-	result, err := callable.Call(ctx, []byte(`{"command":"  COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT\nfixed it"}`))
-	if err != nil {
-		t.Fatal(err)
+func TestSubmissionFromActualCommandOutput(t *testing.T) {
+	tests := []struct {
+		name   string
+		result environment.CommandResult
+		want   string
+		ok     bool
+	}{
+		{
+			name:   "submitted",
+			result: environment.CommandResult{Output: "  \nCOMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT\ndiff --git a/a b/a\n"},
+			want:   "diff --git a/a b/a\n",
+			ok:     true,
+		},
+		{
+			name:   "marker only",
+			result: environment.CommandResult{Output: SubmissionMarker},
+			want:   "",
+			ok:     true,
+		},
+		{
+			name:   "python splitlines boundary",
+			result: environment.CommandResult{Output: SubmissionMarker + "\rpatch\r"},
+			want:   "patch\r",
+			ok:     true,
+		},
+		{
+			name:   "nonzero",
+			result: environment.CommandResult{Output: SubmissionMarker + "\npatch", ReturnCode: 1},
+		},
+		{
+			name:   "not first line",
+			result: environment.CommandResult{Output: "noise\n" + SubmissionMarker + "\npatch"},
+		},
 	}
-	if len(env.commands) != 0 {
-		t.Fatalf("shell commands = %#v, want none", env.commands)
-	}
-	if !invocation.EndInvocation {
-		t.Fatal("EndInvocation = false, want true")
-	}
-	if text, ok := submission.Value(); !ok || text != "fixed it" {
-		t.Fatalf("submission = %q, %v", text, ok)
-	}
-	if result.(environment.CommandResult).ReturnCode != 0 {
-		t.Fatalf("result = %+v", result)
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			got, ok := SubmissionFromResult(test.result)
+			if got != test.want || ok != test.ok {
+				t.Fatalf("SubmissionFromResult() = (%q, %v), want (%q, %v)", got, ok, test.want, test.ok)
+			}
+		})
 	}
 }
 
-func TestFormatObservationTruncatesUnicodeByCharacters(t *testing.T) {
-	output := strings.Repeat("界", maxObservation+20)
-	got := FormatObservation(environment.CommandResult{Output: output, ReturnCode: 7, ExceptionInfo: "boom"})
-	if !strings.Contains(got, "<exception>boom</exception>") || !strings.Contains(got, "<returncode>7</returncode>") {
-		t.Fatalf("observation metadata missing: %q", got[:100])
+func TestParseActions(t *testing.T) {
+	calls := []model.ToolCall{
+		{ID: "one", Function: model.FunctionDefinitionParam{Name: "bash", Arguments: []byte(`{"command":"pwd"}`)}},
+		{ID: "two", Function: model.FunctionDefinitionParam{Name: "bash", Arguments: []byte(`{"command":"git status"}`)}},
 	}
-	if !strings.Contains(got, "20 characters elided") {
+	actions, err := ParseActions(calls)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(actions) != 2 || actions[0].Command != "pwd" || actions[1].ToolCallID != "two" {
+		t.Fatalf("actions = %#v", actions)
+	}
+}
+
+func TestParseActionsReturnsFormatError(t *testing.T) {
+	_, err := ParseActions(nil)
+	if err == nil || !strings.Contains(err.Error(), "No tool calls found") || !strings.Contains(err.Error(), "Every response needs to use the 'bash' tool") {
+		t.Fatalf("error = %v", err)
+	}
+	_, err = ParseActions([]model.ToolCall{{Function: model.FunctionDefinitionParam{Name: "other", Arguments: []byte(`{}`)}}})
+	if err == nil || !strings.Contains(err.Error(), "Unknown tool 'other'.Missing 'command'") {
+		t.Fatalf("error = %v", err)
+	}
+	_, err = ParseActions([]model.ToolCall{{Function: model.FunctionDefinitionParam{Name: "bash", Arguments: []byte(`{"command":`)}}})
+	want := formatError("Error parsing tool call arguments: Expecting value: line 1 column 12 (char 11). Missing 'command' argument in bash tool call.").Error()
+	if err == nil || err.Error() != want {
+		t.Fatalf("malformed JSON error = %q, want %q", err, want)
+	}
+}
+
+func TestFormatObservationLengthBoundary(t *testing.T) {
+	short := FormatObservation(environment.CommandResult{Output: strings.Repeat("界", maxObservation-1), ReturnCode: 7})
+	if strings.Contains(short, "<warning>") || !strings.Contains(short, "<returncode>7</returncode>") {
+		t.Fatalf("short observation boundary mismatch")
+	}
+	exact := FormatObservation(environment.CommandResult{Output: strings.Repeat("界", maxObservation), ExceptionInfo: "boom"})
+	if !strings.Contains(exact, "<exception>boom</exception>") || !strings.Contains(exact, "0 characters elided") {
+		t.Fatalf("exact observation boundary mismatch")
+	}
+	long := FormatObservation(environment.CommandResult{Output: strings.Repeat("界", maxObservation+20)})
+	if !strings.Contains(long, "20 characters elided") {
 		t.Fatalf("truncation marker missing")
 	}
 }

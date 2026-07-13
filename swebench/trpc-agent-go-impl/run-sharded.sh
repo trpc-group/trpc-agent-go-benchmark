@@ -16,8 +16,8 @@ cases="data/generated/cases.jsonl"
 environment_config="config/environments/swebench-testbed.yaml"
 plan_dir=""
 runs_root="results/runs"
-initial_workers=10
-max_workers=15
+initial_workers=15
+max_workers=20
 stall_seconds=600
 poll_seconds=60
 
@@ -161,8 +161,9 @@ for filter_file in "$plan_dir"/batch-*.filter; do
       --output "$output" \
       --filter "$(<"$filter_file")" \
       --agent-workers "$workers" \
+      --resume-policy retryable \
       --case-timeout 2h \
-      --command-timeout 2m >>"$log" 2>&1 &
+      --command-timeout 1m >>"$log" 2>&1 &
     runner_pid=$!
     stalled=0
     while kill -0 "$runner_pid" 2>/dev/null; do
@@ -187,7 +188,7 @@ for filter_file in "$plan_dir"/batch-*.filter; do
 
     if (( stalled == 1 )); then
       cleanup_run_containers "$run_id"
-      workers=$((workers / 2))
+      workers=$((workers - 2))
       (( workers < 1 )) && workers=1
       continue
     fi
@@ -203,7 +204,7 @@ for filter_file in "$plan_dir"/batch-*.filter; do
     fi
     if (( transient_errors > 0 )); then
       echo "$(date -Is) shard=$batch_index transient_endpoint_errors=$transient_errors" | tee -a "$log"
-      workers=$((workers / 2))
+      workers=$((workers - 2))
       (( workers < 1 )) && workers=1
       if (( workers == 1 )); then
         w1_failures=$((w1_failures + 1))

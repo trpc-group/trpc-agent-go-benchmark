@@ -11,9 +11,11 @@ package sweagent
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 
@@ -27,6 +29,62 @@ type fakeFactory struct{ env environment.Environment }
 
 func (f fakeFactory) Start(context.Context, string) (environment.Environment, error) {
 	return f.env, nil
+}
+
+func TestExecutorOpenAIAdapterSendsUpstreamToolRequest(t *testing.T) {
+	requests := make(chan map[string]any, 1)
+	transport := roundTripperFunc(func(request *http.Request) (*http.Response, error) {
+		var body map[string]any
+		if err := json.NewDecoder(request.Body).Decode(&body); err != nil {
+			return nil, err
+		}
+		requests <- body
+		response := `{
+			"id":"chatcmpl-1","object":"chat.completion","created":1,"model":"mock",
+			"choices":[{"index":0,"message":{"role":"assistant","content":"done","tool_calls":[{"id":"submit-1","type":"function","function":{"name":"bash","arguments":"{\"command\":\"submit\"}"}}]},"finish_reason":"tool_calls"}]
+		}`
+		return &http.Response{
+			StatusCode: http.StatusOK,
+			Header:     http.Header{"Content-Type": []string{"application/json"}},
+			Body:       io.NopCloser(strings.NewReader(response)),
+			Request:    request,
+		}, nil
+	})
+
+	patch := "diff --git a/a b/a\n"
+	env := &fakeEnvironment{results: []environment.CommandResult{{Output: SubmissionMarker + "\n" + patch}}}
+	executor := Executor{
+		Factory: fakeFactory{env: env},
+		ModelConfig: modelconfig.EnvConfig{
+			"MODEL_NAME":      "mock",
+			"OPENAI_BASE_URL": "http://example.test/v1",
+			"OPENAI_API_KEY":  "test-key",
+		},
+		CaseTimeout: time.Minute,
+		ModelFactory: func(config modelconfig.EnvConfig) model.Model {
+			return newModelWithTransport(config, transport)
+		},
+	}
+	result := executor.Execute(context.Background(), contract.Case{InstanceID: "repo__repo-1", ProblemStatement: "fix it"})
+	if result.Info.ExitStatus != "Submitted" || result.ModelPatch != patch {
+		t.Fatalf("result = %#v", result)
+	}
+	body := <-requests
+	if body["parallel_tool_calls"] != true || body["temperature"] != float64(0) {
+		t.Fatalf("request settings = %#v", body)
+	}
+	tools, ok := body["tools"].([]any)
+	if !ok || len(tools) != 1 {
+		t.Fatalf("tools = %#v", body["tools"])
+	}
+	function := tools[0].(map[string]any)["function"].(map[string]any)
+	if function["name"] != "bash" {
+		t.Fatalf("tool function = %#v", function)
+	}
+	messages := body["messages"].([]any)
+	if messages[0].(map[string]any)["content"] != SystemPrompt || messages[1].(map[string]any)["content"] != PromptForTask("fix it") {
+		t.Fatalf("messages do not match upstream prompt")
+	}
 }
 
 type submissionModel struct{}
@@ -59,7 +117,8 @@ func (submissionModel) GenerateContent(_ context.Context, _ *model.Request) (<-c
 }
 
 func TestExecutorRunsTRPCAgentWithMockModelAndFakeEnvironment(t *testing.T) {
-	env := &fakeEnvironment{patch: "diff --git a/a b/a\n--- a/a\n+++ b/a\n+fixed\n"}
+	patch := "diff --git a/a b/a\n--- a/a\n+++ b/a\n+fixed\n"
+	env := &fakeEnvironment{results: []environment.CommandResult{{Output: SubmissionMarker + "\n" + patch}}}
 	var progress []ProgressUpdate
 	executor := Executor{
 		Factory:     fakeFactory{env: env},
@@ -76,14 +135,14 @@ func TestExecutorRunsTRPCAgentWithMockModelAndFakeEnvironment(t *testing.T) {
 	if result.Info.ExitStatus != "Submitted" {
 		t.Fatalf("exit status = %q, error = %q", result.Info.ExitStatus, result.Info.Error)
 	}
-	if result.Info.Submission != "done" {
+	if result.Info.Submission != patch {
 		t.Fatalf("submission = %q", result.Info.Submission)
 	}
-	if result.ModelPatch != env.patch {
+	if result.ModelPatch != patch {
 		t.Fatalf("patch = %q", result.ModelPatch)
 	}
-	if len(result.Events) == 0 {
-		t.Fatal("expected tRPC runner events")
+	if len(result.TRPCResponses) == 0 {
+		t.Fatal("expected raw tRPC model responses")
 	}
 	if result.LLMCalls != 1 || result.ToolCalls != 1 {
 		t.Fatalf("llm calls = %d, tool calls = %d", result.LLMCalls, result.ToolCalls)

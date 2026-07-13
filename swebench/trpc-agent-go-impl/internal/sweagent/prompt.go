@@ -10,40 +10,145 @@
 package sweagent
 
 import (
-	"fmt"
 	"strings"
 
 	"trpc.group/trpc-go/trpc-agent-go-benchmark/swebench/internal/contract"
 )
 
-// SystemPrompt matches the deliberately small mini-swe-agent system role.
+// SystemPrompt is rendered from v2.1.0 config/benchmarks/swebench.yaml.
 const SystemPrompt = "You are a helpful assistant that can interact with a computer shell to solve programming tasks."
 
-const instancePrompt = `Your task is to write a patch that resolves the following issue in the repository.
+// instancePrompt is copied verbatim from mini-swe-agent v2.1.0's SWE-Bench
+// configuration. Keep the task placeholder literal so substitution matches
+// Jinja's plain string rendering without interpreting percent characters.
+const instancePrompt = `<pr_description>
+Consider the following PR description:
+{{task}}
+</pr_description>
 
-<issue>
-%s
-</issue>
+<instructions>
+# Task Instructions
 
-You are in the root directory of the repository. Follow these rules:
+## Overview
 
-1. Inspect the relevant code and tests before editing.
-2. Make the smallest complete source-code change that fixes the issue.
-3. Run focused tests or other checks when practical.
-4. Do not modify tests, build artifacts, generated files, or repository metadata unless the issue explicitly requires it.
-5. Do not use interactive commands, editors, or commands that wait for user input.
-6. Use the bash tool for every repository operation. Each call runs independently, so include any required working-directory changes in the command.
-7. When the solution is complete, submit it by calling bash with a command whose first line is exactly:
-COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT
-Do not place that marker in prose or combine it with shell commands. Any following lines are treated as a short final summary.
+You're a software engineer interacting continuously with a computer by submitting commands.
+You'll be helping implement necessary changes to meet requirements in the PR description.
+Your task is specifically to make changes to non-test files in the current directory in order to fix the issue described in the PR description in a way that is general and consistent with the codebase.
+<IMPORTANT>This is an interactive process where you will think and issue AT LEAST ONE command, see the result, then think and issue your next command(s).</important>
 
-The evaluator will collect the final patch from git diff. Do not merely describe a patch; edit the repository.`
+For each response:
 
-// PromptForCase renders the safe benchmark fields visible to the agent.
-func PromptForCase(c contract.Case) string {
-	issue := strings.TrimSpace(c.ProblemStatement)
-	if hints := strings.TrimSpace(c.HintsText); hints != "" {
-		issue += "\n\nHints:\n" + hints
+1. Include a THOUGHT section explaining your reasoning and what you're trying to accomplish
+2. Provide one or more bash tool calls to execute
+
+## Important Boundaries
+
+- MODIFY: Regular source code files in /testbed (this is the working directory for all your subsequent commands)
+- DO NOT MODIFY: Tests, configuration files (pyproject.toml, setup.cfg, etc.)
+
+## Recommended Workflow
+
+1. Analyze the codebase by finding and reading relevant files
+2. Create a script to reproduce the issue
+3. Edit the source code to resolve the issue
+4. Verify your fix works by running your script again
+5. Test edge cases to ensure your fix is robust
+
+## Command Execution Rules
+
+You are operating in an environment where
+
+1. You issue at least one command
+3. The system executes the command(s) in a subshell
+4. You see the result(s)
+5. You write your next command(s)
+
+Each response should include:
+
+1. **Reasoning text** where you explain your analysis and plan
+2. At least one tool call with your command
+
+**CRITICAL REQUIREMENTS:**
+
+- Your response SHOULD include reasoning text explaining what you're doing
+- Your response MUST include AT LEAST ONE bash tool call. You can make MULTIPLE tool calls in a single response when the commands are independent (e.g., searching multiple files, reading different parts of the codebase).
+- Directory or environment variable changes are not persistent. Every action is executed in a new subshell.
+- However, you can prefix any action with [[BACKTICK]]MY_ENV_VAR=MY_VALUE cd /path/to/working/dir && ...[[BACKTICK]] or write/load environment variables from files
+
+Example of a CORRECT response:
+<example_response>
+I need to understand the Builder-related code. Let me find relevant files and check the project structure.
+
+[Makes multiple bash tool calls: {"command": "ls -la"}, {"command": "find src -name '*.java' | grep -i builder"}, {"command": "cat README.md | head -50"}]
+</example_response>
+
+## Environment Details
+
+- You have a full Linux shell environment
+- Always use non-interactive flags (-y, -f) for commands
+- Avoid interactive tools like vi, nano, or any that require user input
+- You can use bash commands or invoke any tool that is available in the environment
+- You can also create new tools or scripts to help you with the task
+- If a tool isn't available, you can also install it
+
+## Submission
+
+When you've completed your work, you MUST submit your changes as a git patch.
+Follow these steps IN ORDER, with SEPARATE commands:
+
+Step 1: Create the patch file
+Run [[BACKTICK]]git diff -- path/to/file1 path/to/file2 > patch.txt[[BACKTICK]] listing only the source files you modified.
+Do NOT commit your changes.
+
+<IMPORTANT>
+The patch must only contain changes to the specific source files you modified to fix the issue.
+Do not submit file creations or changes to any of the following files:
+
+- test and reproduction files
+- helper scripts, tests, or tools that you created
+- installation, build, packaging, configuration, or setup scripts unless they are directly part of the issue you were fixing (you can assume that the environment is already set up for your client)
+- binary or compiled files
+</IMPORTANT>
+
+Step 2: Verify your patch
+Inspect patch.txt to confirm it only contains your intended changes and headers show [[BACKTICK]]--- a/[[BACKTICK]] and [[BACKTICK]]+++ b/[[BACKTICK]] paths.
+
+Step 3: Submit (EXACT command required)
+You MUST use this EXACT command to submit:
+
+[[BACKTICK]][[BACKTICK]][[BACKTICK]]bash
+echo COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT && cat patch.txt
+[[BACKTICK]][[BACKTICK]][[BACKTICK]]
+
+If the command fails (nonzero exit status), it will not submit.
+
+<CRITICAL>
+- Creating/viewing the patch and submitting it MUST be separate commands (not combined with &&).
+- If you modify patch.txt after verifying, you SHOULD verify again before submitting.
+- You CANNOT continue working (reading, editing, testing) in any way on this task after submitting.
+</CRITICAL>
+</instructions>`
+
+// PromptForTask renders only the problem statement, matching the upstream
+// swebench runner's agent.run(task=instance["problem_statement"]).
+func PromptForTask(task string) string {
+	return strings.NewReplacer("{{task}}", task, "[[BACKTICK]]", "`").Replace(instancePrompt)
+}
+
+func agentTrajectoryConfig() map[string]any {
+	return map[string]any{
+		"agent": map[string]any{
+			"system_template":   SystemPrompt + "\n",
+			"instance_template": strings.ReplaceAll(instancePrompt, "[[BACKTICK]]", "`") + "\n",
+			"step_limit":        maxSteps,
+			"cost_limit":        3.0,
+			"output_path":       nil,
+		},
+		"agent_type": "minisweagent.run.benchmarks.swebench.ProgressTrackingAgent",
 	}
-	return fmt.Sprintf(instancePrompt, issue)
+}
+
+// PromptForCase is retained for callers and deliberately ignores hints_text.
+func PromptForCase(c contract.Case) string {
+	return PromptForTask(c.ProblemStatement)
 }

@@ -11,48 +11,51 @@ package sweagent
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
 
+	openaiopt "github.com/openai/openai-go/option"
 	"trpc.group/trpc-go/trpc-agent-go-benchmark/swebench/internal/contract"
 	"trpc.group/trpc-go/trpc-agent-go-benchmark/swebench/internal/modelconfig"
 	"trpc.group/trpc-go/trpc-agent-go-benchmark/swebench/trpc-agent-go-impl/internal/environment"
-	"trpc.group/trpc-go/trpc-agent-go/agent"
-	"trpc.group/trpc-go/trpc-agent-go/agent/llmagent"
-	"trpc.group/trpc-go/trpc-agent-go/event"
 	"trpc.group/trpc-go/trpc-agent-go/model"
 	"trpc.group/trpc-go/trpc-agent-go/model/openai"
-	agentRunner "trpc.group/trpc-go/trpc-agent-go/runner"
-	"trpc.group/trpc-go/trpc-agent-go/tool"
 )
-
-const maxSteps = 250
 
 // CaseResult is the complete native result for one instance.
 type CaseResult struct {
-	InstanceID  string         `json:"instance_id"`
-	Info        CaseInfo       `json:"info"`
-	Messages    []TraceMessage `json:"messages"`
-	Events      []*event.Event `json:"events,omitempty"`
-	ModelPatch  string         `json:"-"`
-	DurationMS  int64          `json:"duration_ms"`
-	Environment string         `json:"environment"`
-	EventCount  int            `json:"event_count"`
-	LLMCalls    int            `json:"llm_calls"`
-	ToolCalls   int            `json:"tool_calls"`
+	InstanceID       string            `json:"instance_id"`
+	Info             CaseInfo          `json:"info"`
+	Messages         []TraceMessage    `json:"messages"`
+	TrajectoryFormat string            `json:"trajectory_format"`
+	TRPCResponses    []*model.Response `json:"-"`
+	ModelPatch       string            `json:"-"`
+	DurationMS       int64             `json:"duration_ms"`
+	Environment      string            `json:"environment"`
+	EventCount       int               `json:"event_count"`
+	LLMCalls         int               `json:"llm_calls"`
+	ToolCalls        int               `json:"tool_calls"`
 }
 
 // CaseInfo is compatible with the shared trajectory importer.
 type CaseInfo struct {
-	ExitStatus    string `json:"exit_status"`
-	Submission    string `json:"submission,omitempty"`
-	Error         string `json:"error,omitempty"`
-	ErrorCategory string `json:"error_category,omitempty"`
-	Retryable     bool   `json:"retryable,omitempty"`
+	ModelStats    ModelStats     `json:"model_stats"`
+	Config        map[string]any `json:"config,omitempty"`
+	MiniVersion   string         `json:"mini_version"`
+	ExitStatus    string         `json:"exit_status"`
+	Submission    string         `json:"submission,omitempty"`
+	Error         string         `json:"error,omitempty"`
+	ErrorCategory string         `json:"error_category,omitempty"`
+	Retryable     bool           `json:"retryable,omitempty"`
+}
+
+// ModelStats matches DefaultAgent.serialize's model_stats object.
+type ModelStats struct {
+	InstanceCost float64 `json:"instance_cost"`
+	APICalls     int     `json:"api_calls"`
 }
 
 // ProgressUpdate is a compact, frequently updated view of an active case.
@@ -72,9 +75,12 @@ type ProgressUpdate struct {
 
 // TraceMessage provides a mini-compatible terminal message.
 type TraceMessage struct {
-	Role    string         `json:"role"`
-	Content string         `json:"content"`
-	Extra   map[string]any `json:"extra,omitempty"`
+	Role             string           `json:"role"`
+	Content          string           `json:"content"`
+	ToolCalls        []model.ToolCall `json:"tool_calls,omitempty"`
+	ToolCallID       string           `json:"tool_call_id,omitempty"`
+	ReasoningContent string           `json:"reasoning_content,omitempty"`
+	Extra            map[string]any   `json:"extra,omitempty"`
 }
 
 // Executor runs one case with a fresh tRPC agent and environment.
@@ -86,7 +92,7 @@ type Executor struct {
 	Progress     func(ProgressUpdate)
 }
 
-// Execute runs one safe SWE-Bench case and always attempts to collect git diff.
+// Execute runs one SWE-Bench case with the source-aligned mini-SWE-agent loop.
 func (e Executor) Execute(ctx context.Context, c contract.Case) (result CaseResult) {
 	started := time.Now()
 	lastEventAt := started
@@ -94,7 +100,10 @@ func (e Executor) Execute(ctx context.Context, c contract.Case) (result CaseResu
 	lastEventObject := ""
 	result.InstanceID = c.InstanceID
 	result.Environment = "docker"
+	result.TrajectoryFormat = "mini-swe-agent-1.1"
 	result.Info.ExitStatus = "Error"
+	result.Info.MiniVersion = "2.1.0"
+	result.Info.Config = agentTrajectoryConfig()
 	report := func(phase string) {
 		if e.Progress == nil {
 			return
@@ -128,7 +137,7 @@ func (e Executor) Execute(ctx context.Context, c contract.Case) (result CaseResu
 		result.Info.Error = err.Error()
 		result.Info.ErrorCategory = ErrorCategoryEnvironment
 		result.Info.Retryable = true
-		result.finishMessage()
+		result.Messages = append(result.Messages, errorExitMessage(err))
 		return result
 	}
 	defer func() {
@@ -148,91 +157,73 @@ func (e Executor) Execute(ctx context.Context, c contract.Case) (result CaseResu
 	}
 	caseCtx, cancel := context.WithTimeout(ctx, caseTimeout)
 	defer cancel()
-	submission := &Submission{}
 	var modelImpl model.Model = newModel(e.ModelConfig)
 	if e.ModelFactory != nil {
 		modelImpl = e.ModelFactory(e.ModelConfig)
 	}
-	ag := llmagent.New("mini-swe-agent",
-		llmagent.WithModel(modelImpl),
-		llmagent.WithGlobalInstruction(SystemPrompt),
-		llmagent.WithTools([]tool.Tool{NewBashTool(env, submission)}),
-		llmagent.WithToolCallbacks(ToolCallbacks()),
-		llmagent.WithGenerationConfig(generationConfig(e.ModelConfig)),
-		llmagent.WithMaxLLMCalls(maxSteps),
-		llmagent.WithMaxToolIterations(maxSteps),
-		llmagent.WithEnableParallelTools(false),
-		llmagent.WithEnableCodeExecutionResponseProcessor(false),
-	)
-	r := agentRunner.NewRunner("swebench", ag)
-	defer r.Close()
-	events, err := r.Run(caseCtx, "swebench", c.InstanceID, model.NewUserMessage(PromptForCase(c)), agent.WithMaxRunDuration(caseTimeout))
-	if err != nil {
-		result.Info.Error = err.Error()
-	} else {
-		for ev := range events {
-			result.Events = append(result.Events, ev)
+	loop := MiniAgent{
+		Model:            modelImpl,
+		Environment:      env,
+		GenerationConfig: generationConfig(e.ModelConfig),
+		StepLimit:        maxSteps,
+		OnQueryStart: func(calls int) {
+			result.LLMCalls = calls
+			lastEventAt = time.Now()
+			lastEventObject = "model.request"
+			report("running")
+		},
+		OnLLMResponse: func(response *model.Response) {
 			result.EventCount++
 			lastEventAt = time.Now()
-			if ev != nil && ev.Response != nil {
-				lastEventObject = ev.Object
-				switch ev.Object {
-				case model.ObjectTypeChatCompletion:
-					result.LLMCalls++
-					completedAt := lastEventAt.UTC()
-					lastLLMAt = &completedAt
-				case model.ObjectTypeToolResponse:
-					result.ToolCalls++
-				}
-			}
-			if ev != nil && ev.Response != nil && ev.Error != nil {
-				result.Info.Error = ev.Error.Message
+			lastEventObject = response.Object
+			if response.Done {
+				completedAt := lastEventAt.UTC()
+				lastLLMAt = &completedAt
 			}
 			report("running")
-		}
+		},
+		OnToolResult: func(_ Action, _ environment.CommandResult) {
+			result.ToolCalls++
+			result.EventCount++
+			lastEventAt = time.Now()
+			lastEventObject = "tool.response"
+			report("running")
+		},
 	}
-	if text, ok := submission.Value(); ok {
-		result.Info.ExitStatus = "Submitted"
-		result.Info.Submission = text
-		result.Info.ErrorCategory = ""
-		result.Info.Retryable = false
-	} else if caseCtx.Err() == context.DeadlineExceeded {
+	loopResult := loop.Run(caseCtx, c.ProblemStatement)
+	result.Info = loopResult.Info
+	result.Info.ModelStats = ModelStats{InstanceCost: loopResult.Cost, APICalls: loopResult.LLMCalls}
+	result.Info.MiniVersion = "2.1.0"
+	result.Info.Config = agentTrajectoryConfig()
+	result.Messages = loopResult.Messages
+	result.TRPCResponses = loopResult.Responses
+	result.LLMCalls = loopResult.LLMCalls
+	result.ToolCalls = loopResult.ToolCalls
+	result.ModelPatch = loopResult.Submission
+	lastEventAt = loopResult.LastEventAt
+	lastLLMAt = loopResult.LastLLMAt
+	if caseCtx.Err() == context.DeadlineExceeded {
 		result.Info.ExitStatus = "Timeout"
 		result.Info.Error = caseCtx.Err().Error()
 		result.Info.ErrorCategory = ErrorCategoryCaseTimeout
-	} else if strings.Contains(strings.ToLower(result.Info.Error), "limit") {
-		result.Info.ExitStatus = "LimitsExceeded"
-		result.Info.ErrorCategory = ErrorCategoryAgentLimit
-	} else if result.Info.Error == "" {
-		result.Info.ExitStatus = "NoSubmission"
 	}
 	if result.Info.Error != "" && result.Info.ErrorCategory == "" {
 		result.Info.ErrorCategory, result.Info.Retryable = ClassifyError(result.Info.Error)
 	}
-	patch := env.Execute(context.Background(), "git add -N . >/dev/null 2>&1; git diff --binary --no-ext-diff")
-	if patch.ReturnCode == 0 {
-		result.ModelPatch = patch.Output
-	} else if result.Info.Error == "" {
-		result.Info.Error = fmt.Sprintf("collect patch: %s", patch.ExceptionInfo)
-		result.Info.ErrorCategory = ErrorCategoryEnvironment
-		result.Info.Retryable = true
-	}
-	result.finishMessage()
 	return result
 }
 
-func (r *CaseResult) finishMessage() {
-	r.Messages = append(r.Messages, TraceMessage{
-		Role:    "exit",
-		Content: r.Info.ExitStatus,
-		Extra:   map[string]any{"exit_status": r.Info.ExitStatus},
-	})
+func newModel(cfg modelconfig.EnvConfig) model.Model {
+	return newModelWithTransport(cfg, nil)
 }
 
-func newModel(cfg modelconfig.EnvConfig) model.Model {
+func newModelWithTransport(cfg modelconfig.EnvConfig, transport http.RoundTripper) model.Model {
 	opts := []openai.Option{
 		openai.WithAPIKey(cfg["OPENAI_API_KEY"]),
 		openai.WithBaseURL(cfg["OPENAI_BASE_URL"]),
+		// mini-SWE-agent owns the ten-attempt exponential retry loop. Disable
+		// the SDK's nested retries so an attempt has the same meaning.
+		openai.WithOpenAIOptions(openaiopt.WithMaxRetries(0)),
 	}
 	headers := map[string]string{}
 	for envKey, header := range map[string]string{
@@ -247,11 +238,17 @@ func newModel(cfg modelconfig.EnvConfig) model.Model {
 	if len(headers) > 0 {
 		opts = append(opts, openai.WithHeaders(headers))
 	}
+	baseTransport := transport
+	if baseTransport == nil {
+		baseTransport = http.DefaultTransport
+	}
 	if seconds, err := strconv.ParseFloat(cfg["MODEL_TIMEOUT_SECONDS"], 64); err == nil && seconds > 0 {
 		opts = append(opts, openai.WithHTTPClientOptions(openai.WithHTTPClientTransport(timeoutTransport{
-			base:    http.DefaultTransport,
+			base:    baseTransport,
 			timeout: time.Duration(seconds * float64(time.Second)),
 		})))
+	} else if transport != nil {
+		opts = append(opts, openai.WithHTTPClientOptions(openai.WithHTTPClientTransport(transport)))
 	}
 	return openai.New(cfg["MODEL_NAME"], opts...)
 }

@@ -42,7 +42,7 @@ func TestPrepareResumeSkipsCompleteAndRetriesRetryable(t *testing.T) {
 	}})
 	selected := []contract.Case{{InstanceID: "repo__repo-1"}, {InstanceID: "repo__repo-2"}}
 
-	state, err := prepareResume(output, predictionsPath, selected, false)
+	state, err := prepareResume(output, predictionsPath, selected, false, resumePolicyRetryable)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -59,7 +59,7 @@ func TestPrepareResumeSkipsCompleteAndRetriesRetryable(t *testing.T) {
 		t.Fatal("prediction from another shard was removed")
 	}
 
-	redo, err := prepareResume(output, predictionsPath, selected, true)
+	redo, err := prepareResume(output, predictionsPath, selected, true, resumePolicyRetryable)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -68,5 +68,24 @@ func TestPrepareResumeSkipsCompleteAndRetriesRetryable(t *testing.T) {
 	}
 	if _, ok := redo.Predictions["other__repo-3"]; !ok {
 		t.Fatal("redo removed another shard")
+	}
+}
+
+func TestPrepareResumeUpstreamSkipsEveryExistingPrediction(t *testing.T) {
+	output := t.TempDir()
+	predictionsPath := filepath.Join(output, "preds.json")
+	predictions := map[string]contract.Prediction{
+		"repo__repo-1": {InstanceID: "repo__repo-1", ModelPatch: ""},
+	}
+	if err := artifact.WriteJSON(predictionsPath, predictions); err != nil {
+		t.Fatal(err)
+	}
+	selected := []contract.Case{{InstanceID: "repo__repo-1"}}
+	state, err := prepareResume(output, predictionsPath, selected, false, resumePolicyUpstream)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(state.Pending) != 0 || state.Skipped["repo__repo-1"].Info.ExitStatus != "ExistingPrediction" {
+		t.Fatalf("state = %#v", state)
 	}
 }

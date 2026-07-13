@@ -45,6 +45,7 @@ type manifest struct {
 	PredictionCount            int               `json:"prediction_count"`
 	Workers                    int               `json:"workers"`
 	RedoExisting               bool              `json:"redo_existing"`
+	ResumePolicy               string            `json:"resume_policy"`
 	Predictions                string            `json:"predictions"`
 	Progress                   string            `json:"progress"`
 	ModelConfig                map[string]string `json:"model_config,omitempty"`
@@ -75,6 +76,7 @@ func Run(args []string) error {
 	caseTimeout := fs.Duration("case-timeout", 2*time.Hour, "timeout for each case")
 	dockerHost := fs.String("docker-host", "", "optional Docker daemon endpoint")
 	redoExisting := fs.Bool("redo-existing", false, "rerun selected cases even when complete artifacts exist")
+	resumePolicy := fs.String("resume-policy", resumePolicyUpstream, "resume policy: upstream or retryable")
 	if err := fs.Parse(args[1:]); err != nil {
 		return err
 	}
@@ -89,6 +91,9 @@ func Run(args []string) error {
 	}
 	if *workers <= 0 {
 		return fmt.Errorf("-agent-workers must be positive")
+	}
+	if *resumePolicy != resumePolicyUpstream && *resumePolicy != resumePolicyRetryable {
+		return fmt.Errorf("-resume-policy must be %q or %q", resumePolicyUpstream, resumePolicyRetryable)
 	}
 	if *output == "" {
 		*output = filepath.Join("results", "runs", *runID)
@@ -125,7 +130,7 @@ func Run(args []string) error {
 		Labels:         map[string]string{"trpc-agent-go.run_id": *runID},
 	}
 	predictionsPath := filepath.Join(*output, "preds.json")
-	resume, err := prepareResume(*output, predictionsPath, selected, *redoExisting)
+	resume, err := prepareResume(*output, predictionsPath, selected, *redoExisting, *resumePolicy)
 	if err != nil {
 		return fmt.Errorf("prepare resume state: %w", err)
 	}
@@ -157,6 +162,13 @@ func Run(args []string) error {
 			defer wg.Done()
 			for c := range jobs {
 				caseResult := executor.Execute(ctx, c)
+				responsesPath := filepath.Join(*output, c.InstanceID, c.InstanceID+".trpc-responses.json")
+				if writeErr := artifact.WriteJSON(responsesPath, caseResult.TRPCResponses); writeErr != nil {
+					caseResult.Info.ExitStatus = "ArtifactError"
+					caseResult.Info.Error = writeErr.Error()
+					caseResult.Info.ErrorCategory = sweagent.ErrorCategoryArtifact
+					caseResult.Info.Retryable = true
+				}
 				tracePath := filepath.Join(*output, c.InstanceID, c.InstanceID+".traj.json")
 				if writeErr := artifact.WriteJSON(tracePath, caseResult); writeErr != nil {
 					caseResult.Info.ExitStatus = "ArtifactError"
@@ -198,11 +210,20 @@ func Run(args []string) error {
 		}
 	}
 	cumulativeExitCounts, cumulativeErrorCategories, cumulativeServiceErrors := aggregateResultCounts(*output, preds)
+	notes := []string{
+		"Each case uses an official SWE-Bench Docker image and an independent source-aligned control loop over the tRPC model transport.",
+		"Predictions are updated atomically after every completed case.",
+	}
+	if *resumePolicy == resumePolicyUpstream {
+		notes = append(notes, "Upstream resume policy skips every instance already present in preds.json.")
+	} else {
+		notes = append(notes, "Extension resume policy retries missing, incomplete, and retryable trajectories.")
+	}
 	doc := manifest{
 		RunID:                      *runID,
-		RunnerType:                 "trpc-agent-go-native",
+		RunnerType:                 "trpc-agent-go-native-experimental",
 		FrameworkVersion:           "v1.10.1-0.20260616104537-c6c3bb29ab60",
-		AgentProtocol:              "mini-swe-agent-v2.1-compatible",
+		AgentProtocol:              "mini-swe-agent-v2.1-source-parity-pending-docker-smoke",
 		StartedAt:                  start.UTC(),
 		FinishedAt:                 finish.UTC(),
 		DurationMS:                 finish.Sub(start).Milliseconds(),
@@ -216,6 +237,7 @@ func Run(args []string) error {
 		PredictionCount:            len(preds),
 		Workers:                    *workers,
 		RedoExisting:               *redoExisting,
+		ResumePolicy:               *resumePolicy,
 		Predictions:                artifact.AbsPath(predictionsPath),
 		Progress:                   artifact.AbsPath(progressPath),
 		ModelConfig:                modelconfig.RedactSecrets(modelCfg),
@@ -229,11 +251,7 @@ func Run(args []string) error {
 		CumulativeErrorCategories:  cumulativeErrorCategories,
 		CumulativeServiceErrors:    cumulativeServiceErrors,
 		Status:                     status,
-		Notes: []string{
-			"Each case uses an official SWE-Bench Docker image and an independent tRPC agent runner.",
-			"Predictions are updated atomically after every completed case.",
-			"Existing complete non-retryable cases are skipped by default; use --redo-existing to rerun selected cases.",
-		},
+		Notes:                      notes,
 	}
 	manifestPath := filepath.Join(*output, "native-runner-manifest.json")
 	if err := artifact.WriteJSON(manifestPath, doc); err != nil {

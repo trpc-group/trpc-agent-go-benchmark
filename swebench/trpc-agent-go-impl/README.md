@@ -1,17 +1,24 @@
 # tRPC-Agent-Go SWE Agent
 
-This directory contains the Go-native SWE-Bench agent. It preserves the key
-mini-swe-agent v2.1 behavior while using `trpc-agent-go` for the model/tool loop:
+This directory contains the Go-native SWE-Bench agent. Its compatibility target
+is mini-SWE-agent v2.1.0 at commit
+`3a9b8e874d322a9cfb1f391ff4f4df67721c108c`; see [`UPSTREAM.md`](UPSTREAM.md).
+The implementation uses tRPC-Agent-Go's model, message, and tool abstractions
+inside an explicit source-aligned control loop:
 
 - one `bash` tool and a linear 250-step limit;
 - one official SWE-Bench Docker testbed per instance, rooted at `/testbed`;
-- mini-compatible command observations and 10,000-character truncation;
-- the `COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT` submission protocol;
+- byte-for-byte golden-tested prompt, FormatError, and command observations;
+- sequential execution of all bash calls returned in one model response;
+- submission only when successful command stdout starts with
+  `COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT`;
+- LiteLLM-compatible ten-attempt model retry timing;
 - concurrent cases, incremental atomic predictions, and per-case trajectories;
 - resumable runs, live LLM/tool progress, and endpoint-error classification.
 
-Docker is only required when cases are executed. Unit and integration tests use
-fake environments and a mock model.
+Docker is only required when cases are executed. Unit tests use fake
+environments and a mock model. Until the deterministic Docker smoke is checked,
+the manifest deliberately labels this runner `trpc-agent-go-native-experimental`.
 
 ## Run
 
@@ -29,16 +36,18 @@ go run ./trpc-agent-go-impl \
 ```
 
 Useful runtime controls are `--command-timeout`, `--case-timeout`, and
-`--docker-host`. Existing complete cases are skipped by default. Retryable
-endpoint/environment failures and incomplete artifacts are attempted again;
-`--redo-existing` deliberately reruns every selected case. The output directory
-contains:
+`--docker-host`. The default `--resume-policy upstream` skips every case already
+present in `preds.json`, matching mini-SWE-agent. The optional
+`--resume-policy retryable` extension retries endpoint/environment failures and
+incomplete artifacts; `--redo-existing` reruns every selected case. The output
+directory contains:
 
 ```text
 preds.json
 native-runner-manifest.json
 native-runner-progress.json
 <instance_id>/<instance_id>.traj.json
+<instance_id>/<instance_id>.trpc-responses.json
 ```
 
 `preds.json` is directly consumable by the official SWE-Bench harness. The
@@ -60,15 +69,16 @@ without deleting completed artifacts:
 ./trpc-agent-go-impl/run-sharded.sh \
   --run-prefix trpc-glm52-full500-$(date +%Y%m%d) \
   --model-config config/models/glm-5.2.local.yaml \
-  --initial-workers 10 \
-  --max-workers 15
+  --initial-workers 15 \
+  --max-workers 20
 ```
 
 After a stable shard, concurrency increases by one. Final transient endpoint
-errors or ten minutes with no LLM result reduce concurrency by half and retry
+errors or ten minutes with no LLM result reduce concurrency by two and retry
 only incomplete/retryable cases. At one worker the no-progress window becomes
-30 minutes. Permanent endpoint/configuration errors pause the supervisor. On
-completion it writes the shard summary and merged predictions under
+30 minutes. Permanent endpoint/configuration errors pause the supervisor. This
+AIMD supervisor is an orchestration extension, not part of the v2.1 agent core.
+On completion it writes the shard summary and merged predictions under
 `results/runs/<run-prefix>/`.
 
 ## Validate without Docker

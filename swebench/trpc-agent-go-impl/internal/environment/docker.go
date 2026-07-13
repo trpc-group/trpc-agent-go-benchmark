@@ -123,8 +123,8 @@ func (e *dockerEnvironment) Execute(ctx context.Context, command string) Command
 		return result
 	}
 	if errors.Is(commandCtx.Err(), context.DeadlineExceeded) {
-		result.ReturnCode = 124
-		result.ExceptionInfo = fmt.Sprintf("command timed out after %s", timeout)
+		result.ReturnCode = -1
+		result.ExceptionInfo = fmt.Sprintf("An error occurred while executing the command: command timed out after %s", timeout)
 		result.TimedOut = true
 		return result
 	}

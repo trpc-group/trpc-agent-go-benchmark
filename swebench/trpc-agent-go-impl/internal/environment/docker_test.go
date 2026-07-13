@@ -26,12 +26,41 @@ type fakeCommander struct {
 	commands []recordedCommand
 }
 
+type timeoutCommander struct{}
+
+func (timeoutCommander) Run(ctx context.Context, _ []string, _ string, args ...string) ([]byte, error) {
+	if len(args) == 0 || args[0] != "exec" {
+		return []byte("container-id"), nil
+	}
+	<-ctx.Done()
+	return []byte("partial"), ctx.Err()
+}
+
 func (f *fakeCommander) Run(_ context.Context, env []string, name string, args ...string) ([]byte, error) {
 	f.commands = append(f.commands, recordedCommand{env: env, name: name, args: append([]string(nil), args...)})
 	if len(args) > 0 && args[0] == "exec" {
 		return []byte("ok"), nil
 	}
 	return []byte("container-id"), nil
+}
+
+func TestDockerCommandTimeoutMatchesMiniEnvironmentResult(t *testing.T) {
+	var cfg Config
+	cfg.Environment.Interpreter = []string{"bash", "-c"}
+	factory := DockerFactory{
+		Config:         cfg,
+		CommandTimeout: time.Millisecond,
+		CaseTimeout:    time.Hour,
+		Commander:      timeoutCommander{},
+	}
+	env, err := factory.Start(context.Background(), "repo__repo-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	result := env.Execute(context.Background(), "sleep 10")
+	if result.ReturnCode != -1 || !result.TimedOut || result.Output != "partial" || !strings.HasPrefix(result.ExceptionInfo, "An error occurred while executing the command:") {
+		t.Fatalf("result = %#v", result)
+	}
 }
 
 func TestImageForInstance(t *testing.T) {

@@ -25,7 +25,12 @@ type resumeState struct {
 	Skipped     map[string]sweagent.CaseResult
 }
 
-func prepareResume(output, predictionsPath string, selected []contract.Case, redoExisting bool) (resumeState, error) {
+const (
+	resumePolicyUpstream  = "upstream"
+	resumePolicyRetryable = "retryable"
+)
+
+func prepareResume(output, predictionsPath string, selected []contract.Case, redoExisting bool, policy string) (resumeState, error) {
 	state := resumeState{
 		Predictions: map[string]contract.Prediction{},
 		Skipped:     map[string]sweagent.CaseResult{},
@@ -46,10 +51,17 @@ func prepareResume(output, predictionsPath string, selected []contract.Case, red
 		}
 		var result sweagent.CaseResult
 		tracePath := filepath.Join(output, c.InstanceID, c.InstanceID+".traj.json")
-		if err := artifact.ReadJSONFile(tracePath, &result); err != nil || result.Info.ExitStatus == "" || result.Info.Retryable {
+		traceErr := artifact.ReadJSONFile(tracePath, &result)
+		if policy == resumePolicyRetryable && (traceErr != nil || result.Info.ExitStatus == "" || result.Info.Retryable) {
 			delete(state.Predictions, c.InstanceID)
 			state.Pending = append(state.Pending, c)
 			continue
+		}
+		if traceErr != nil || result.Info.ExitStatus == "" {
+			// Upstream mini-SWE-agent considers preds.json authoritative and
+			// skips every existing key without inspecting its trajectory.
+			result.InstanceID = c.InstanceID
+			result.Info.ExitStatus = "ExistingPrediction"
 		}
 		if prediction.InstanceID == "" {
 			prediction.InstanceID = c.InstanceID
