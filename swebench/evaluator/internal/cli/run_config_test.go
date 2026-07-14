@@ -16,7 +16,7 @@ import (
 	"time"
 )
 
-func TestRunConfigSupportsGenericNativeRunnerManifest(t *testing.T) {
+func TestRunConfigSupportsMiniGoRunnerManifest(t *testing.T) {
 	dir := t.TempDir()
 	start := time.Date(2026, 7, 13, 1, 0, 0, 0, time.UTC)
 
@@ -33,12 +33,12 @@ func TestRunConfigSupportsGenericNativeRunnerManifest(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	runnerDir := filepath.Join(dir, "native")
+	runnerDir := filepath.Join(dir, "mini-go")
 	predictionsPath := filepath.Join(runnerDir, "preds.json")
-	runnerManifestPath := filepath.Join(runnerDir, "native-runner-manifest.json")
+	runnerManifestPath := filepath.Join(runnerDir, "mini-go-runner-manifest.json")
 	if err := writeJSON(runnerManifestPath, runnerManifest{
-		RunID:       "native-run",
-		RunnerType:  "trpc-agent-go-native",
+		RunID:       "mini-go-run",
+		RunnerType:  "mini-swe-agent-go",
 		StartedAt:   start,
 		FinishedAt:  start.Add(2 * time.Minute),
 		DurationMS:  int64((2 * time.Minute) / time.Millisecond),
@@ -73,10 +73,10 @@ func TestRunConfigSupportsGenericNativeRunnerManifest(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	importSummaryPath := filepath.Join(dir, "imported", "summary", "native.json")
+	importSummaryPath := filepath.Join(dir, "imported", "summary", "mini-go.json")
 	if err := writeJSON(importSummaryPath, importSummary{
 		GeneratedAt: start.Add(5 * time.Minute),
-		Target:      "native",
+		Target:      "mini-go",
 		Total:       1,
 		Counts:      map[string]int{"empty_patch": 1},
 	}); err != nil {
@@ -85,8 +85,8 @@ func TestRunConfigSupportsGenericNativeRunnerManifest(t *testing.T) {
 
 	outputPath := filepath.Join(dir, "run_config.json")
 	err := runRunConfig([]string{
-		"--run-id", "native-run",
-		"--target", "native",
+		"--run-id", "mini-go-run",
+		"--target", "mini-go",
 		"--cases-manifest", casesManifestPath,
 		"--runner-manifest", runnerManifestPath,
 		"--verifier-manifest", verifyManifestPath,
@@ -102,8 +102,8 @@ func TestRunConfigSupportsGenericNativeRunnerManifest(t *testing.T) {
 	if err := readJSONFile(outputPath, &doc); err != nil {
 		t.Fatal(err)
 	}
-	if doc.Runner.Type != "trpc-agent-go-native" {
-		t.Fatalf("Runner.Type = %q, want trpc-agent-go-native", doc.Runner.Type)
+	if doc.Runner.Type != "mini-swe-agent-go" {
+		t.Fatalf("Runner.Type = %q, want mini-swe-agent-go", doc.Runner.Type)
 	}
 	if doc.Concurrency.AgentGenerationWorkers != 0 {
 		t.Fatalf("AgentGenerationWorkers = %d, want 0 for generic manifest", doc.Concurrency.AgentGenerationWorkers)
@@ -112,10 +112,10 @@ func TestRunConfigSupportsGenericNativeRunnerManifest(t *testing.T) {
 		t.Fatalf("RunnerOutputDir = %q, want %q", doc.Artifacts.RunnerOutputDir, runnerDir)
 	}
 	if doc.Artifacts.MiniRawDir != "" {
-		t.Fatalf("MiniRawDir = %q, want empty for native", doc.Artifacts.MiniRawDir)
+		t.Fatalf("MiniRawDir = %q, want empty for mini-go", doc.Artifacts.MiniRawDir)
 	}
 	if doc.SourceFiles.RunMiniManifest != "" {
-		t.Fatalf("RunMiniManifest = %q, want empty for native", doc.SourceFiles.RunMiniManifest)
+		t.Fatalf("RunMiniManifest = %q, want empty for mini-go", doc.SourceFiles.RunMiniManifest)
 	}
 	if _, err := os.Stat(outputPath); err != nil {
 		t.Fatalf("expected run_config.json: %v", err)

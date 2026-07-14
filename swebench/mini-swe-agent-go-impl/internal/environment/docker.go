@@ -65,7 +65,7 @@ func (f DockerFactory) Start(ctx context.Context, instanceID string) (Environmen
 	if caseTimeout <= 0 {
 		caseTimeout = 2 * time.Hour
 	}
-	name := unsafeContainerName.ReplaceAllString("trpc-swe-"+instanceID, "-")
+	name := unsafeContainerName.ReplaceAllString("mini-swe-go-"+instanceID, "-")
 	suffix := "-" + strconv.FormatInt(time.Now().UnixNano(), 36)
 	maxBase := 63 - len(suffix)
 	if len(name) > maxBase {

@@ -29,7 +29,7 @@ type importedCase struct {
 	Repo       string        `json:"repo,omitempty"`
 	BaseCommit string        `json:"base_commit,omitempty"`
 	Baseline   *targetResult `json:"baseline,omitempty"`
-	Native     *targetResult `json:"native,omitempty"`
+	MiniGo     *targetResult `json:"mini_go,omitempty"`
 }
 
 type targetResult struct {
@@ -59,7 +59,7 @@ type importSummary struct {
 
 func runImport(args []string) error {
 	fs := flag.NewFlagSet("import", flag.ExitOnError)
-	target := fs.String("target", "baseline", "target name; first version writes baseline")
+	target := fs.String("target", targetBaseline, targetHelp)
 	casesPath := fs.String("cases", "", "optional canonical cases.jsonl")
 	predsPath := fs.String("predictions", "", "mini preds.json path")
 	rawDir := fs.String("raw-dir", "", "mini raw output directory containing per-case trajectories")
@@ -75,8 +75,8 @@ func runImport(args []string) error {
 	if err := required(fs, "output", *output); err != nil {
 		return err
 	}
-	if *target != "baseline" && *target != "native" {
-		return fmt.Errorf("-target must be baseline or native")
+	if err := validateTarget(*target); err != nil {
+		return err
 	}
 	if err := ensureDir(*output); err != nil {
 		return err
@@ -168,10 +168,10 @@ func runImport(args []string) error {
 			BaseCommit: c.BaseCommit,
 		}
 		switch *target {
-		case "baseline":
+		case targetBaseline:
 			row.Baseline = &result
-		case "native":
-			row.Native = &result
+		case targetMiniGo:
+			row.MiniGo = &result
 		}
 		data, err := json.Marshal(row)
 		if err != nil {

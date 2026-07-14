@@ -20,12 +20,12 @@ import (
 	openaiopt "github.com/openai/openai-go/option"
 	"trpc.group/trpc-go/trpc-agent-go-benchmark/swebench/internal/contract"
 	"trpc.group/trpc-go/trpc-agent-go-benchmark/swebench/internal/modelconfig"
-	"trpc.group/trpc-go/trpc-agent-go-benchmark/swebench/trpc-agent-go-impl/internal/environment"
+	"trpc.group/trpc-go/trpc-agent-go-benchmark/swebench/mini-swe-agent-go-impl/internal/environment"
 	"trpc.group/trpc-go/trpc-agent-go/model"
 	"trpc.group/trpc-go/trpc-agent-go/model/openai"
 )
 
-// CaseResult is the complete native result for one instance.
+// CaseResult is the complete mini-go result for one instance.
 type CaseResult struct {
 	InstanceID       string            `json:"instance_id"`
 	Info             CaseInfo          `json:"info"`
@@ -83,7 +83,7 @@ type TraceMessage struct {
 	Extra            map[string]any   `json:"extra,omitempty"`
 }
 
-// Executor runs one case with a fresh tRPC agent and environment.
+// Executor runs one case with a fresh source-aligned mini agent and environment.
 type Executor struct {
 	Factory      environment.Factory
 	ModelConfig  modelconfig.EnvConfig

@@ -13,7 +13,7 @@ import (
 	"log"
 	"os"
 
-	"trpc.group/trpc-go/trpc-agent-go-benchmark/swebench/trpc-agent-go-impl/internal/runner"
+	"trpc.group/trpc-go/trpc-agent-go-benchmark/swebench/mini-swe-agent-go-impl/internal/runner"
 )
 
 func main() {

@@ -61,7 +61,7 @@ type verifyConfig struct {
 func runVerify(ctx context.Context, args []string) error {
 	fs := flag.NewFlagSet("verify", flag.ExitOnError)
 	runID := fs.String("run-id", "", "run id")
-	target := fs.String("target", "baseline", "baseline or native")
+	target := fs.String("target", targetBaseline, targetHelp)
 	predictions := fs.String("predictions", "", "predictions JSON/JSONL path")
 	output := fs.String("output", "", "output directory; defaults to results/runs/<run-id>/local-harness-report/<target>")
 	dataset := fs.String("dataset", defaultDatasetName, "SWE-Bench dataset name")
@@ -84,6 +84,9 @@ func runVerify(ctx context.Context, args []string) error {
 		return err
 	}
 	if err := required(fs, "predictions", *predictions); err != nil {
+		return err
+	}
+	if err := validateTarget(*target); err != nil {
 		return err
 	}
 	if *workers < 1 {

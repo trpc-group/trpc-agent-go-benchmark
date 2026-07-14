@@ -140,7 +140,7 @@ type runnerManifest struct {
 func runRunConfig(args []string) error {
 	fs := flag.NewFlagSet("run-config", flag.ExitOnError)
 	runID := fs.String("run-id", "", "run id")
-	target := fs.String("target", "baseline", "baseline or native")
+	target := fs.String("target", targetBaseline, targetHelp)
 	output := fs.String("output", "", "output run_config.json path; defaults to results/runs/<run-id>/run_config.json")
 	casesManifestPath := fs.String("cases-manifest", "", "cases.manifest.json path")
 	runMiniManifestPath := fs.String("run-mini-manifest", "", "run-mini-manifest.json path; deprecated alias for mini baseline")
@@ -170,6 +170,9 @@ func runRunConfig(args []string) error {
 		if err := required(fs, name, value); err != nil {
 			return err
 		}
+	}
+	if err := validateTarget(*target); err != nil {
+		return err
 	}
 	if strings.TrimSpace(*runnerManifestPath) == "" && strings.TrimSpace(*shardsManifestPath) == "" {
 		*runnerManifestPath = *runMiniManifestPath

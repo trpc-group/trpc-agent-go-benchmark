@@ -15,7 +15,7 @@ import (
 	"testing"
 	"time"
 
-	"trpc.group/trpc-go/trpc-agent-go-benchmark/swebench/trpc-agent-go-impl/internal/environment"
+	"trpc.group/trpc-go/trpc-agent-go-benchmark/swebench/mini-swe-agent-go-impl/internal/environment"
 	"trpc.group/trpc-go/trpc-agent-go/model"
 )
 
@@ -35,7 +35,7 @@ func TestDockerMiniAgentSmoke(t *testing.T) {
 		DockerHost:     os.Getenv("DOCKER_HOST"),
 		CommandTimeout: time.Minute,
 		CaseTimeout:    10 * time.Minute,
-		Labels:         map[string]string{"trpc-agent-go.smoke": "mini-v2.1-parity"},
+		Labels:         map[string]string{"mini-swe-agent-go.smoke": "mini-v2.1-parity"},
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()

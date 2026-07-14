@@ -1,7 +1,7 @@
-# tRPC-Agent-Go SWE Agent
+# mini-SWE-agent Go Implementation
 
-This directory contains the Go-native SWE-Bench agent. Its compatibility target
-is mini-SWE-agent v2.1.0 at commit
+This directory contains a Go port of mini-SWE-agent. Its compatibility target is
+mini-SWE-agent v2.1.0 at commit
 `3a9b8e874d322a9cfb1f391ff4f4df67721c108c`; see [`UPSTREAM.md`](UPSTREAM.md).
 The implementation uses tRPC-Agent-Go's model, message, and tool abstractions
 inside an explicit source-aligned control loop:
@@ -23,17 +23,21 @@ gate. Manifests identify a passing build as
 `mini-swe-agent-v2.1-source-aligned`; provider transport and orchestration stay
 explicitly separate adapters.
 
+This is not the tRPC-Agent-Go framework lane: it does not use `llmagent` or the
+tRPC-Agent-Go runner lifecycle. The name `trpc-agent-go-impl` is reserved for a
+future implementation built on those framework components.
+
 ## Run
 
 From `swebench/`:
 
 ```bash
-go run ./trpc-agent-go-impl \
-  --run-id native-smoke \
+go run ./mini-swe-agent-go-impl \
+  --run-id mini-go-smoke \
   --cases data/generated/cases.jsonl \
   --model-config config/models/<model>.yaml \
   --environment-config config/environments/swebench-testbed.yaml \
-  --output results/runs/native-smoke/raw/native \
+  --output results/runs/mini-go-smoke/raw/mini-go \
   --filter '^(astropy__astropy-12907)$' \
   --agent-workers 1
 ```
@@ -47,17 +51,17 @@ directory contains:
 
 ```text
 preds.json
-native-runner-manifest.json
-native-runner-progress.json
+mini-go-runner-manifest.json
+mini-go-runner-progress.json
 <instance_id>/<instance_id>.traj.json
 <instance_id>/<instance_id>.trpc-responses.json
 ```
 
 `preds.json` is directly consumable by the official SWE-Bench harness. The
 shared evaluator's import, shard-summary, and run-config commands accept the
-native artifacts without conversion.
+mini-go artifacts without conversion.
 
-`native-runner-progress.json` is updated while cases are active. It includes
+`mini-go-runner-progress.json` is updated while cases are active. It includes
 `last_llm_at`, event/LLM/tool counts, and final error categories. The manifest's
 `service_error_counts` contains only model endpoint errors, so agent outcomes
 such as `LimitsExceeded`, empty patches, and unresolved patches do not look like
@@ -69,8 +73,8 @@ The supervisor creates 10 fixed 50-case shards, runs them serially, and resumes
 without deleting completed artifacts:
 
 ```bash
-./trpc-agent-go-impl/run-sharded.sh \
-  --run-prefix trpc-glm52-full500-$(date +%Y%m%d) \
+./mini-swe-agent-go-impl/run-sharded.sh \
+  --run-prefix mini-go-glm52-full500-$(date +%Y%m%d) \
   --model-config config/models/glm-5.2.local.yaml \
   --initial-workers 15 \
   --max-workers 20
@@ -87,8 +91,8 @@ On completion it writes the shard summary and merged predictions under
 ## Validate without Docker
 
 ```bash
-go test ./trpc-agent-go-impl/...
-go test -race ./trpc-agent-go-impl/...
+go test ./mini-swe-agent-go-impl/...
+go test -race ./mini-swe-agent-go-impl/...
 ```
 
 On a Docker host, run the deterministic official-image smoke without sending a
@@ -97,5 +101,5 @@ model request:
 ```bash
 SWE_DOCKER_SMOKE_INSTANCE=astropy__astropy-12907 \
   go test -count=1 -run TestDockerMiniAgentSmoke -v \
-  ./trpc-agent-go-impl/internal/sweagent
+  ./mini-swe-agent-go-impl/internal/sweagent
 ```

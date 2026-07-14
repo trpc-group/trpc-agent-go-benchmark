@@ -71,13 +71,13 @@ if [[ ! -f "$plan_dir/plan.json" ]]; then
     --batch-size 50 || exit $?
 fi
 
-binary="$runs_root/$run_prefix/trpc-agent-go-impl"
-go build -o "$binary" ./trpc-agent-go-impl || exit $?
+binary="$runs_root/$run_prefix/mini-swe-agent-go-impl"
+go build -o "$binary" ./mini-swe-agent-go-impl || exit $?
 
 cleanup_run_containers() {
   local id="$1"
   local containers
-  containers=$(docker ps -aq --filter "label=trpc-agent-go.run_id=$id")
+  containers=$(docker ps -aq --filter "label=mini-swe-agent-go.run_id=$id")
   if [[ -n "$containers" ]]; then
     docker rm -f $containers >/dev/null
   fi
@@ -140,8 +140,8 @@ for filter_file in "$plan_dir"/batch-*.filter; do
   batch_name=$(basename "$filter_file" .filter)
   batch_index=${batch_name#batch-}
   run_id="$run_prefix-$batch_index"
-  output="$runs_root/$run_id/raw/native"
-  log="$runs_root/$run_id/native-runner.log"
+  output="$runs_root/$run_id/raw/mini-go"
+  log="$runs_root/$run_id/mini-go-runner.log"
   mkdir -p "$output"
   attempt=0
 
@@ -171,7 +171,7 @@ for filter_file in "$plan_dir"/batch-*.filter; do
       if ! kill -0 "$runner_pid" 2>/dev/null; then
         break
       fi
-      if [[ $(progress_stalled "$output/native-runner-progress.json" "$current_stall_seconds") == 1 ]]; then
+      if [[ $(progress_stalled "$output/mini-go-runner-progress.json" "$current_stall_seconds") == 1 ]]; then
         stalled=1
         echo "$(date -Is) shard=$batch_index no_llm_progress=1 stopping_pid=$runner_pid" | tee -a "$log"
         kill "$runner_pid" 2>/dev/null || true
@@ -197,7 +197,7 @@ for filter_file in "$plan_dir"/batch-*.filter; do
       exit "$runner_status"
     fi
 
-    read -r transient_errors permanent_errors < <(service_error_counts "$output/native-runner-manifest.json")
+    read -r transient_errors permanent_errors < <(service_error_counts "$output/mini-go-runner-manifest.json")
     if (( permanent_errors > 0 )); then
       echo "$(date -Is) shard=$batch_index permanent_endpoint_errors=$permanent_errors; fix configuration before resuming" | tee -a "$log" >&2
       exit 3
@@ -228,7 +228,7 @@ done
 go run ./evaluator summarize-shards \
   --plan "$plan_dir/plan.json" \
   --runs-root "$runs_root" \
-  --raw-subdir raw/native \
+  --raw-subdir raw/mini-go \
   --output "$runs_root/$run_prefix/shards.json" || exit $?
 go run ./evaluator merge-predictions \
   --shards "$runs_root/$run_prefix/shards.json" \

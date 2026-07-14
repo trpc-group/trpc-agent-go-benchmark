@@ -21,7 +21,7 @@ import (
 
 	"trpc.group/trpc-go/trpc-agent-go-benchmark/swebench/internal/contract"
 	"trpc.group/trpc-go/trpc-agent-go-benchmark/swebench/internal/modelconfig"
-	"trpc.group/trpc-go/trpc-agent-go-benchmark/swebench/trpc-agent-go-impl/internal/environment"
+	"trpc.group/trpc-go/trpc-agent-go-benchmark/swebench/mini-swe-agent-go-impl/internal/environment"
 	"trpc.group/trpc-go/trpc-agent-go/model"
 )
 
@@ -116,7 +116,7 @@ func (submissionModel) GenerateContent(_ context.Context, _ *model.Request) (<-c
 	return responses, nil
 }
 
-func TestExecutorRunsTRPCAgentWithMockModelAndFakeEnvironment(t *testing.T) {
+func TestExecutorRunsMiniGoAgentWithMockModelAndFakeEnvironment(t *testing.T) {
 	patch := "diff --git a/a b/a\n--- a/a\n+++ b/a\n+fixed\n"
 	env := &fakeEnvironment{results: []environment.CommandResult{{Output: SubmissionMarker + "\n" + patch}}}
 	var progress []ProgressUpdate

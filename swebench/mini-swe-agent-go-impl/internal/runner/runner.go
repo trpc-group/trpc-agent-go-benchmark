@@ -23,8 +23,8 @@ import (
 	"trpc.group/trpc-go/trpc-agent-go-benchmark/swebench/internal/artifact"
 	"trpc.group/trpc-go/trpc-agent-go-benchmark/swebench/internal/contract"
 	"trpc.group/trpc-go/trpc-agent-go-benchmark/swebench/internal/modelconfig"
-	"trpc.group/trpc-go/trpc-agent-go-benchmark/swebench/trpc-agent-go-impl/internal/environment"
-	"trpc.group/trpc-go/trpc-agent-go-benchmark/swebench/trpc-agent-go-impl/internal/sweagent"
+	"trpc.group/trpc-go/trpc-agent-go-benchmark/swebench/mini-swe-agent-go-impl/internal/environment"
+	"trpc.group/trpc-go/trpc-agent-go-benchmark/swebench/mini-swe-agent-go-impl/internal/sweagent"
 )
 
 type manifest struct {
@@ -63,9 +63,9 @@ type manifest struct {
 	Notes                      []string          `json:"notes,omitempty"`
 }
 
-// Run executes the native runner CLI.
+// Run executes the source-aligned mini-go runner CLI.
 func Run(args []string) error {
-	fs := flag.NewFlagSet("trpc-agent-go-impl", flag.ContinueOnError)
+	fs := flag.NewFlagSet("mini-swe-agent-go-impl", flag.ContinueOnError)
 	runID := fs.String("run-id", "", "run id")
 	casesPath := fs.String("cases", "data/generated/cases.jsonl", "safe SWE-Bench cases.jsonl")
 	modelConfigPath := fs.String("model-config", "", "model config YAML/env path")
@@ -128,7 +128,7 @@ func Run(args []string) error {
 		DockerHost:     *dockerHost,
 		CommandTimeout: *commandTimeout,
 		CaseTimeout:    *caseTimeout,
-		Labels:         map[string]string{"trpc-agent-go.run_id": *runID},
+		Labels:         map[string]string{"mini-swe-agent-go.run_id": *runID},
 	}
 	predictionsPath := filepath.Join(*output, "preds.json")
 	resume, err := prepareResume(*output, predictionsPath, selected, *redoExisting, *resumePolicy)
@@ -139,7 +139,7 @@ func Run(args []string) error {
 	if err := artifact.WriteJSONAtomic(predictionsPath, preds); err != nil {
 		return err
 	}
-	progressPath := filepath.Join(*output, "native-runner-progress.json")
+	progressPath := filepath.Join(*output, "mini-go-runner-progress.json")
 	progress := newProgressReporter(progressPath, *runID)
 	for id, result := range resume.Skipped {
 		progress.MarkSkipped(id, result)
@@ -179,7 +179,7 @@ func Run(args []string) error {
 				}
 				mu.Lock()
 				preds[c.InstanceID] = contract.Prediction{
-					ModelNameOrPath: "trpc-agent-go/" + modelCfg["MODEL_NAME"],
+					ModelNameOrPath: "mini-swe-agent-go/" + modelCfg["MODEL_NAME"],
 					InstanceID:      c.InstanceID,
 					ModelPatch:      caseResult.ModelPatch,
 				}
@@ -222,7 +222,7 @@ func Run(args []string) error {
 	}
 	doc := manifest{
 		RunID:                      *runID,
-		RunnerType:                 "trpc-agent-go-native",
+		RunnerType:                 "mini-swe-agent-go",
 		FrameworkVersion:           "v1.10.1-0.20260616104537-c6c3bb29ab60",
 		AgentProtocol:              "mini-swe-agent-v2.1-source-aligned",
 		UpstreamCommit:             sweagent.UpstreamCommit,
@@ -255,7 +255,7 @@ func Run(args []string) error {
 		Status:                     status,
 		Notes:                      notes,
 	}
-	manifestPath := filepath.Join(*output, "native-runner-manifest.json")
+	manifestPath := filepath.Join(*output, "mini-go-runner-manifest.json")
 	if err := artifact.WriteJSON(manifestPath, doc); err != nil {
 		return err
 	}

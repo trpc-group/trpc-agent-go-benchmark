@@ -2,8 +2,8 @@
 
 SWE-Bench Verified 使用真实 GitHub issue 评估软件工程 Agent 的修复能力。
 本 benchmark 提供一条可复现路径：运行官方 500 case test split，使用官方
-local harness 验证 patch，并对比 mini-SWE-agent 与 Go-native
-`trpc-agent-go` 实现。
+local harness 验证 patch，并对比官方 mini-SWE-agent runner 与使用
+tRPC-Agent-Go 模型传输和协议类型的 source-aligned Go 移植版。
 
 ## 结果
 
@@ -20,7 +20,7 @@ MiniMax M2.5 用于对齐 SWE-Bench 官网公开参考结果，验证 evaluator 
 和
 [`results/experiments/mini-swe-agent-glm-5.2-internal-r3.json`](results/experiments/mini-swe-agent-glm-5.2-internal-r3.json)。
 
-完整对比报告将在原生 `trpc-agent-go` run 完成后发布到
+完整对比报告将在 mini-go run 完成后发布到
 [`results/REPORT.md`](results/REPORT.md) 和
 [`results/REPORT.zh_CN.md`](results/REPORT.zh_CN.md)。
 
@@ -34,7 +34,7 @@ swebench/
   data/                    # 固定 case list 和生成的数据集元信息。
   evaluator/               # 共享 dataset、verifier、importer 和 report CLI。
   mini-swe-agent-impl/     # mini-SWE-agent baseline adapter。
-  trpc-agent-go-impl/      # Go-native SWE Agent 实现。
+  mini-swe-agent-go-impl/  # 使用 tRPC model transport 的 source-aligned Go 移植。
   results/                 # 报告和小型结构化摘要。
 ```
 
@@ -118,8 +118,12 @@ go run ./evaluator prepare-data --python python
 
 - mini-SWE-agent baseline:
   [`mini-swe-agent-impl/README.md`](mini-swe-agent-impl/README.md)
-- Go-native `trpc-agent-go` agent:
-  [`trpc-agent-go-impl/README.md`](trpc-agent-go-impl/README.md)
+- source-aligned mini-SWE-agent Go 移植：
+  [`mini-swe-agent-go-impl/README.md`](mini-swe-agent-go-impl/README.md)
+
+`trpc-agent-go-impl` 名称预留给未来真正使用 tRPC-Agent-Go `llmagent` 和
+runner 生命周期的实现。已有 source-aligned Go 结果已经迁移到 `mini-go`
+布局；`native` 不再是 evaluator target。
 
 后续步骤中的 `<path-to-preds.json>` 指向该文件。
 
@@ -130,9 +134,9 @@ go run ./evaluator prepare-data --python python
 ```bash
 go run ./evaluator verify \
   --run-id <run-id> \
-  --target <baseline-or-native> \
+  --target <baseline-or-mini-go> \
   --predictions <path-to-preds.json> \
-  --output results/runs/<run-id>/local-harness-report/<baseline-or-native> \
+  --output results/runs/<run-id>/local-harness-report/<baseline-or-mini-go> \
   --harness-workers 1
 ```
 
@@ -143,7 +147,7 @@ go run ./evaluator verify \
 
 ```bash
 go run ./evaluator import \
-  --target <baseline-or-native> \
+  --target <baseline-or-mini-go> \
   --cases data/generated/cases.jsonl \
   --predictions <path-to-preds.json> \
   --raw-dir <path-to-raw-run-dir> \
@@ -160,11 +164,11 @@ go run ./evaluator import \
 ```bash
 go run ./evaluator run-config \
   --run-id <run-id> \
-  --target <baseline-or-native> \
+  --target <baseline-or-mini-go> \
   --cases-manifest data/generated/cases.manifest.json \
   --runner-manifest <path-to-runner-manifest.json> \
-  --verifier-manifest results/runs/<run-id>/local-harness-report/<baseline-or-native>/verifier_manifest.json \
-  --import-summary results/runs/<run-id>/imported/summary/<baseline-or-native>.json \
+  --verifier-manifest results/runs/<run-id>/local-harness-report/<baseline-or-mini-go>/verifier_manifest.json \
+  --import-summary results/runs/<run-id>/imported/summary/<baseline-or-mini-go>.json \
   --harness-report <path-to-harness-report.json> \
   --model-name <model-name> \
   --output results/runs/<run-id>/run_config.json

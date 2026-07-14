@@ -14,7 +14,7 @@ import (
 	"strings"
 	"testing"
 
-	"trpc.group/trpc-go/trpc-agent-go-benchmark/swebench/trpc-agent-go-impl/internal/environment"
+	"trpc.group/trpc-go/trpc-agent-go-benchmark/swebench/mini-swe-agent-go-impl/internal/environment"
 	"trpc.group/trpc-go/trpc-agent-go/model"
 )
 
