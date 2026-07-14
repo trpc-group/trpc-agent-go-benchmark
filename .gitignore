@@ -43,6 +43,7 @@ swebench/results/**/workspaces/
 swebench/data/cache/
 swebench/data/raw/
 swebench/data/generated/
+swebench/data/batches/
 .gomodcache
 next-env.d.ts
 .codebuddy
