@@ -42,14 +42,22 @@ type CaseResult struct {
 
 // CaseInfo is compatible with the shared trajectory importer.
 type CaseInfo struct {
-	ModelStats    ModelStats     `json:"model_stats"`
-	Config        map[string]any `json:"config,omitempty"`
-	MiniVersion   string         `json:"mini_version"`
-	ExitStatus    string         `json:"exit_status"`
-	Submission    string         `json:"submission,omitempty"`
-	Error         string         `json:"error,omitempty"`
-	ErrorCategory string         `json:"error_category,omitempty"`
-	Retryable     bool           `json:"retryable,omitempty"`
+	ModelStats       ModelStats     `json:"model_stats"`
+	Config           map[string]any `json:"config,omitempty"`
+	MiniVersion      string         `json:"mini_version"`
+	ObservationCodec string         `json:"observation_codec,omitempty"`
+	BillingAgentName string         `json:"billing_agent_name,omitempty"`
+	ExperimentID     string         `json:"experiment_id,omitempty"`
+	SourceRevision   string         `json:"source_revision,omitempty"`
+	SourceModified   bool           `json:"source_modified,omitempty"`
+	BinarySHA256     string         `json:"binary_sha256,omitempty"`
+	ModelConfigHash  string         `json:"model_config_sha256,omitempty"`
+	CasesHash        string         `json:"cases_sha256,omitempty"`
+	ExitStatus       string         `json:"exit_status"`
+	Submission       string         `json:"submission,omitempty"`
+	Error            string         `json:"error,omitempty"`
+	ErrorCategory    string         `json:"error_category,omitempty"`
+	Retryable        bool           `json:"retryable,omitempty"`
 }
 
 // ModelStats matches DefaultAgent.serialize's model_stats object.
@@ -85,11 +93,19 @@ type TraceMessage struct {
 
 // Executor runs one case with a fresh source-aligned mini agent and environment.
 type Executor struct {
-	Factory      environment.Factory
-	ModelConfig  modelconfig.EnvConfig
-	CaseTimeout  time.Duration
-	ModelFactory func(modelconfig.EnvConfig) model.Model
-	Progress     func(ProgressUpdate)
+	Factory          environment.Factory
+	ModelConfig      modelconfig.EnvConfig
+	ObservationCodec ObservationCodec
+	BillingAgentName string
+	ExperimentID     string
+	SourceRevision   string
+	SourceModified   bool
+	BinarySHA256     string
+	ModelConfigHash  string
+	CasesHash        string
+	CaseTimeout      time.Duration
+	ModelFactory     func(modelconfig.EnvConfig) model.Model
+	Progress         func(ProgressUpdate)
 }
 
 // Execute runs one SWE-Bench case with the source-aligned mini-SWE-agent loop.
@@ -103,7 +119,16 @@ func (e Executor) Execute(ctx context.Context, c contract.Case) (result CaseResu
 	result.TrajectoryFormat = "mini-swe-agent-1.1"
 	result.Info.ExitStatus = "Error"
 	result.Info.MiniVersion = "2.1.0"
-	result.Info.Config = agentTrajectoryConfig()
+	codec := normalizeObservationCodec(e.ObservationCodec)
+	result.Info.ObservationCodec = string(codec)
+	result.Info.BillingAgentName = e.BillingAgentName
+	result.Info.ExperimentID = e.ExperimentID
+	result.Info.SourceRevision = e.SourceRevision
+	result.Info.SourceModified = e.SourceModified
+	result.Info.BinarySHA256 = e.BinarySHA256
+	result.Info.ModelConfigHash = e.ModelConfigHash
+	result.Info.CasesHash = e.CasesHash
+	result.Info.Config = agentTrajectoryConfig(codec)
 	report := func(phase string) {
 		if e.Progress == nil {
 			return
@@ -164,6 +189,7 @@ func (e Executor) Execute(ctx context.Context, c contract.Case) (result CaseResu
 	loop := MiniAgent{
 		Model:            modelImpl,
 		Environment:      env,
+		ObservationCodec: codec,
 		GenerationConfig: generationConfig(e.ModelConfig),
 		StepLimit:        maxSteps,
 		OnQueryStart: func(calls int) {
@@ -194,7 +220,15 @@ func (e Executor) Execute(ctx context.Context, c contract.Case) (result CaseResu
 	result.Info = loopResult.Info
 	result.Info.ModelStats = ModelStats{InstanceCost: loopResult.Cost, APICalls: loopResult.LLMCalls}
 	result.Info.MiniVersion = "2.1.0"
-	result.Info.Config = agentTrajectoryConfig()
+	result.Info.ObservationCodec = string(codec)
+	result.Info.BillingAgentName = e.BillingAgentName
+	result.Info.ExperimentID = e.ExperimentID
+	result.Info.SourceRevision = e.SourceRevision
+	result.Info.SourceModified = e.SourceModified
+	result.Info.BinarySHA256 = e.BinarySHA256
+	result.Info.ModelConfigHash = e.ModelConfigHash
+	result.Info.CasesHash = e.CasesHash
+	result.Info.Config = agentTrajectoryConfig(codec)
 	result.Messages = loopResult.Messages
 	result.TRPCResponses = loopResult.Responses
 	result.LLMCalls = loopResult.LLMCalls

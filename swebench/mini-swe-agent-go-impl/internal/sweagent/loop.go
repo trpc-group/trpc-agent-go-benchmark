@@ -28,6 +28,7 @@ const maxSteps = 250
 type MiniAgent struct {
 	Model            model.Model
 	Environment      environment.Environment
+	ObservationCodec ObservationCodec
 	GenerationConfig model.GenerationConfig
 	StepLimit        int
 	CostLimit        float64
@@ -163,7 +164,13 @@ func (a *MiniAgent) Run(ctx context.Context, task string) LoopResult {
 		}
 
 		for i, output := range outputs {
-			observation := FormatObservation(output)
+			observation, formatErr := FormatObservationWithCodec(output, a.ObservationCodec)
+			if formatErr != nil {
+				result.Info.ExitStatus = "Error"
+				result.Info.Error = formatErr.Error()
+				result.Messages = append(result.Messages, errorExitMessage(formatErr))
+				return result
+			}
 			trace := TraceMessage{
 				Role:       "tool",
 				Content:    observation,

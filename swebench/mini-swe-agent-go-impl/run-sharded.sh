@@ -20,9 +20,12 @@ initial_workers=15
 max_workers=20
 stall_seconds=600
 poll_seconds=60
+observation_codec="xml"
+billing_tag=""
+experiment_id=""
 
 usage() {
-  echo "usage: $0 --run-prefix ID [--model-config PATH] [--initial-workers N] [--max-workers N]"
+  echo "usage: $0 --run-prefix ID [--observation-codec xml|json|text] [--billing-tag SUFFIX --experiment-id ID] [--model-config PATH] [--initial-workers N] [--max-workers N]"
 }
 
 while [[ $# -gt 0 ]]; do
@@ -37,6 +40,9 @@ while [[ $# -gt 0 ]]; do
     --max-workers) max_workers="$2"; shift 2 ;;
     --stall-seconds) stall_seconds="$2"; shift 2 ;;
     --poll-seconds) poll_seconds="$2"; shift 2 ;;
+    --observation-codec) observation_codec="$2"; shift 2 ;;
+    --billing-tag) billing_tag="$2"; shift 2 ;;
+    --experiment-id) experiment_id="$2"; shift 2 ;;
     -h|--help) usage; exit 0 ;;
     *) echo "unknown argument: $1" >&2; usage >&2; exit 2 ;;
   esac
@@ -46,6 +52,16 @@ if [[ -z "$run_prefix" ]]; then
   usage >&2
   exit 2
 fi
+if [[ "$observation_codec" != "xml" && "$observation_codec" != "json" && "$observation_codec" != "text" ]]; then
+  echo "observation codec must be xml, json, or text" >&2
+  exit 2
+fi
+if [[ -n "$billing_tag" || -n "$experiment_id" ]]; then
+  if [[ -z "$billing_tag" || -z "$experiment_id" ]]; then
+    echo "billing tag and experiment id must be set together" >&2
+    exit 2
+  fi
+fi
 if ! [[ "$initial_workers" =~ ^[1-9][0-9]*$ && "$max_workers" =~ ^[1-9][0-9]*$ ]]; then
   echo "worker counts must be positive integers" >&2
   exit 2
@@ -53,6 +69,11 @@ fi
 if (( initial_workers > max_workers )); then
   echo "initial workers must not exceed max workers" >&2
   exit 2
+fi
+
+runner_experiment_args=(--observation-codec "$observation_codec")
+if [[ -n "$billing_tag" ]]; then
+  runner_experiment_args+=(--billing-tag "$billing_tag" --experiment-id "$experiment_id")
 fi
 
 script_dir=$(cd "$(dirname "$0")" && pwd)
@@ -134,8 +155,41 @@ print(transient, permanent)
 PY
 }
 
+record_attempt() {
+  local path="$1"
+  shift
+  python3 - "$path" "$@" <<'PY'
+import json
+import pathlib
+import sys
+
+path = pathlib.Path(sys.argv[1])
+record = {
+    "run_prefix": sys.argv[2],
+    "run_id": sys.argv[3],
+    "shard": sys.argv[4],
+    "attempt": int(sys.argv[5]),
+    "workers": int(sys.argv[6]),
+    "stall_seconds": int(sys.argv[7]),
+    "started_at": sys.argv[8],
+    "finished_at": sys.argv[9],
+    "runner_exit": int(sys.argv[10]),
+    "stalled": bool(int(sys.argv[11])),
+    "transient_endpoint_errors": int(sys.argv[12]),
+    "permanent_endpoint_errors": int(sys.argv[13]),
+    "observation_codec": sys.argv[14],
+    "billing_tag": sys.argv[15],
+    "experiment_id": sys.argv[16],
+}
+path.parent.mkdir(parents=True, exist_ok=True)
+with path.open("a", encoding="utf-8") as handle:
+    handle.write(json.dumps(record, sort_keys=True, separators=(",", ":")) + "\n")
+PY
+}
+
 workers=$initial_workers
 w1_failures=0
+attempts_path="$runs_root/$run_prefix/attempts.jsonl"
 for filter_file in "$plan_dir"/batch-*.filter; do
   batch_name=$(basename "$filter_file" .filter)
   batch_index=${batch_name#batch-}
@@ -151,6 +205,7 @@ for filter_file in "$plan_dir"/batch-*.filter; do
     if (( workers == 1 && current_stall_seconds < 1800 )); then
       current_stall_seconds=1800
     fi
+    attempt_started_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)
     echo "$(date -Is) shard=$batch_index attempt=$attempt workers=$workers stall_seconds=$current_stall_seconds" | tee -a "$log"
 
     "$binary" \
@@ -162,6 +217,7 @@ for filter_file in "$plan_dir"/batch-*.filter; do
       --filter "$(<"$filter_file")" \
       --agent-workers "$workers" \
       --resume-policy retryable \
+      "${runner_experiment_args[@]}" \
       --case-timeout 2h \
       --command-timeout 1m >>"$log" 2>&1 &
     runner_pid=$!
@@ -185,6 +241,15 @@ for filter_file in "$plan_dir"/batch-*.filter; do
     done
     wait "$runner_pid"
     runner_status=$?
+    attempt_finished_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+    transient_errors=0
+    permanent_errors=0
+    if (( stalled == 0 && runner_status == 0 )) && [[ -f "$output/mini-go-runner-manifest.json" ]]; then
+      read -r transient_errors permanent_errors < <(service_error_counts "$output/mini-go-runner-manifest.json")
+    fi
+    record_attempt "$attempts_path" "$run_prefix" "$run_id" "$batch_index" "$attempt" "$workers" \
+      "$current_stall_seconds" "$attempt_started_at" "$attempt_finished_at" "$runner_status" "$stalled" \
+      "$transient_errors" "$permanent_errors" "$observation_codec" "$billing_tag" "$experiment_id"
 
     if (( stalled == 1 )); then
       cleanup_run_containers "$run_id"
@@ -197,7 +262,6 @@ for filter_file in "$plan_dir"/batch-*.filter; do
       exit "$runner_status"
     fi
 
-    read -r transient_errors permanent_errors < <(service_error_counts "$output/mini-go-runner-manifest.json")
     if (( permanent_errors > 0 )); then
       echo "$(date -Is) shard=$batch_index permanent_endpoint_errors=$permanent_errors; fix configuration before resuming" | tee -a "$log" >&2
       exit 3

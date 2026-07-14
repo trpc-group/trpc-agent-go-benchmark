@@ -49,6 +49,13 @@ present in `preds.json`, matching mini-SWE-agent. The optional
 incomplete artifacts; `--redo-existing` reruns every selected case. The output
 directory contains:
 
+`--observation-codec` accepts `xml`, `json`, or `text` and defaults to `xml`.
+The XML renderer remains the source-aligned compatibility behavior. A tagged
+experiment must pass `--billing-tag` and `--experiment-id` together; the runner
+appends the tag to the configured `X-SMG-Agent-Name` and records the resolved
+agent name, codec, experiment ID, source revision, binary hash, cases hash, and
+model-config hash in every manifest and trajectory.
+
 ```text
 preds.json
 mini-go-runner-manifest.json
@@ -75,9 +82,7 @@ without deleting completed artifacts:
 ```bash
 ./mini-swe-agent-go-impl/run-sharded.sh \
   --run-prefix mini-go-glm52-full500-$(date +%Y%m%d) \
-  --model-config config/models/glm-5.2.local.yaml \
-  --initial-workers 15 \
-  --max-workers 20
+  --model-config config/models/glm-5.2.local.yaml
 ```
 
 After a stable shard, concurrency increases by one. Final transient endpoint
@@ -86,7 +91,33 @@ only incomplete/retryable cases. At one worker the no-progress window becomes
 30 minutes. Permanent endpoint/configuration errors pause the supervisor. This
 AIMD supervisor is an orchestration extension, not part of the v2.1 agent core.
 On completion it writes the shard summary and merged predictions under
-`results/runs/<run-prefix>/`.
+`results/runs/<run-prefix>/`. It also appends every invocation, including
+stalled and retried attempts, to `attempts.jsonl`. The worker policy is run
+metadata, not a codec experiment variable.
+
+For the codec experiment, use separate run prefixes and billing tags while
+leaving the supervisor defaults unchanged:
+
+```bash
+./mini-swe-agent-go-impl/run-sharded.sh --run-prefix codec-json-e1 --observation-codec json --billing-tag codec-json-e1 --experiment-id codec-e1
+./mini-swe-agent-go-impl/run-sharded.sh --run-prefix codec-xml-e1  --observation-codec xml  --billing-tag codec-xml-e1  --experiment-id codec-e1
+./mini-swe-agent-go-impl/run-sharded.sh --run-prefix codec-text-e1 --observation-codec text --billing-tag codec-text-e1 --experiment-id codec-e1
+```
+
+After exporting backend rows with `agent_name`, `input_tokens`,
+`output_tokens`, `total_tokens`, `prompt_cached_tokens`, and `cost`, normalize
+one experiment and bind it to its shard identity with:
+
+```bash
+go run ./evaluator import-billing \
+  --input results/runs/codec-json-e1/billing-export.json \
+  --manifest results/runs/codec-json-e1/shards.json \
+  --output results/runs/codec-json-e1/billing.json
+```
+
+`run-config --billing ...` then records both the backend accounting and its
+token deltas from locally captured response usage. Backend cost remains a
+decimal string so no currency or floating-point precision is invented.
 
 ## Validate without Docker
 

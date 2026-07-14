@@ -42,7 +42,7 @@ func TestPrepareResumeSkipsCompleteAndRetriesRetryable(t *testing.T) {
 	}})
 	selected := []contract.Case{{InstanceID: "repo__repo-1"}, {InstanceID: "repo__repo-2"}}
 
-	state, err := prepareResume(output, predictionsPath, selected, false, resumePolicyRetryable)
+	state, err := prepareResume(output, predictionsPath, selected, false, resumePolicyRetryable, runIdentity{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -59,7 +59,7 @@ func TestPrepareResumeSkipsCompleteAndRetriesRetryable(t *testing.T) {
 		t.Fatal("prediction from another shard was removed")
 	}
 
-	redo, err := prepareResume(output, predictionsPath, selected, true, resumePolicyRetryable)
+	redo, err := prepareResume(output, predictionsPath, selected, true, resumePolicyRetryable, runIdentity{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -81,11 +81,44 @@ func TestPrepareResumeUpstreamSkipsEveryExistingPrediction(t *testing.T) {
 		t.Fatal(err)
 	}
 	selected := []contract.Case{{InstanceID: "repo__repo-1"}}
-	state, err := prepareResume(output, predictionsPath, selected, false, resumePolicyUpstream)
+	state, err := prepareResume(output, predictionsPath, selected, false, resumePolicyUpstream, runIdentity{})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(state.Pending) != 0 || state.Skipped["repo__repo-1"].Info.ExitStatus != "ExistingPrediction" {
 		t.Fatalf("state = %#v", state)
+	}
+}
+
+func TestPrepareResumeRejectsMixedExperimentIdentity(t *testing.T) {
+	output := t.TempDir()
+	predictionsPath := filepath.Join(output, "preds.json")
+	if err := artifact.WriteJSON(predictionsPath, map[string]contract.Prediction{
+		"repo__repo-1": {InstanceID: "repo__repo-1", ModelPatch: "patch"},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(output, "repo__repo-1", "repo__repo-1.traj.json")
+	if err := artifact.WriteJSON(path, sweagent.CaseResult{Info: sweagent.CaseInfo{
+		ExitStatus:       "Submitted",
+		ObservationCodec: "json",
+		BillingAgentName: "BenchSWE-codec-json-e1",
+		ExperimentID:     "e1",
+		SourceRevision:   "revision",
+		ModelConfigHash:  "model-hash",
+		CasesHash:        "cases-hash",
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	_, err := prepareResume(output, predictionsPath, []contract.Case{{InstanceID: "repo__repo-1"}}, false, resumePolicyRetryable, runIdentity{
+		ObservationCodec: "text",
+		BillingAgentName: "BenchSWE-codec-text-e1",
+		ExperimentID:     "e1",
+		SourceRevision:   "revision",
+		ModelConfigHash:  "model-hash",
+		CasesHash:        "cases-hash",
+	})
+	if err == nil {
+		t.Fatal("mixed experiment identity accepted")
 	}
 }

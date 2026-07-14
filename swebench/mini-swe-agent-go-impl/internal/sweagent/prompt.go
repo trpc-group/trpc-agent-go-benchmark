@@ -135,7 +135,7 @@ func PromptForTask(task string) string {
 	return strings.NewReplacer("{{task}}", task, "[[BACKTICK]]", "`").Replace(instancePrompt)
 }
 
-func agentTrajectoryConfig() map[string]any {
+func agentTrajectoryConfig(codec ObservationCodec) map[string]any {
 	return map[string]any{
 		"agent": map[string]any{
 			"system_template":   SystemPrompt + "\n",
@@ -143,6 +143,7 @@ func agentTrajectoryConfig() map[string]any {
 			"step_limit":        maxSteps,
 			"cost_limit":        3.0,
 			"output_path":       nil,
+			"observation_codec": string(normalizeObservationCodec(codec)),
 		},
 		"agent_type": "minisweagent.run.benchmarks.swebench.ProgressTrackingAgent",
 	}

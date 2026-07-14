@@ -23,6 +23,15 @@ import (
 )
 
 type shardsManifest struct {
+	ObservationCodec     string         `json:"observation_codec,omitempty"`
+	BillingAgentName     string         `json:"billing_agent_name,omitempty"`
+	BillingTag           string         `json:"billing_tag,omitempty"`
+	ExperimentID         string         `json:"experiment_id,omitempty"`
+	SourceRevision       string         `json:"source_revision,omitempty"`
+	SourceModified       bool           `json:"source_modified"`
+	BinarySHA256         string         `json:"binary_sha256,omitempty"`
+	CasesSHA256          string         `json:"cases_sha256,omitempty"`
+	ModelConfigSHA256    string         `json:"model_config_sha256,omitempty"`
 	GeneratedAt          time.Time      `json:"generated_at"`
 	PlanPath             string         `json:"plan_path"`
 	RunsRoot             string         `json:"runs_root"`
@@ -44,25 +53,34 @@ type shardsManifest struct {
 }
 
 type shardSummary struct {
-	Index            int                `json:"index"`
-	Name             string             `json:"name"`
-	RunID            string             `json:"run_id"`
-	RawDir           string             `json:"raw_dir"`
-	Status           string             `json:"status"`
-	FailureReason    string             `json:"failure_reason,omitempty"`
-	ExpectedCount    int                `json:"expected_count"`
-	PredictionsCount int                `json:"predictions_count"`
-	AcceptedCount    int                `json:"accepted_count"`
-	MissingCount     int                `json:"missing_count"`
-	InvalidCount     int                `json:"invalid_count"`
-	EmptyPatchCount  int                `json:"empty_patch_count"`
-	Workers          int                `json:"workers,omitempty"`
-	StartedAt        string             `json:"started_at,omitempty"`
-	FinishedAt       string             `json:"finished_at,omitempty"`
-	DurationMS       int64              `json:"duration_ms,omitempty"`
-	ExitStatusCounts map[string]int     `json:"exit_status_counts"`
-	ExpectedIDs      []string           `json:"expected_ids"`
-	Cases            []shardCaseSummary `json:"cases"`
+	ObservationCodec  string             `json:"observation_codec,omitempty"`
+	BillingAgentName  string             `json:"billing_agent_name,omitempty"`
+	BillingTag        string             `json:"billing_tag,omitempty"`
+	ExperimentID      string             `json:"experiment_id,omitempty"`
+	SourceRevision    string             `json:"source_revision,omitempty"`
+	SourceModified    bool               `json:"source_modified"`
+	BinarySHA256      string             `json:"binary_sha256,omitempty"`
+	CasesSHA256       string             `json:"cases_sha256,omitempty"`
+	ModelConfigSHA256 string             `json:"model_config_sha256,omitempty"`
+	Index             int                `json:"index"`
+	Name              string             `json:"name"`
+	RunID             string             `json:"run_id"`
+	RawDir            string             `json:"raw_dir"`
+	Status            string             `json:"status"`
+	FailureReason     string             `json:"failure_reason,omitempty"`
+	ExpectedCount     int                `json:"expected_count"`
+	PredictionsCount  int                `json:"predictions_count"`
+	AcceptedCount     int                `json:"accepted_count"`
+	MissingCount      int                `json:"missing_count"`
+	InvalidCount      int                `json:"invalid_count"`
+	EmptyPatchCount   int                `json:"empty_patch_count"`
+	Workers           int                `json:"workers,omitempty"`
+	StartedAt         string             `json:"started_at,omitempty"`
+	FinishedAt        string             `json:"finished_at,omitempty"`
+	DurationMS        int64              `json:"duration_ms,omitempty"`
+	ExitStatusCounts  map[string]int     `json:"exit_status_counts"`
+	ExpectedIDs       []string           `json:"expected_ids"`
+	Cases             []shardCaseSummary `json:"cases"`
 }
 
 type shardCaseSummary struct {
@@ -121,8 +139,12 @@ func summarizeShardPlan(plan batchPlan, planPath, runsRoot, rawSubdir string) (s
 	}
 	acceptedSeen := map[string]int{}
 	var earliest, latest time.Time
+	identityMode := -1
 	for _, batch := range plan.Batches {
 		shard := summarizeShard(batch, runsRoot, rawSubdir)
+		if err := mergeShardIdentity(&manifest, shard, &identityMode); err != nil {
+			return shardsManifest{}, err
+		}
 		manifest.Shards = append(manifest.Shards, shard)
 		manifest.MissingCases += shard.MissingCount
 		manifest.InvalidCases += shard.InvalidCount
@@ -203,6 +225,15 @@ func summarizeShard(batch batchPlanItem, runsRoot, rawSubdir string) shardSummar
 		var miniGoManifest runnerManifest
 		miniGoPath := filepath.Join(rawDir, "mini-go-runner-manifest.json")
 		if miniGoErr := readJSONFile(miniGoPath, &miniGoManifest); miniGoErr == nil {
+			shard.ObservationCodec = miniGoManifest.ObservationCodec
+			shard.BillingAgentName = miniGoManifest.BillingAgentName
+			shard.BillingTag = miniGoManifest.BillingTag
+			shard.ExperimentID = miniGoManifest.ExperimentID
+			shard.SourceRevision = miniGoManifest.SourceRevision
+			shard.SourceModified = miniGoManifest.SourceModified
+			shard.BinarySHA256 = miniGoManifest.BinarySHA256
+			shard.CasesSHA256 = miniGoManifest.CasesSHA256
+			shard.ModelConfigSHA256 = miniGoManifest.ModelConfigSHA256
 			shard.Workers = miniGoManifest.Workers
 			shard.StartedAt = miniGoManifest.StartedAt.UTC().Format(time.RFC3339Nano)
 			shard.FinishedAt = miniGoManifest.FinishedAt.UTC().Format(time.RFC3339Nano)
@@ -245,6 +276,56 @@ func summarizeShard(batch batchPlanItem, runsRoot, rawSubdir string) shardSummar
 		shard.Status = "failed"
 	}
 	return shard
+}
+
+func mergeShardIdentity(manifest *shardsManifest, shard shardSummary, identityMode *int) error {
+	shardPresent := shard.ObservationCodec != "" || shard.BillingAgentName != "" || shard.ExperimentID != "" || shard.SourceRevision != ""
+	mode := 0
+	if shardPresent {
+		mode = 1
+	}
+	if *identityMode == -1 {
+		*identityMode = mode
+		if shardPresent {
+			manifest.ObservationCodec = shard.ObservationCodec
+			manifest.BillingAgentName = shard.BillingAgentName
+			manifest.BillingTag = shard.BillingTag
+			manifest.ExperimentID = shard.ExperimentID
+			manifest.SourceRevision = shard.SourceRevision
+			manifest.SourceModified = shard.SourceModified
+			manifest.BinarySHA256 = shard.BinarySHA256
+			manifest.CasesSHA256 = shard.CasesSHA256
+			manifest.ModelConfigSHA256 = shard.ModelConfigSHA256
+		}
+		return nil
+	}
+	if *identityMode != mode {
+		return fmt.Errorf("shard %s is missing experiment identity", shard.RunID)
+	}
+	if !shardPresent {
+		return nil
+	}
+	checks := []struct {
+		name, want, got string
+	}{
+		{"observation_codec", manifest.ObservationCodec, shard.ObservationCodec},
+		{"billing_agent_name", manifest.BillingAgentName, shard.BillingAgentName},
+		{"billing_tag", manifest.BillingTag, shard.BillingTag},
+		{"experiment_id", manifest.ExperimentID, shard.ExperimentID},
+		{"source_revision", manifest.SourceRevision, shard.SourceRevision},
+		{"binary_sha256", manifest.BinarySHA256, shard.BinarySHA256},
+		{"cases_sha256", manifest.CasesSHA256, shard.CasesSHA256},
+		{"model_config_sha256", manifest.ModelConfigSHA256, shard.ModelConfigSHA256},
+	}
+	for _, check := range checks {
+		if check.want != check.got {
+			return fmt.Errorf("shard %s has mismatched %s: got %q, want %q", shard.RunID, check.name, check.got, check.want)
+		}
+	}
+	if manifest.SourceModified != shard.SourceModified {
+		return fmt.Errorf("shard %s has mismatched source_modified", shard.RunID)
+	}
+	return nil
 }
 
 func summarizeShardCase(rawDir, instanceID string, preds map[string]contract.Prediction) shardCaseSummary {

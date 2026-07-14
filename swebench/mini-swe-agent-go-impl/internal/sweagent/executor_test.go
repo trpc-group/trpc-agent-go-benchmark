@@ -33,7 +33,9 @@ func (f fakeFactory) Start(context.Context, string) (environment.Environment, er
 
 func TestExecutorOpenAIAdapterSendsUpstreamToolRequest(t *testing.T) {
 	requests := make(chan map[string]any, 1)
+	agentNames := make(chan string, 1)
 	transport := roundTripperFunc(func(request *http.Request) (*http.Response, error) {
+		agentNames <- request.Header.Get("X-SMG-Agent-Name")
 		var body map[string]any
 		if err := json.NewDecoder(request.Body).Decode(&body); err != nil {
 			return nil, err
@@ -56,9 +58,10 @@ func TestExecutorOpenAIAdapterSendsUpstreamToolRequest(t *testing.T) {
 	executor := Executor{
 		Factory: fakeFactory{env: env},
 		ModelConfig: modelconfig.EnvConfig{
-			"MODEL_NAME":      "mock",
-			"OPENAI_BASE_URL": "http://example.test/v1",
-			"OPENAI_API_KEY":  "test-key",
+			"MODEL_NAME":       "mock",
+			"OPENAI_BASE_URL":  "http://example.test/v1",
+			"OPENAI_API_KEY":   "test-key",
+			"X_SMG_AGENT_NAME": "BenchSWE-codec-json-e1",
 		},
 		CaseTimeout: time.Minute,
 		ModelFactory: func(config modelconfig.EnvConfig) model.Model {
@@ -70,6 +73,9 @@ func TestExecutorOpenAIAdapterSendsUpstreamToolRequest(t *testing.T) {
 		t.Fatalf("result = %#v", result)
 	}
 	body := <-requests
+	if got := <-agentNames; got != "BenchSWE-codec-json-e1" {
+		t.Fatalf("X-SMG-Agent-Name = %q", got)
+	}
 	if body["parallel_tool_calls"] != true || body["temperature"] != float64(0) {
 		t.Fatalf("request settings = %#v", body)
 	}

@@ -98,14 +98,22 @@ func TestSummarizeShardAcceptsMiniGoRunnerManifest(t *testing.T) {
 	rawDir := filepath.Join(dir, runID, rawSubdir)
 	start := time.Date(2026, 7, 13, 1, 0, 0, 0, time.UTC)
 	if err := writeJSON(filepath.Join(rawDir, "mini-go-runner-manifest.json"), runnerManifest{
-		RunID:      runID,
-		RunnerType: "mini-swe-agent-go",
-		StartedAt:  start,
-		FinishedAt: start.Add(time.Minute),
-		DurationMS: int64(time.Minute / time.Millisecond),
-		CaseCount:  1,
-		Workers:    3,
-		Status:     "completed",
+		RunID:             runID,
+		RunnerType:        "mini-swe-agent-go",
+		ObservationCodec:  "json",
+		BillingAgentName:  "BenchSWE-codec-json-e1",
+		BillingTag:        "codec-json-e1",
+		ExperimentID:      "codec-e1",
+		SourceRevision:    "abc123",
+		BinarySHA256:      "binary-hash",
+		CasesSHA256:       "cases-hash",
+		ModelConfigSHA256: "model-hash",
+		StartedAt:         start,
+		FinishedAt:        start.Add(time.Minute),
+		DurationMS:        int64(time.Minute / time.Millisecond),
+		CaseCount:         1,
+		Workers:           3,
+		Status:            "completed",
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -116,6 +124,38 @@ func TestSummarizeShardAcceptsMiniGoRunnerManifest(t *testing.T) {
 	shard := summarizeShard(batchPlanItem{RunID: runID, InstanceIDs: []string{"case-a"}}, dir, rawSubdir)
 	if shard.Status != "accepted" || shard.Workers != 3 || shard.FailureReason != "" {
 		t.Fatalf("shard = %+v", shard)
+	}
+	if shard.ObservationCodec != "json" || shard.BillingAgentName != "BenchSWE-codec-json-e1" || shard.ExperimentID != "codec-e1" {
+		t.Fatalf("shard identity = %+v", shard)
+	}
+}
+
+func TestSummarizeShardPlanRejectsMixedExperimentIdentity(t *testing.T) {
+	dir := t.TempDir()
+	items := []batchPlanItem{
+		{Index: 0, Name: "batch-000", RunID: "run-000", InstanceIDs: []string{"case-a"}},
+		{Index: 1, Name: "batch-001", RunID: "run-001", InstanceIDs: []string{"case-b"}},
+	}
+	for i, item := range items {
+		rawDir := filepath.Join(dir, item.RunID, "raw", "mini-go")
+		codec := "json"
+		if i == 1 {
+			codec = "text"
+		}
+		if err := writeJSON(filepath.Join(rawDir, "mini-go-runner-manifest.json"), runnerManifest{
+			RunID: item.RunID, RunnerType: "mini-swe-agent-go", ObservationCodec: codec,
+			BillingAgentName: "BenchSWE-codec-e1", ExperimentID: "codec-e1", SourceRevision: "abc123",
+			BinarySHA256: "binary-hash", CasesSHA256: "cases-hash", ModelConfigSHA256: "model-hash",
+		}); err != nil {
+			t.Fatal(err)
+		}
+		id := item.InstanceIDs[0]
+		writeTestPreds(t, rawDir, map[string]contract.Prediction{id: {InstanceID: id, ModelPatch: "patch"}})
+		writeTestTrajectory(t, rawDir, id, "Submitted")
+	}
+	_, err := summarizeShardPlan(testBatchPlan(items), filepath.Join(dir, "plan.json"), dir, filepath.Join("raw", "mini-go"))
+	if err == nil || !strings.Contains(err.Error(), "observation_codec") {
+		t.Fatalf("summarizeShardPlan() error = %v, want observation codec mismatch", err)
 	}
 }
 

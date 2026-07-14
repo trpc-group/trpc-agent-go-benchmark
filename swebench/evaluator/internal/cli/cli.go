@@ -36,6 +36,8 @@ func Run(args []string) error {
 		return runVerify(ctx, args[2:])
 	case "import":
 		return runImport(args[2:])
+	case "import-billing":
+		return runImportBilling(args[2:])
 	case "run-config":
 		return runRunConfig(args[2:])
 	case "plan-batches":
@@ -59,6 +61,7 @@ func usage() {
   swebench run-mini [flags]
   swebench verify   [flags]
   swebench import   [flags]
+  swebench import-billing [flags]
   swebench run-config [flags]
   swebench plan-batches [flags]
   swebench summarize-shards [flags]
@@ -70,6 +73,7 @@ Commands:
   run-mini  Run mini-SWE-agent batch runner for a filter/slice.
   verify    Run SWE-Bench official local harness for predictions.
   import    Normalize mini predictions, trajectories, and harness report.
+  import-billing  Validate and normalize backend token and cost export.
   run-config  Write a run-level manifest from generated artifacts.
   plan-batches  Create fixed case batches and mini-SWE-agent filters.
   summarize-shards  Summarize shard outputs and accepted case coverage.

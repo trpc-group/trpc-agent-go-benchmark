@@ -22,7 +22,6 @@ import (
 
 const (
 	SubmissionMarker = "COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT"
-	maxObservation   = 10000
 	// UpstreamCommit pins the source target used by all parity fixtures.
 	UpstreamCommit = "3a9b8e874d322a9cfb1f391ff4f4df67721c108c"
 )
@@ -157,34 +156,4 @@ func splitFirstLineKeepEnds(value string) (string, string) {
 		}
 	}
 	return value, ""
-}
-
-// FormatObservation mirrors the v2.1.0 SWE-Bench observation template.
-func FormatObservation(result environment.CommandResult) string {
-	var b strings.Builder
-	if result.ExceptionInfo != "" {
-		fmt.Fprintf(&b, "<exception>%s</exception>\n", result.ExceptionInfo)
-	}
-	fmt.Fprintf(&b, "<returncode>%d</returncode>\n", result.ReturnCode)
-	if len([]rune(result.Output)) < maxObservation {
-		fmt.Fprintf(&b, "<output>\n%s</output>", result.Output)
-		return b.String()
-	}
-	runes := []rune(result.Output)
-	fmt.Fprintf(&b, `<warning>
-The output of your last command was too long.
-Please try a different command that produces less output.
-If you're looking at a file you can try use head, tail or sed to view a smaller number of lines selectively.
-If you're using grep or find and it produced too much output, you can use a more selective search pattern.
-If you really need to see something from the full command's output, you can redirect output to a file and then search in that file.
-</warning><output_head>
-%s
-</output_head>
-<elided_chars>
-%d characters elided
-</elided_chars>
-<output_tail>
-%s
-</output_tail>`, string(runes[:5000]), len(runes)-maxObservation, string(runes[len(runes)-5000:]))
-	return b.String()
 }

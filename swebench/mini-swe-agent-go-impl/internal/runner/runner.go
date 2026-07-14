@@ -33,6 +33,15 @@ type manifest struct {
 	FrameworkVersion           string            `json:"framework_version"`
 	AgentProtocol              string            `json:"agent_protocol"`
 	UpstreamCommit             string            `json:"upstream_commit"`
+	ObservationCodec           string            `json:"observation_codec"`
+	BillingAgentName           string            `json:"billing_agent_name,omitempty"`
+	BillingTag                 string            `json:"billing_tag,omitempty"`
+	ExperimentID               string            `json:"experiment_id,omitempty"`
+	SourceRevision             string            `json:"source_revision,omitempty"`
+	SourceModified             bool              `json:"source_modified"`
+	BinarySHA256               string            `json:"binary_sha256,omitempty"`
+	CasesSHA256                string            `json:"cases_sha256"`
+	ModelConfigSHA256          string            `json:"model_config_sha256"`
 	StartedAt                  time.Time         `json:"started_at"`
 	FinishedAt                 time.Time         `json:"finished_at"`
 	DurationMS                 int64             `json:"duration_ms"`
@@ -78,6 +87,9 @@ func Run(args []string) error {
 	dockerHost := fs.String("docker-host", "", "optional Docker daemon endpoint")
 	redoExisting := fs.Bool("redo-existing", false, "rerun selected cases even when complete artifacts exist")
 	resumePolicy := fs.String("resume-policy", resumePolicyUpstream, "resume policy: upstream or retryable")
+	observationCodecValue := fs.String("observation-codec", string(sweagent.ObservationCodecXML), "observation codec: xml, json, or text")
+	billingTag := fs.String("billing-tag", "", "suffix appended to X-SMG-Agent-Name for billing isolation")
+	experimentID := fs.String("experiment-id", "", "experiment identifier recorded with billing-tag")
 	if err := fs.Parse(args[1:]); err != nil {
 		return err
 	}
@@ -96,6 +108,10 @@ func Run(args []string) error {
 	if *resumePolicy != resumePolicyUpstream && *resumePolicy != resumePolicyRetryable {
 		return fmt.Errorf("-resume-policy must be %q or %q", resumePolicyUpstream, resumePolicyRetryable)
 	}
+	observationCodec, err := sweagent.ParseObservationCodec(*observationCodecValue)
+	if err != nil {
+		return err
+	}
 	if *output == "" {
 		*output = filepath.Join("results", "runs", *runID)
 	}
@@ -104,6 +120,18 @@ func Run(args []string) error {
 		return err
 	}
 
+	casesHash, err := fileSHA256(*casesPath)
+	if err != nil {
+		return fmt.Errorf("hash cases: %w", err)
+	}
+	modelConfigHash, err := fileSHA256(*modelConfigPath)
+	if err != nil {
+		return fmt.Errorf("hash model config: %w", err)
+	}
+	build, err := currentBuildMetadata()
+	if err != nil {
+		return err
+	}
 	cases, err := artifact.ReadCasesJSONL(*casesPath)
 	if err != nil {
 		return fmt.Errorf("read cases: %w", err)
@@ -119,6 +147,13 @@ func Run(args []string) error {
 	if strings.TrimSpace(modelCfg["MODEL_NAME"]) == "" {
 		return fmt.Errorf("model config has no model.model_name or MODEL_NAME")
 	}
+	billingAgentName, err := resolveBillingAgentName(modelCfg["X_SMG_AGENT_NAME"], *billingTag, *experimentID)
+	if err != nil {
+		return err
+	}
+	if billingAgentName != "" {
+		modelCfg["X_SMG_AGENT_NAME"] = billingAgentName
+	}
 	envCfg, err := environment.LoadConfig(*environmentConfigPath)
 	if err != nil {
 		return err
@@ -131,7 +166,17 @@ func Run(args []string) error {
 		Labels:         map[string]string{"mini-swe-agent-go.run_id": *runID},
 	}
 	predictionsPath := filepath.Join(*output, "preds.json")
-	resume, err := prepareResume(*output, predictionsPath, selected, *redoExisting, *resumePolicy)
+	identity := runIdentity{
+		ObservationCodec: string(observationCodec),
+		BillingAgentName: billingAgentName,
+		ExperimentID:     strings.TrimSpace(*experimentID),
+		SourceRevision:   build.SourceRevision,
+		SourceModified:   build.SourceModified,
+		BinarySHA256:     build.BinarySHA256,
+		ModelConfigHash:  modelConfigHash,
+		CasesHash:        casesHash,
+	}
+	resume, err := prepareResume(*output, predictionsPath, selected, *redoExisting, *resumePolicy, identity)
 	if err != nil {
 		return fmt.Errorf("prepare resume state: %w", err)
 	}
@@ -145,7 +190,12 @@ func Run(args []string) error {
 		progress.MarkSkipped(id, result)
 	}
 	executor := sweagent.Executor{
-		Factory: factory, ModelConfig: modelCfg, CaseTimeout: *caseTimeout, Progress: progress.Update,
+		Factory: factory, ModelConfig: modelCfg, ObservationCodec: observationCodec,
+		BillingAgentName: billingAgentName, ExperimentID: strings.TrimSpace(*experimentID),
+		SourceRevision: build.SourceRevision, SourceModified: build.SourceModified,
+		BinarySHA256:    build.BinarySHA256,
+		ModelConfigHash: modelConfigHash, CasesHash: casesHash,
+		CaseTimeout: *caseTimeout, Progress: progress.Update,
 	}
 	exitCounts := map[string]int{}
 	errorCategories := map[string]int{}
@@ -224,8 +274,17 @@ func Run(args []string) error {
 		RunID:                      *runID,
 		RunnerType:                 "mini-swe-agent-go",
 		FrameworkVersion:           "v1.10.1-0.20260616104537-c6c3bb29ab60",
-		AgentProtocol:              "mini-swe-agent-v2.1-source-aligned",
+		AgentProtocol:              agentProtocol(observationCodec),
 		UpstreamCommit:             sweagent.UpstreamCommit,
+		ObservationCodec:           string(observationCodec),
+		BillingAgentName:           billingAgentName,
+		BillingTag:                 strings.TrimSpace(*billingTag),
+		ExperimentID:               strings.TrimSpace(*experimentID),
+		SourceRevision:             build.SourceRevision,
+		SourceModified:             build.SourceModified,
+		BinarySHA256:               build.BinarySHA256,
+		CasesSHA256:                casesHash,
+		ModelConfigSHA256:          modelConfigHash,
 		StartedAt:                  start.UTC(),
 		FinishedAt:                 finish.UTC(),
 		DurationMS:                 finish.Sub(start).Milliseconds(),
@@ -261,6 +320,13 @@ func Run(args []string) error {
 	}
 	fmt.Printf("selected=%d attempted=%d skipped_existing=%d completed=%d\npredictions=%s\nprogress=%s\nmanifest=%s\n", len(selected), len(resume.Pending), len(resume.Skipped), completedCount, predictionsPath, progressPath, manifestPath)
 	return nil
+}
+
+func agentProtocol(codec sweagent.ObservationCodec) string {
+	if codec == sweagent.ObservationCodecXML {
+		return "mini-swe-agent-v2.1-source-aligned"
+	}
+	return "mini-swe-agent-v2.1-control-loop+codec-" + string(codec)
 }
 
 func countResult(result sweagent.CaseResult, exitCounts, errorCategories, serviceErrors map[string]int) {

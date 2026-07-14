@@ -167,6 +167,32 @@ func TestMiniAgentChecksStepLimitBeforeNextQuery(t *testing.T) {
 	}
 }
 
+func TestMiniAgentUsesSelectedObservationCodec(t *testing.T) {
+	modelImpl := &scriptedModel{responses: []*model.Response{
+		assistantResponse("inspect", bashCall("inspect", "pwd")),
+		assistantResponse("done", bashCall("submit", "submit")),
+	}}
+	env := &fakeEnvironment{results: []environment.CommandResult{
+		{Output: "/testbed\n"},
+		{Output: SubmissionMarker + "\npatch\n"},
+	}}
+	result := (&MiniAgent{
+		Model: modelImpl, Environment: env, ObservationCodec: ObservationCodecJSON,
+	}).Run(context.Background(), "fix it")
+	if result.Info.ExitStatus != "Submitted" {
+		t.Fatalf("result = %#v", result.Info)
+	}
+	toolMessage := modelImpl.requests[1].Messages[3]
+	if toolMessage.Role != model.RoleTool || toolMessage.Content != `{"returncode":0,"output":"/testbed\n"}` {
+		t.Fatalf("tool message = %#v", toolMessage)
+	}
+	for _, message := range result.Messages {
+		if message.Role == "tool" && message.Content != toolMessage.Content {
+			t.Fatalf("trajectory observation %q differs from request %q", message.Content, toolMessage.Content)
+		}
+	}
+}
+
 func TestMiniAgentRequestUsesParallelBashTools(t *testing.T) {
 	modelImpl := &scriptedModel{responses: []*model.Response{
 		assistantResponse("done", bashCall("submit", "submit")),

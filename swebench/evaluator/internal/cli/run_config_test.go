@@ -37,15 +37,23 @@ func TestRunConfigSupportsMiniGoRunnerManifest(t *testing.T) {
 	predictionsPath := filepath.Join(runnerDir, "preds.json")
 	runnerManifestPath := filepath.Join(runnerDir, "mini-go-runner-manifest.json")
 	if err := writeJSON(runnerManifestPath, runnerManifest{
-		RunID:       "mini-go-run",
-		RunnerType:  "mini-swe-agent-go",
-		StartedAt:   start,
-		FinishedAt:  start.Add(2 * time.Minute),
-		DurationMS:  int64((2 * time.Minute) / time.Millisecond),
-		OutputDir:   runnerDir,
-		CaseCount:   1,
-		Predictions: predictionsPath,
-		Status:      "completed",
+		RunID:             "mini-go-run",
+		RunnerType:        "mini-swe-agent-go",
+		ObservationCodec:  "text",
+		BillingAgentName:  "BenchSWE-codec-text-e1",
+		BillingTag:        "codec-text-e1",
+		ExperimentID:      "codec-e1",
+		SourceRevision:    "abc123",
+		BinarySHA256:      "binary-hash",
+		CasesSHA256:       "cases-hash",
+		ModelConfigSHA256: "model-hash",
+		StartedAt:         start,
+		FinishedAt:        start.Add(2 * time.Minute),
+		DurationMS:        int64((2 * time.Minute) / time.Millisecond),
+		OutputDir:         runnerDir,
+		CaseCount:         1,
+		Predictions:       predictionsPath,
+		Status:            "completed",
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -79,6 +87,16 @@ func TestRunConfigSupportsMiniGoRunnerManifest(t *testing.T) {
 		Target:      "mini-go",
 		Total:       1,
 		Counts:      map[string]int{"empty_patch": 1},
+		Usage: usageStats{
+			PromptTokens: 90, PromptCachedTokens: 70, CompletionTokens: 9, TotalTokens: 99,
+		},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	billingPath := filepath.Join(dir, "billing.json")
+	if err := writeJSON(billingPath, billingDocument{
+		SchemaVersion: 1, AgentName: "BenchSWE-codec-text-e1", ObservationCodec: "text", ExperimentID: "codec-e1",
+		InputTokens: 100, OutputTokens: 10, TotalTokens: 110, PromptCachedTokens: 80, Cost: "1.25",
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -91,6 +109,7 @@ func TestRunConfigSupportsMiniGoRunnerManifest(t *testing.T) {
 		"--runner-manifest", runnerManifestPath,
 		"--verifier-manifest", verifyManifestPath,
 		"--import-summary", importSummaryPath,
+		"--billing", billingPath,
 		"--model-name", "test-model",
 		"--output", outputPath,
 	})
@@ -104,6 +123,12 @@ func TestRunConfigSupportsMiniGoRunnerManifest(t *testing.T) {
 	}
 	if doc.Runner.Type != "mini-swe-agent-go" {
 		t.Fatalf("Runner.Type = %q, want mini-swe-agent-go", doc.Runner.Type)
+	}
+	if doc.Runner.ObservationCodec != "text" || doc.Runner.BillingAgentName != "BenchSWE-codec-text-e1" || doc.Runner.ExperimentID != "codec-e1" {
+		t.Fatalf("Runner identity = %+v", doc.Runner)
+	}
+	if doc.Accounting == nil || doc.Accounting.Backend.Cost != "1.25" || doc.Accounting.BackendMinusLocal.InputTokens != 10 || doc.Accounting.BackendMinusLocal.PromptCachedTokens != 10 {
+		t.Fatalf("Accounting = %+v", doc.Accounting)
 	}
 	if doc.Concurrency.AgentGenerationWorkers != 0 {
 		t.Fatalf("AgentGenerationWorkers = %d, want 0 for generic manifest", doc.Concurrency.AgentGenerationWorkers)

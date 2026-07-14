@@ -31,6 +31,7 @@ type runConfigDocument struct {
 	Verifier        runConfigVerifier        `json:"verifier"`
 	Artifacts       runConfigArtifacts       `json:"artifacts"`
 	ResultSummary   importSummary            `json:"result_summary"`
+	Accounting      *runConfigAccounting     `json:"accounting,omitempty"`
 	ServiceFindings runConfigServiceFindings `json:"service_findings,omitempty"`
 	Notes           []string                 `json:"notes,omitempty"`
 	SourceFiles     runConfigSourceFiles     `json:"source_files"`
@@ -62,6 +63,15 @@ type runConfigModel struct {
 type runConfigRunner struct {
 	Type                string `json:"type"`
 	MiniSWEAgentVersion string `json:"mini_swe_agent_version,omitempty"`
+	ObservationCodec    string `json:"observation_codec,omitempty"`
+	BillingAgentName    string `json:"billing_agent_name,omitempty"`
+	BillingTag          string `json:"billing_tag,omitempty"`
+	ExperimentID        string `json:"experiment_id,omitempty"`
+	SourceRevision      string `json:"source_revision,omitempty"`
+	SourceModified      bool   `json:"source_modified"`
+	BinarySHA256        string `json:"binary_sha256,omitempty"`
+	CasesSHA256         string `json:"cases_sha256,omitempty"`
+	ModelConfigSHA256   string `json:"model_config_sha256,omitempty"`
 	MiniExtra           string `json:"mini_extra,omitempty"`
 	BaseConfig          string `json:"base_config,omitempty"`
 	PrivateConfig       string `json:"private_config,omitempty"`
@@ -105,6 +115,20 @@ type runConfigArtifacts struct {
 	ImportedDir       string `json:"imported_dir,omitempty"`
 	ImportedCases     string `json:"imported_cases,omitempty"`
 	ImportSummary     string `json:"import_summary"`
+	Billing           string `json:"billing,omitempty"`
+}
+
+type runConfigAccounting struct {
+	Backend           billingDocument   `json:"backend"`
+	LocalUsage        usageStats        `json:"local_usage"`
+	BackendMinusLocal billingTokenDelta `json:"backend_minus_local"`
+}
+
+type billingTokenDelta struct {
+	InputTokens        int64 `json:"input_tokens"`
+	OutputTokens       int64 `json:"output_tokens"`
+	TotalTokens        int64 `json:"total_tokens"`
+	PromptCachedTokens int64 `json:"prompt_cached_tokens"`
 }
 
 type runConfigServiceFindings struct {
@@ -124,17 +148,26 @@ type runConfigSourceFiles struct {
 }
 
 type runnerManifest struct {
-	RunID       string            `json:"run_id"`
-	RunnerType  string            `json:"runner_type"`
-	StartedAt   time.Time         `json:"started_at"`
-	FinishedAt  time.Time         `json:"finished_at"`
-	DurationMS  int64             `json:"duration_ms"`
-	OutputDir   string            `json:"output_dir"`
-	CaseCount   int               `json:"case_count"`
-	Workers     int               `json:"workers,omitempty"`
-	Predictions string            `json:"predictions"`
-	ModelConfig map[string]string `json:"model_config,omitempty"`
-	Status      string            `json:"status,omitempty"`
+	RunID             string            `json:"run_id"`
+	RunnerType        string            `json:"runner_type"`
+	ObservationCodec  string            `json:"observation_codec,omitempty"`
+	BillingAgentName  string            `json:"billing_agent_name,omitempty"`
+	BillingTag        string            `json:"billing_tag,omitempty"`
+	ExperimentID      string            `json:"experiment_id,omitempty"`
+	SourceRevision    string            `json:"source_revision,omitempty"`
+	SourceModified    bool              `json:"source_modified"`
+	BinarySHA256      string            `json:"binary_sha256,omitempty"`
+	CasesSHA256       string            `json:"cases_sha256,omitempty"`
+	ModelConfigSHA256 string            `json:"model_config_sha256,omitempty"`
+	StartedAt         time.Time         `json:"started_at"`
+	FinishedAt        time.Time         `json:"finished_at"`
+	DurationMS        int64             `json:"duration_ms"`
+	OutputDir         string            `json:"output_dir"`
+	CaseCount         int               `json:"case_count"`
+	Workers           int               `json:"workers,omitempty"`
+	Predictions       string            `json:"predictions"`
+	ModelConfig       map[string]string `json:"model_config,omitempty"`
+	Status            string            `json:"status,omitempty"`
 }
 
 func runRunConfig(args []string) error {
@@ -148,6 +181,7 @@ func runRunConfig(args []string) error {
 	shardsManifestPath := fs.String("shards-manifest", "", "summarize-shards output path for sharded mini baseline")
 	verifierManifestPath := fs.String("verifier-manifest", "", "verifier_manifest.json path")
 	importSummaryPath := fs.String("import-summary", "", "normalized import summary JSON path")
+	billingPath := fs.String("billing", "", "optional normalized backend billing JSON path")
 	harnessReportPath := fs.String("harness-report", "", "optional official harness report JSON path")
 	doctorPath := fs.String("doctor", "", "optional doctor.json path")
 	modelName := fs.String("model-name", "", "model name used for this run")
@@ -250,6 +284,7 @@ func runRunConfig(args []string) error {
 	predictionsPath := filepath.Join(miniManifest.Config.OutputDir, "preds.json")
 	outputDir := miniManifest.Config.OutputDir
 	runnerLog := miniManifest.Command.LogPath
+	runnerIdentity := runConfigRunner{}
 	miniExtra := miniManifest.Config.MiniExtra
 	baseConfig := miniManifest.Config.BaseConfig
 	privateConfig := miniManifest.Config.MiniConfig
@@ -266,6 +301,17 @@ func runRunConfig(args []string) error {
 		serviceFindings = runConfigServiceFindings{}
 		miniRawDir = ""
 		miniLog = ""
+		runnerIdentity = runConfigRunner{
+			ObservationCodec:  genericManifest.ObservationCodec,
+			BillingAgentName:  genericManifest.BillingAgentName,
+			BillingTag:        genericManifest.BillingTag,
+			ExperimentID:      genericManifest.ExperimentID,
+			SourceRevision:    genericManifest.SourceRevision,
+			SourceModified:    genericManifest.SourceModified,
+			BinarySHA256:      genericManifest.BinarySHA256,
+			CasesSHA256:       genericManifest.CasesSHA256,
+			ModelConfigSHA256: genericManifest.ModelConfigSHA256,
+		}
 	}
 	if hasShardsManifest {
 		runnerType = "mini-swe-agent-sharded"
@@ -283,6 +329,37 @@ func runRunConfig(args []string) error {
 		serviceFindings = runConfigServiceFindings{}
 		miniRawDir = ""
 		miniLog = ""
+		runnerIdentity = runConfigRunner{
+			ObservationCodec:  shardManifest.ObservationCodec,
+			BillingAgentName:  shardManifest.BillingAgentName,
+			BillingTag:        shardManifest.BillingTag,
+			ExperimentID:      shardManifest.ExperimentID,
+			SourceRevision:    shardManifest.SourceRevision,
+			SourceModified:    shardManifest.SourceModified,
+			BinarySHA256:      shardManifest.BinarySHA256,
+			CasesSHA256:       shardManifest.CasesSHA256,
+			ModelConfigSHA256: shardManifest.ModelConfigSHA256,
+		}
+	}
+	var accounting *runConfigAccounting
+	if strings.TrimSpace(*billingPath) != "" {
+		var billing billingDocument
+		if err := readJSONFile(*billingPath, &billing); err != nil {
+			return fmt.Errorf("read billing: %w", err)
+		}
+		if billing.AgentName != runnerIdentity.BillingAgentName || billing.ObservationCodec != runnerIdentity.ObservationCodec || billing.ExperimentID != runnerIdentity.ExperimentID {
+			return fmt.Errorf("billing identity does not match runner identity")
+		}
+		accounting = &runConfigAccounting{
+			Backend:    billing,
+			LocalUsage: summary.Usage,
+			BackendMinusLocal: billingTokenDelta{
+				InputTokens:        billing.InputTokens - int64(summary.Usage.PromptTokens),
+				OutputTokens:       billing.OutputTokens - int64(summary.Usage.CompletionTokens),
+				TotalTokens:        billing.TotalTokens - int64(summary.Usage.TotalTokens),
+				PromptCachedTokens: billing.PromptCachedTokens - int64(summary.Usage.PromptCachedTokens),
+			},
+		}
 	}
 
 	doc := runConfigDocument{
@@ -310,6 +387,15 @@ func runRunConfig(args []string) error {
 		Runner: runConfigRunner{
 			Type:                runnerType,
 			MiniSWEAgentVersion: miniSWEAgentVersion(doctor),
+			ObservationCodec:    runnerIdentity.ObservationCodec,
+			BillingAgentName:    runnerIdentity.BillingAgentName,
+			BillingTag:          runnerIdentity.BillingTag,
+			ExperimentID:        runnerIdentity.ExperimentID,
+			SourceRevision:      runnerIdentity.SourceRevision,
+			SourceModified:      runnerIdentity.SourceModified,
+			BinarySHA256:        runnerIdentity.BinarySHA256,
+			CasesSHA256:         runnerIdentity.CasesSHA256,
+			ModelConfigSHA256:   runnerIdentity.ModelConfigSHA256,
 			MiniExtra:           miniExtra,
 			BaseConfig:          baseConfig,
 			PrivateConfig:       privateConfig,
@@ -350,8 +436,10 @@ func runRunConfig(args []string) error {
 			ImportedDir:       filepath.Dir(filepath.Dir(absPath(*importSummaryPath))),
 			ImportedCases:     filepath.Join(filepath.Dir(filepath.Dir(absPath(*importSummaryPath))), "cases.jsonl"),
 			ImportSummary:     absPath(*importSummaryPath),
+			Billing:           absPath(*billingPath),
 		},
 		ResultSummary:   summary,
+		Accounting:      accounting,
 		ServiceFindings: serviceFindings,
 		Notes:           splitNotes(*notes),
 		SourceFiles: runConfigSourceFiles{

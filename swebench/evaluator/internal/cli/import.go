@@ -12,6 +12,7 @@ package cli
 import (
 	"bufio"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -44,10 +45,15 @@ type targetResult struct {
 }
 
 type usageStats struct {
-	PromptTokens     int `json:"prompt_tokens"`
-	CompletionTokens int `json:"completion_tokens"`
-	TotalTokens      int `json:"total_tokens"`
-	APICalls         int `json:"api_calls"`
+	PromptTokens       int `json:"prompt_tokens"`
+	PromptCachedTokens int `json:"prompt_cached_tokens"`
+	PromptUncached     int `json:"prompt_uncached_tokens"`
+	CompletionTokens   int `json:"completion_tokens"`
+	TotalTokens        int `json:"total_tokens"`
+	ResponseObjects    int `json:"response_objects,omitempty"`
+	UsageObjects       int `json:"usage_objects,omitempty"`
+	MissingUsage       int `json:"missing_usage_objects,omitempty"`
+	APICalls           int `json:"api_calls"`
 }
 
 type importSummary struct {
@@ -55,6 +61,7 @@ type importSummary struct {
 	Target      string         `json:"target"`
 	Total       int            `json:"total"`
 	Counts      map[string]int `json:"counts"`
+	Usage       usageStats     `json:"usage"`
 }
 
 func runImport(args []string) error {
@@ -161,6 +168,7 @@ func runImport(args []string) error {
 			result.VerifierResultRef = absPath(*harnessReport)
 		}
 		summary.Counts[status]++
+		addUsage(&summary.Usage, result.Usage)
 
 		row := importedCase{
 			InstanceID: c.InstanceID,
@@ -182,6 +190,18 @@ func runImport(args []string) error {
 		}
 	}
 	return writeJSON(filepath.Join(*output, "summary", *target+".json"), summary)
+}
+
+func addUsage(total *usageStats, current usageStats) {
+	total.PromptTokens += current.PromptTokens
+	total.PromptCachedTokens += current.PromptCachedTokens
+	total.PromptUncached += current.PromptUncached
+	total.CompletionTokens += current.CompletionTokens
+	total.TotalTokens += current.TotalTokens
+	total.ResponseObjects += current.ResponseObjects
+	total.UsageObjects += current.UsageObjects
+	total.MissingUsage += current.MissingUsage
+	total.APICalls += current.APICalls
 }
 
 func readPredictions(path string) (map[string]contract.Prediction, error) {
@@ -318,11 +338,56 @@ func copyScrubbedTrace(rawDir, traceDir, instanceID string) (string, usageStats,
 		return "", usageStats{}, err
 	}
 	usage := extractUsage(data)
+	responsesPath := filepath.Join(rawDir, instanceID, instanceID+".trpc-responses.json")
+	responsesData, responsesErr := os.ReadFile(responsesPath)
+	if responsesErr == nil {
+		responseUsage, usageErr := extractResponseUsage(responsesData)
+		if usageErr != nil {
+			return "", usageStats{}, fmt.Errorf("read response usage for %s: %w", instanceID, usageErr)
+		}
+		responseUsage.APICalls = usage.APICalls
+		usage = responseUsage
+	} else if !errors.Is(responsesErr, os.ErrNotExist) {
+		return "", usageStats{}, responsesErr
+	}
 	dst := filepath.Join(traceDir, instanceID+".json")
 	if err := os.WriteFile(dst, redactJSONBytes(data), 0o644); err != nil {
 		return "", usageStats{}, err
 	}
 	return dst, usage, nil
+}
+
+func extractResponseUsage(data []byte) (usageStats, error) {
+	type promptDetails struct {
+		CachedTokens int `json:"cached_tokens"`
+	}
+	type responseUsage struct {
+		PromptTokens       int           `json:"prompt_tokens"`
+		CompletionTokens   int           `json:"completion_tokens"`
+		TotalTokens        int           `json:"total_tokens"`
+		PromptTokenDetails promptDetails `json:"prompt_tokens_details"`
+	}
+	type response struct {
+		Usage *responseUsage `json:"usage"`
+	}
+	var responses []response
+	if err := json.Unmarshal(data, &responses); err != nil {
+		return usageStats{}, err
+	}
+	stats := usageStats{ResponseObjects: len(responses)}
+	for _, response := range responses {
+		if response.Usage == nil {
+			stats.MissingUsage++
+			continue
+		}
+		stats.UsageObjects++
+		stats.PromptTokens += response.Usage.PromptTokens
+		stats.PromptCachedTokens += response.Usage.PromptTokenDetails.CachedTokens
+		stats.CompletionTokens += response.Usage.CompletionTokens
+		stats.TotalTokens += response.Usage.TotalTokens
+	}
+	stats.PromptUncached = stats.PromptTokens - stats.PromptCachedTokens
+	return stats, nil
 }
 
 func extractUsage(data []byte) usageStats {
