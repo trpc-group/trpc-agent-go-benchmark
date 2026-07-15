@@ -6,7 +6,8 @@ evaluator 下完成 SWE-Bench Verified 全量评测后，再补充最终对比�
 ## Baseline
 
 当前接受的 baseline 是 mini-SWE-agent 2.1.0 + MiniMax M2.5，运行在
-SWE-Bench Verified test split 全量 500 case 上。
+SWE-Bench Verified test split 全量 500 case 上。该 run 用于对齐
+SWE-Bench 官网公开参考结果，确认 baseline 和 evaluator 链路本身可信。
 
 | 指标 | 值 |
 | --- | ---: |
@@ -21,6 +22,21 @@ SWE-Bench Verified test split 全量 500 case 上。
 
 结构化摘要见
 [`baseline-mini-swe-agent-m2.5.json`](baseline-mini-swe-agent-m2.5.json)。
+
+## 内部 GLM-5.2 实验
+
+后续实验，包括 mini-SWE-agent 后续 run 和 Go-native `trpc-agent-go` 实现，
+默认使用内部 GLM-5.2 endpoint（`glm52`）。该 endpoint 是内部部署版本，
+不直接等同于 SWE-Bench leaderboard 上的公开 GLM-5.2。
+
+mini-SWE-agent GLM-5.2 三轮重复实验摘要见
+[`experiments/mini-swe-agent-glm52-r3.json`](experiments/mini-swe-agent-glm52-r3.json)。
+
+| Run | Resolved | Unresolved | Empty patch | Error | Resolved rate |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| r2 | 383 | 116 | 0 | 1 | 76.60% |
+| r3 | 382 | 118 | 0 | 0 | 76.40% |
+| r4 | 394 | 106 | 0 | 0 | 78.80% |
 
 ## Verifier
 

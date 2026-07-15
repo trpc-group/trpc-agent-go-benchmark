@@ -14,3 +14,5 @@ Committed files:
 - `REPORT.zh_CN.md`: Chinese report.
 - `baseline-mini-swe-agent-m2.5.json`: structured baseline summary for the
   accepted MiniMax M2.5 + mini-SWE-agent full-500 run.
+- `experiments/`: small structured summaries for additional runs that inform
+  later experiments but are not the accepted evaluator-calibration baseline.
