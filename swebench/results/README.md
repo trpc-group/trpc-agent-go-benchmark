@@ -16,3 +16,9 @@ Committed files:
   accepted MiniMax M2.5 + mini-SWE-agent full-500 run.
 - `experiments/`: small structured summaries for additional runs that inform
   later experiments but are not the accepted evaluator-calibration baseline.
+- `experiments/observation-codec/REPORT.zh_CN.md`: JSON/XML observation codec
+  experiment and the preliminary recommendation for an opt-in per-tool TAG
+  `json2xml` tool-result codec.
+- `experiments/observation-codec/json-vs-xml-e1.json`: machine-readable run,
+  verifier, usage, billing, reconciliation, and comparison data for that
+  experiment.

@@ -1,0 +1,220 @@
+{
+  "schema_version": 1,
+  "experiment_id": "codec-e1-json-vs-xml",
+  "status": "completed",
+  "decision_target": "TAG opt-in per-tool json2xml tool-result codec",
+  "scope": {
+    "dataset": "princeton-nlp/SWE-bench_Verified",
+    "split": "test",
+    "total_instances": 500,
+    "case_list_sha256": "a6b0fd7c8c2969a0eef892e032250adcfa6d32362d395c246930e61b575ac9b9",
+    "agent": "mini-go",
+    "upstream_agent": "mini-SWE-agent",
+    "upstream_agent_version": "2.1.0",
+    "model": "glm-5.2",
+    "source_revision": "02e07966e2946d8955df64253b96d080634c574c",
+    "rebased_equivalent_revision": "23fcef4",
+    "source_modified": false,
+    "verifier_mode": "calibrated",
+    "verifier_workers": 8,
+    "verifier_clean": true,
+    "concurrency_policy": "runner default adaptive strategy; not an experiment variable"
+  },
+  "runs": [
+    {
+      "codec": "json",
+      "run_id": "codec-json-e1",
+      "billing_agent_name": "BenchSWE-codec-json-e1",
+      "generation": {
+        "expected": 500,
+        "accepted": 500,
+        "missing": 0,
+        "invalid": 0,
+        "duplicate": 0,
+        "exit_status_counts": {
+          "Submitted": 499,
+          "LimitsExceeded": 1
+        }
+      },
+      "verifier": {
+        "total": 500,
+        "submitted": 500,
+        "completed": 499,
+        "resolved": 388,
+        "unresolved": 111,
+        "resolved_rate": 0.776,
+        "empty_patch": 1,
+        "error": 0,
+        "incomplete": 0,
+        "exit_code": 0,
+        "unstopped_containers": 0,
+        "unremoved_images": 0
+      },
+      "observation_audit": {
+        "trajectory_files": 500,
+        "tool_observations": 14047,
+        "short": 13942,
+        "truncated": 105,
+        "exception": 48,
+        "format_mismatch": 0
+      },
+      "local_usage": {
+        "response_files": 500,
+        "records": 13657,
+        "records_with_usage": 13650,
+        "records_missing_usage": 7,
+        "input_tokens": 247438154,
+        "output_tokens": 3610350,
+        "total_tokens": 251048504,
+        "prompt_cached_tokens": 242340736,
+        "arithmetic_mismatch": 0
+      },
+      "billing_daily": [
+        {
+          "statis_day": "2026-07-14",
+          "input_tokens": 247438154,
+          "output_tokens": 3610350,
+          "total_tokens": 251048504,
+          "prompt_cached_tokens": 242340736,
+          "cost": 626.5506
+        }
+      ],
+      "billing_total": {
+        "input_tokens": 247438154,
+        "output_tokens": 3610350,
+        "total_tokens": 251048504,
+        "prompt_cached_tokens": 242340736,
+        "cost": 626.5506,
+        "cost_per_resolved": 1.6148
+      },
+      "billing_minus_local_usage": {
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "total_tokens": 0,
+        "prompt_cached_tokens": 0
+      },
+      "known_anomalies": [
+        "django__django-11265 reached the agent limit and produced an empty patch"
+      ],
+      "artifacts": {
+        "manifest": "results/runs/codec-json-e1/shards.json",
+        "predictions": "results/runs/codec-json-e1/preds.json",
+        "verifier_report": "results/runs/codec-json-e1/local-harness-report/mini-go/mini-swe-agent-go__glm52.codec-json-e1-mini-go.json",
+        "verifier_manifest": "results/runs/codec-json-e1/local-harness-report/mini-go/verifier_manifest.json"
+      }
+    },
+    {
+      "codec": "xml",
+      "run_id": "codec-xml-e1",
+      "billing_agent_name": "BenchSWE-codec-xml-e1",
+      "generation": {
+        "expected": 500,
+        "accepted": 500,
+        "missing": 0,
+        "invalid": 0,
+        "duplicate": 0,
+        "exit_status_counts": {
+          "Submitted": 500
+        }
+      },
+      "verifier": {
+        "total": 500,
+        "submitted": 500,
+        "completed": 499,
+        "resolved": 396,
+        "unresolved": 103,
+        "resolved_rate": 0.792,
+        "empty_patch": 0,
+        "error": 1,
+        "error_ids": [
+          "sympy__sympy-19040"
+        ],
+        "incomplete": 0,
+        "exit_code": 0,
+        "unstopped_containers": 0,
+        "unremoved_images": 0
+      },
+      "observation_audit": {
+        "trajectory_files": 500,
+        "tool_observations": 13711,
+        "short": 13622,
+        "truncated": 89,
+        "exception": 45,
+        "format_mismatch": 0
+      },
+      "local_usage": {
+        "response_files": 500,
+        "records": 13364,
+        "records_with_usage": 13359,
+        "records_missing_usage": 5,
+        "input_tokens": 211658627,
+        "output_tokens": 3534284,
+        "total_tokens": 215192911,
+        "prompt_cached_tokens": 206870080,
+        "arithmetic_mismatch": 0
+      },
+      "billing_daily": [
+        {
+          "statis_day": "2026-07-14",
+          "input_tokens": 62001574,
+          "output_tokens": 1049278,
+          "total_tokens": 63050852,
+          "prompt_cached_tokens": 60582272,
+          "cost": 161.8987
+        },
+        {
+          "statis_day": "2026-07-15",
+          "input_tokens": 150435485,
+          "output_tokens": 2501627,
+          "total_tokens": 152937112,
+          "prompt_cached_tokens": 147034112,
+          "cost": 391.3248
+        }
+      ],
+      "billing_total": {
+        "input_tokens": 212437059,
+        "output_tokens": 3550905,
+        "total_tokens": 215987964,
+        "prompt_cached_tokens": 207616384,
+        "cost": 553.2235,
+        "cost_per_resolved": 1.3970
+      },
+      "billing_minus_local_usage": {
+        "input_tokens": 778432,
+        "output_tokens": 16621,
+        "total_tokens": 795053,
+        "prompt_cached_tokens": 746304
+      },
+      "known_anomalies": [
+        "one transient generation endpoint error was retried by the shard supervisor",
+        "sympy__sympy-19040 reached the 1800-second verifier test timeout and was retained as an error"
+      ],
+      "artifacts": {
+        "manifest": "results/runs/codec-xml-e1/shards.json",
+        "predictions": "results/runs/codec-xml-e1/preds.json",
+        "verifier_report": "results/runs/codec-xml-e1/local-harness-report/mini-go/mini-swe-agent-go__glm52.codec-xml-e1-mini-go.json",
+        "verifier_manifest": "results/runs/codec-xml-e1/local-harness-report/mini-go/verifier_manifest.json"
+      }
+    }
+  ],
+  "comparison": {
+    "baseline": "json",
+    "candidate": "xml",
+    "resolved_delta": 8,
+    "resolved_rate_delta_percentage_points": 1.6,
+    "input_tokens_delta_percent": -14.1,
+    "output_tokens_delta_percent": -1.6,
+    "total_tokens_delta_percent": -14.0,
+    "prompt_cached_tokens_delta_percent": -14.3,
+    "cost_delta": -73.3271,
+    "cost_delta_percent": -11.7,
+    "cost_per_resolved_delta_percent": -13.5
+  },
+  "preliminary_conclusion": {
+    "supports": "TAG should provide a built-in, opt-in, per-tool json2xml tool-result codec/helper",
+    "does_not_support": [
+      "changing TAG's default tool-result serialization from JSON to XML",
+      "claiming XML is better for every model or tool"
+    ]
+  }
+}
