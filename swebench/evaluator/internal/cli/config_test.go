@@ -11,13 +11,13 @@ package cli
 
 import "testing"
 
-func TestLoadGLM52YAML(t *testing.T) {
+func TestLoadModelYAML(t *testing.T) {
 	cfg, err := loadModelConfig("../../../config/models/glm-5.2.yaml.example")
 	if err != nil {
 		t.Fatalf("loadModelConfig() error = %v", err)
 	}
 	want := map[string]string{
-		"MODEL_NAME":             "glm52",
+		"MODEL_NAME":             "<model-name>",
 		"OPENAI_BASE_URL":        "***/v1",
 		"OPENAI_API_KEY":         "sk-***",
 		"MODEL_TIMEOUT_SECONDS":  "300",

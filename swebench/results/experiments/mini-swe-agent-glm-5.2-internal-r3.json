@@ -1,19 +1,18 @@
 {
-  "experiment_id": "2026-07-14_mini-swe-agent_glm52_R3",
+  "experiment_id": "2026-07-14_mini-swe-agent_glm-5.2-internal_R3",
   "target": "baseline",
   "agent": "mini-SWE-agent",
   "agent_version": "2.1.0",
-  "model": "glm52",
-  "model_description": "internal GLM-5.2 endpoint",
+  "model": "GLM-5.2-Internal",
   "dataset": "princeton-nlp/SWE-bench_Verified",
   "split": "test",
   "total_instances": 500,
   "case_list_sha256": "a6b0fd7c8c2969a0eef892e032250adcfa6d32362d395c246930e61b575ac9b9",
   "verifier": "calibrated official local harness",
-  "purpose": "repeat-run reference for the internal model used by later mini-SWE-agent and trpc-agent-go experiments",
+  "purpose": "repeat-run summary for completed mini-SWE-agent experiments",
   "runs": [
     {
-      "run_id": "baseline-mini-glm52-full-500-aimd-r2",
+      "run": "r2",
       "submitted": 500,
       "completed": 499,
       "resolved": 383,
@@ -23,7 +22,7 @@
       "resolved_rate": 0.766
     },
     {
-      "run_id": "baseline-mini-glm52-full-500-aimd-r3",
+      "run": "r3",
       "submitted": 500,
       "completed": 500,
       "resolved": 382,
@@ -33,7 +32,7 @@
       "resolved_rate": 0.764
     },
     {
-      "run_id": "baseline-mini-glm52-full-500-aimd-r4",
+      "run": "r4",
       "submitted": 500,
       "completed": 500,
       "resolved": 394,
@@ -45,7 +44,6 @@
   ],
   "notes": [
     "MiniMax M2.5 remains the evaluator-calibration baseline because it has a public SWE-Bench reference point.",
-    "This internal GLM-5.2 endpoint may differ from public GLM-5.2 leaderboard results and is not used to calibrate evaluator correctness.",
-    "Raw artifacts are retained outside the repository archive named 2026-07-14_mini-swe-agent_glm52_R3."
+    "Raw artifacts are retained outside the repository."
   ]
 }

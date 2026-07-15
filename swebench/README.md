@@ -8,8 +8,7 @@ mini-SWE-agent against a Go-native `trpc-agent-go` implementation.
 ## Results
 
 MiniMax M2.5 is used to validate the evaluator and baseline chain against a
-public SWE-Bench reference point. Subsequent mini-SWE-agent and Go-native
-experiments use GLM-5.2-Internal.
+public SWE-Bench reference point. Completed repeat runs are listed separately.
 
 | Model | Agent | Resolved Rate |
 | --- | --- | ---: |
@@ -19,7 +18,7 @@ experiments use GLM-5.2-Internal.
 Structured summaries are stored in
 [`results/baseline-mini-swe-agent-m2.5.json`](results/baseline-mini-swe-agent-m2.5.json)
 and
-[`results/experiments/mini-swe-agent-glm52-r3.json`](results/experiments/mini-swe-agent-glm52-r3.json).
+[`results/experiments/mini-swe-agent-glm-5.2-internal-r3.json`](results/experiments/mini-swe-agent-glm-5.2-internal-r3.json).
 
 The full comparison report will be published in
 [`results/REPORT.md`](results/REPORT.md) and

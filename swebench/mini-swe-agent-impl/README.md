@@ -24,10 +24,10 @@ Record the actual commit in `run_config.json`.
 ```bash
 cd swebench
 
-RUN_ID=baseline-mini-glm52-smoke
+RUN_ID=baseline-mini-glm-5.2-internal-smoke
 MODEL_CONFIG=config/models/glm-5.2.local.yaml
-MODEL_NAME=glm52
-MINI_MODEL_NAME=openai/glm52
+MODEL_NAME=GLM-5.2-Internal
+MINI_MODEL_NAME=openai/<model-name>
 
 go run ./evaluator run-mini \
   --run-id "$RUN_ID" \
@@ -90,11 +90,11 @@ recommended because it makes endpoint failures recoverable at batch granularity.
 ```bash
 cd swebench
 
-RUN_PREFIX=baseline-mini-glm52-full
+RUN_PREFIX=baseline-mini-glm-5.2-internal-full
 PLAN_DIR=data/generated/batches/$RUN_PREFIX
 MODEL_CONFIG=config/models/glm-5.2.local.yaml
-MODEL_NAME=glm52
-MINI_MODEL_NAME=openai/glm52
+MODEL_NAME=GLM-5.2-Internal
+MINI_MODEL_NAME=openai/<model-name>
 
 go run ./evaluator plan-batches \
   --cases data/generated/cases.jsonl \

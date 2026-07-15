@@ -1,5 +1,5 @@
 model:
-  model_name: openai/glm52
+  model_name: openai/<model-name>
   cost_tracking: ignore_errors
   model_kwargs:
     api_base: "***/v1"

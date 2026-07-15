@@ -25,15 +25,10 @@ point.
 The canonical summary is
 [`baseline-mini-swe-agent-m2.5.json`](baseline-mini-swe-agent-m2.5.json).
 
-## Internal GLM-5.2 Runs
+## GLM-5.2-Internal Runs
 
-Subsequent experiments, including mini-SWE-agent follow-up runs and the
-Go-native `trpc-agent-go` implementation, use the internal GLM-5.2 endpoint
-(`glm52`). This endpoint is not treated as the public leaderboard GLM-5.2
-because it is internally deployed and may differ from the public model.
-
-The mini-SWE-agent GLM-5.2 repeat-run summary is
-[`experiments/mini-swe-agent-glm52-r3.json`](experiments/mini-swe-agent-glm52-r3.json).
+The mini-SWE-agent GLM-5.2-Internal repeat-run summary is
+[`experiments/mini-swe-agent-glm-5.2-internal-r3.json`](experiments/mini-swe-agent-glm-5.2-internal-r3.json).
 
 | Run | Resolved | Unresolved | Empty patch | Error | Resolved rate |
 | --- | ---: | ---: | ---: | ---: | ---: |

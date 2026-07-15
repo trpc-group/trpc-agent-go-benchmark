@@ -23,14 +23,10 @@ SWE-Bench 官网公开参考结果，确认 baseline 和 evaluator 链路本身�
 结构化摘要见
 [`baseline-mini-swe-agent-m2.5.json`](baseline-mini-swe-agent-m2.5.json)。
 
-## 内部 GLM-5.2 实验
+## GLM-5.2-Internal 实验
 
-后续实验，包括 mini-SWE-agent 后续 run 和 Go-native `trpc-agent-go` 实现，
-默认使用内部 GLM-5.2 endpoint（`glm52`）。该 endpoint 是内部部署版本，
-不直接等同于 SWE-Bench leaderboard 上的公开 GLM-5.2。
-
-mini-SWE-agent GLM-5.2 三轮重复实验摘要见
-[`experiments/mini-swe-agent-glm52-r3.json`](experiments/mini-swe-agent-glm52-r3.json)。
+mini-SWE-agent GLM-5.2-Internal 三轮重复实验摘要见
+[`experiments/mini-swe-agent-glm-5.2-internal-r3.json`](experiments/mini-swe-agent-glm-5.2-internal-r3.json)。
 
 | Run | Resolved | Unresolved | Empty patch | Error | Resolved rate |
 | --- | ---: | ---: | ---: | ---: | ---: |
