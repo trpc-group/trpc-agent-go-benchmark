@@ -13,12 +13,13 @@ The committed baseline summary is
 | Metric | Value |
 | --- | ---: |
 | Total cases | 500 |
-| Resolved | 382 |
-| Unresolved | 117 |
+| Submitted | 500 |
+| Completed | 495 |
+| Resolved | 380 |
+| Unresolved | 115 |
 | Empty patch | 1 |
-| Infra error | 0 |
-| Incomplete | 0 |
-| Resolved rate | 76.4% |
+| Error | 4 |
+| Resolved rate | 76.00% |
 
 The full comparison report will be published in
 [`results/REPORT.md`](results/REPORT.md) and

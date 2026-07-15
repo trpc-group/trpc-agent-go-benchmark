@@ -13,12 +13,13 @@ local harness 验证 patch，并对比 mini-SWE-agent 与 Go-native
 | 指标 | 值 |
 | --- | ---: |
 | Total cases | 500 |
-| Resolved | 382 |
-| Unresolved | 117 |
+| Submitted | 500 |
+| Completed | 495 |
+| Resolved | 380 |
+| Unresolved | 115 |
 | Empty patch | 1 |
-| Infra error | 0 |
-| Incomplete | 0 |
-| Resolved rate | 76.4% |
+| Error | 4 |
+| Resolved rate | 76.00% |
 
 完整对比报告将在原生 `trpc-agent-go` run 完成后发布到
 [`results/REPORT.md`](results/REPORT.md) 和

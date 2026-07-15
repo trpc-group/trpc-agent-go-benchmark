@@ -1,5 +1,5 @@
 {
-  "run_id": "m2.5-high-full-500-mini210",
+  "run_id": "2026-07-14_mini-swe-agent_m2.5-R1",
   "target": "baseline",
   "agent": "mini-SWE-agent",
   "agent_version": "2.1.0",
@@ -10,30 +10,39 @@
   "total_instances": 500,
   "case_list_sha256": "a6b0fd7c8c2969a0eef892e032250adcfa6d32362d395c246930e61b575ac9b9",
   "verifier": "calibrated official local harness",
-  "raw_report": {
-    "resolved": 381,
-    "unresolved": 114,
+  "status_schema": [
+    "resolved",
+    "unresolved",
+    "empty_patch",
+    "error",
+    "incomplete"
+  ],
+  "report": {
+    "submitted": 500,
+    "completed": 495,
+    "resolved": 380,
+    "unresolved": 115,
     "empty_patch": 1,
     "error": 4,
-    "completed": 495
-  },
-  "final_report": {
-    "resolved": 382,
-    "unresolved": 117,
-    "empty_patch": 1,
-    "infra_error": 0,
     "incomplete": 0,
-    "resolved_rate": 0.764
+    "resolved_rate": 0.76
   },
-  "adjudication": {
-    "sympy__sympy-24213": "full-run Docker API transient timeout; same calibrated verifier single-case retry resolved",
-    "django__django-10554": "invalid non-unified-diff patch; counted as unresolved",
-    "sphinx-doc__sphinx-9230": "invalid non-unified-diff patch; counted as unresolved",
-    "sympy__sympy-21612": "invalid non-unified-diff patch; counted as unresolved"
-  },
+  "empty_patch_ids": [
+    "django__django-11734"
+  ],
+  "error_ids": [
+    "django__django-10554",
+    "sphinx-doc__sphinx-9230",
+    "sympy__sympy-21612",
+    "sympy__sympy-24213"
+  ],
   "artifacts": {
-    "predictions": "/data/swebench-verified/results/baseline-full/m2.5-high-full-500-mini210/raw/mini/preds.json",
-    "calibrated_verifier_report": "/data/swebench-verified/openai__minimax-m2.5.m2.5-high-full-500-mini210-calibrated-verifier.json",
-    "transient_retry_report": "/data/swebench-verified/openai__minimax-m2.5.m2.5-high-full-500-mini210-calibrated-verifier-retry-sympy-24213.json"
-  }
+    "archive_name": "2026-07-14_mini-swe-agent_m2.5-R1",
+    "predictions": "results/baseline-full/m2.5-high-full-500-mini210/raw/mini/preds.json",
+    "calibrated_verifier_report": "results/baseline-full/m2.5-high-full-500-mini210-current-calibrated/local-harness-report/baseline/openai__minimax-m2.5.m2.5-high-full-500-mini210-current-calibrated-20260710-baseline.json"
+  },
+  "notes": [
+    "This summary uses the full-500 calibrated verifier aggregate as the canonical baseline result.",
+    "Single-case reruns are kept as review evidence in the archive but do not override the canonical full-run counts."
+  ]
 }

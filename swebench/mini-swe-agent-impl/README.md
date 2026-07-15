@@ -103,7 +103,8 @@ go run ./evaluator plan-batches \
   --batch-size 20
 ```
 
-Run every planned batch:
+Run each planned batch. Keep the `run_id` stable for a batch so failed or
+missing batches can be rerun without changing the final merge plan.
 
 ```bash
 for filter_file in "$PLAN_DIR"/batch-*.filter; do
@@ -125,13 +126,25 @@ for filter_file in "$PLAN_DIR"/batch-*.filter; do
 done
 ```
 
-Summarize shards and merge predictions:
+Summarize shards after every batch pass:
 
 ```bash
 go run ./evaluator summarize-shards \
   --plan "$PLAN_DIR/plan.json" \
   --runs-root results/runs \
   --output "results/runs/$RUN_PREFIX/shards.json"
+```
+
+Inspect the summary before merging. `accepted=500 missing=0 invalid=0
+duplicate=0` means the generation stage has complete case coverage. Empty
+patches and limit-exceeded trajectories are valid case outcomes and do not
+require a batch rerun. Missing trajectories, corrupt JSON, missing predictions,
+and duplicate accepted cases should be fixed by rerunning only the affected
+batch or case.
+
+Merge predictions only after shard coverage is complete:
+
+```bash
 
 go run ./evaluator merge-predictions \
   --shards "results/runs/$RUN_PREFIX/shards.json" \
