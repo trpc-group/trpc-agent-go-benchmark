@@ -126,7 +126,7 @@ func (e Executor) Execute(ctx context.Context, c contract.Case) (result CaseResu
 	result.Usage = snapshot.Usage
 	result.Responses = snapshot.Responses
 	switch {
-	case snapshot.Submission != "":
+	case snapshot.Submitted:
 		result.Info.ExitStatus = "Submitted"
 		result.Info.Error = ""
 	case caseCtx.Err() == context.DeadlineExceeded:

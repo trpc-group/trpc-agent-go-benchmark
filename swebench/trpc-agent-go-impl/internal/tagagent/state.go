@@ -19,6 +19,7 @@ import (
 type State struct {
 	mu         sync.Mutex
 	submission string
+	submitted  bool
 	llmCalls   int
 	toolCalls  int
 	usage      model.Usage
@@ -29,6 +30,7 @@ func (s *State) setSubmission(patch string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.submission = patch
+	s.submitted = true
 }
 
 func (s *State) recordModelCall() {
@@ -70,6 +72,7 @@ func (s *State) Snapshot() Snapshot {
 	}
 	return Snapshot{
 		Submission: s.submission,
+		Submitted:  s.submitted,
 		LLMCalls:   s.llmCalls,
 		ToolCalls:  s.toolCalls,
 		Usage:      s.usage,
@@ -80,6 +83,7 @@ func (s *State) Snapshot() Snapshot {
 // Snapshot is the immutable case state consumed by the runner.
 type Snapshot struct {
 	Submission string
+	Submitted  bool
 	LLMCalls   int
 	ToolCalls  int
 	Usage      model.Usage

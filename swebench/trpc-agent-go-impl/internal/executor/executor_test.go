@@ -210,3 +210,22 @@ func TestSubmissionSkipSummarizationDoesNotCallModelAgain(t *testing.T) {
 		t.Fatal("environment was not closed")
 	}
 }
+
+func TestEmptyPatchSubmissionIsSubmitted(t *testing.T) {
+	modelImpl := &scriptedModel{responses: []*model.Response{
+		assistantResponse("done", bashCall("submit", "submit")),
+	}}
+	environment := &fakeEnvironment{results: []sweenv.CommandResult{{
+		Output: minicompat.SubmissionMarker + "\n",
+	}}}
+	result := newTestExecutor(modelImpl, environment, minicompat.ObservationCodecXML).Execute(
+		context.Background(), contract.Case{InstanceID: "case-a", ProblemStatement: "fix it"},
+	)
+
+	if result.Info.ExitStatus != "Submitted" || result.ModelPatch != "" {
+		t.Fatalf("result = %+v", result)
+	}
+	if result.LLMCalls != 1 || result.ToolCalls != 1 {
+		t.Fatalf("calls = llm %d, tool %d", result.LLMCalls, result.ToolCalls)
+	}
+}
