@@ -26,8 +26,8 @@ cd swebench
 
 RUN_ID=baseline-mini-glm52-smoke
 MODEL_CONFIG=config/models/glm-5.2.local.yaml
-MODEL_NAME=glm-5.2
-MINI_MODEL_NAME=openai/glm-5.2
+MODEL_NAME=glm52
+MINI_MODEL_NAME=openai/glm52
 
 go run ./evaluator run-mini \
   --run-id "$RUN_ID" \
@@ -93,8 +93,8 @@ cd swebench
 RUN_PREFIX=baseline-mini-glm52-full
 PLAN_DIR=data/generated/batches/$RUN_PREFIX
 MODEL_CONFIG=config/models/glm-5.2.local.yaml
-MODEL_NAME=glm-5.2
-MINI_MODEL_NAME=openai/glm-5.2
+MODEL_NAME=glm52
+MINI_MODEL_NAME=openai/glm52
 
 go run ./evaluator plan-batches \
   --cases data/generated/cases.jsonl \

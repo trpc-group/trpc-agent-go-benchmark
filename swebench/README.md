@@ -84,10 +84,8 @@ For the mini-SWE-agent baseline runner, see
 cp swebench/config/models/glm-5.2.yaml.example swebench/config/models/glm-5.2.local.yaml
 ```
 
-Use the matching template for other models, for example
-`config/models/glm-5.0.yaml.example`. Fill in the endpoint, API key, and
-required gateway headers in the local YAML. Local model config is ignored by
-git.
+Fill in the endpoint, API key, and required gateway headers in the local YAML.
+Local model config is ignored by git.
 
 ### 3. Check evaluator and model access
 

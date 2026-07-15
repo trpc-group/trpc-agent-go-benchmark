@@ -1,10 +1,10 @@
 model:
-  model_name: openai/glm-5.2
+  model_name: openai/glm52
   cost_tracking: ignore_errors
   model_kwargs:
-    api_base: ""
-    api_key: ""
-    timeout: 120
+    api_base: "***/v1"
+    api_key: "sk-***"
+    timeout: 300
     drop_params: true
     parallel_tool_calls: true
     reasoning_effort: high

@@ -81,9 +81,8 @@ mini-SWE-agent baseline runner 的安装和运行见
 cp swebench/config/models/glm-5.2.yaml.example swebench/config/models/glm-5.2.local.yaml
 ```
 
-其他模型使用对应模板，例如 `config/models/glm-5.0.yaml.example`。在本地
-YAML 中填写 endpoint、API key 和必要的网关 header。本地模型配置已被
-gitignore。
+在本地 YAML 中填写 endpoint、API key 和必要的网关 header。本地模型配置已
+被 gitignore。
 
 ### 3. 检查 evaluator 和模型访问
 
