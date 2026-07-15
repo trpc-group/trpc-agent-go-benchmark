@@ -296,6 +296,7 @@ func runRunConfig(args []string) error {
 		runnerStartedAt = formatTime(genericManifest.StartedAt)
 		runnerFinishedAt = formatTime(genericManifest.FinishedAt)
 		runnerDurationMS = genericManifest.DurationMS
+		agentWorkers = genericManifest.Workers
 		predictionsPath = genericManifest.Predictions
 		outputDir = genericManifest.OutputDir
 		serviceFindings = runConfigServiceFindings{}

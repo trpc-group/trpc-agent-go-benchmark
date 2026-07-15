@@ -14,14 +14,15 @@ import "fmt"
 const (
 	targetBaseline = "baseline"
 	targetMiniGo   = "mini-go"
-	targetHelp     = "baseline or mini-go"
+	targetTAG      = "tag"
+	targetHelp     = "baseline, mini-go, or tag"
 )
 
 func validateTarget(target string) error {
 	switch target {
-	case targetBaseline, targetMiniGo:
+	case targetBaseline, targetMiniGo, targetTAG:
 		return nil
 	default:
-		return fmt.Errorf("-target must be baseline or mini-go")
+		return fmt.Errorf("-target must be baseline, mini-go, or tag")
 	}
 }

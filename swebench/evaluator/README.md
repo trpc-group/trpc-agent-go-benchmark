@@ -29,7 +29,7 @@ Run evaluator commands from the `swebench/` root with `go run ./evaluator ...`.
 | `prepare-data` | Download/load SWE-Bench Verified, validate the committed 500-case list, and write generated dataset metadata. |
 | `run-mini` | Run mini-SWE-agent and write raw predictions/traces. |
 | `verify` | Run the official local SWE-Bench harness. |
-| `import` | Normalize predictions, traces, and verifier output into case-level results. |
+| `import` | Normalize baseline, mini-go, or TAG predictions, traces, and verifier output into case-level results. |
 | `run-config` | Build a run-level manifest from generated artifacts. |
 | `plan-batches` | Build fixed case batches and mini-SWE-agent filters. |
 | `summarize-shards` | Summarize shard outputs, accepted case coverage, missing cases, and total runtime. |

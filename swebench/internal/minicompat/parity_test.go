@@ -1,0 +1,126 @@
+//
+// Tencent is pleased to support the open source community by making
+// trpc-agent-go available.
+//
+// Copyright (C) 2025 Tencent.  All rights reserved.
+//
+// trpc-agent-go is licensed under the Apache License Version 2.0.
+//
+
+package minicompat
+
+import (
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
+	"os"
+	"path/filepath"
+	"strconv"
+	"testing"
+	"unicode/utf8"
+
+	"trpc.group/trpc-go/trpc-agent-go-benchmark/swebench/internal/sweenv"
+	"trpc.group/trpc-go/trpc-agent-go/model"
+)
+
+type goldenText struct {
+	Length int    `json:"length"`
+	SHA256 string `json:"sha256"`
+}
+
+type goldenObservation struct {
+	OutputChars   int    `json:"output_chars"`
+	ExceptionInfo string `json:"exception_info"`
+	ReturnCode    int    `json:"returncode"`
+	goldenText
+}
+
+type goldenFormatError struct {
+	Error string `json:"error"`
+	goldenText
+}
+
+type upstreamGolden struct {
+	UpstreamCommit string              `json:"upstream_commit"`
+	Task           string              `json:"task"`
+	System         goldenText          `json:"system"`
+	Instance       goldenText          `json:"instance"`
+	Observations   []goldenObservation `json:"observations"`
+	FormatErrors   []goldenFormatError `json:"format_errors"`
+}
+
+func loadGolden(t *testing.T) upstreamGolden {
+	t.Helper()
+	path := filepath.Join("..", "..", "mini-swe-agent-go-impl", "internal", "sweagent", "testdata", "upstream_v2_1_golden.json")
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var golden upstreamGolden
+	if err := json.Unmarshal(data, &golden); err != nil {
+		t.Fatal(err)
+	}
+	return golden
+}
+
+func assertGoldenText(t *testing.T, name, value string, golden goldenText) {
+	t.Helper()
+	sum := sha256.Sum256([]byte(value))
+	length := utf8.RuneCountInString(value)
+	digest := hex.EncodeToString(sum[:])
+	if length != golden.Length || digest != golden.SHA256 {
+		t.Fatalf("%s mismatch: length=%d sha256=%s, want length=%d sha256=%s", name, length, digest, golden.Length, golden.SHA256)
+	}
+}
+
+func TestUpstreamV21PromptGolden(t *testing.T) {
+	golden := loadGolden(t)
+	if golden.UpstreamCommit != UpstreamCommit {
+		t.Fatalf("fixture commit = %q, implementation commit = %q", golden.UpstreamCommit, UpstreamCommit)
+	}
+	assertGoldenText(t, "system", SystemPrompt, golden.System)
+	assertGoldenText(t, "instance", PromptForTask(golden.Task), golden.Instance)
+}
+
+func TestUpstreamV21XMLObservationGolden(t *testing.T) {
+	golden := loadGolden(t)
+	for _, fixture := range golden.Observations {
+		fixture := fixture
+		t.Run(strconv.Itoa(fixture.OutputChars), func(t *testing.T) {
+			value, err := FormatObservation(sweenv.CommandResult{
+				Output: repeatRune('界', fixture.OutputChars), ReturnCode: fixture.ReturnCode,
+				ExceptionInfo: fixture.ExceptionInfo,
+			}, ObservationCodecXML)
+			if err != nil {
+				t.Fatal(err)
+			}
+			assertGoldenText(t, "observation", value, fixture.goldenText)
+		})
+	}
+}
+
+func TestUpstreamV21FormatErrorGolden(t *testing.T) {
+	golden := loadGolden(t)
+	cases := []struct {
+		calls []model.ToolCall
+	}{
+		{},
+		{calls: []model.ToolCall{{Function: model.FunctionDefinitionParam{Name: "other", Arguments: []byte(`{}`)}}}},
+		{calls: []model.ToolCall{{Function: model.FunctionDefinitionParam{Name: "bash", Arguments: []byte(`{"command":`)}}}},
+	}
+	for i, fixture := range golden.FormatErrors {
+		_, err := ParseActions(cases[i].calls)
+		if err == nil {
+			t.Fatalf("case %d unexpectedly succeeded", i)
+		}
+		assertGoldenText(t, fixture.Error, err.Error(), fixture.goldenText)
+	}
+}
+
+func repeatRune(value rune, count int) string {
+	runes := make([]rune, count)
+	for i := range runes {
+		runes[i] = value
+	}
+	return string(runes)
+}

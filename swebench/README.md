@@ -3,8 +3,8 @@
 SWE-Bench Verified evaluates software-engineering agents on real GitHub issues.
 This benchmark provides a reproducible path to run the official 500-case test
 split, verify patches with the official local harness, and compare the official
-mini-SWE-agent runner against a source-aligned Go port using tRPC-Agent-Go's
-model transport and protocol types.
+mini-SWE-agent runner against both a source-aligned explicit Go control loop and
+a framework implementation using the tRPC-Agent-Go (TAG) agent lifecycle.
 
 ## Results
 
@@ -37,6 +37,7 @@ swebench/
   evaluator/               # Shared dataset, verifier, importer, and report CLI.
   mini-swe-agent-impl/     # mini-SWE-agent baseline adapter.
   mini-swe-agent-go-impl/  # Source-aligned Go port using tRPC model transport.
+  trpc-agent-go-impl/      # TAG llmagent and runner implementation.
   results/                 # Reports and small structured summaries.
 ```
 
@@ -124,11 +125,11 @@ Choose an implementation, run it, and keep its SWE-Bench predictions file:
   [`mini-swe-agent-impl/README.md`](mini-swe-agent-impl/README.md)
 - source-aligned mini-SWE-agent Go port:
   [`mini-swe-agent-go-impl/README.md`](mini-swe-agent-go-impl/README.md)
+- TAG framework implementation:
+  [`trpc-agent-go-impl/README.md`](trpc-agent-go-impl/README.md)
 
-The name `trpc-agent-go-impl` is reserved for a future implementation that uses
-the tRPC-Agent-Go `llmagent` and runner lifecycle. Existing source-aligned Go
-results were migrated to the `mini-go` layout; `native` is no longer an
-evaluator target.
+Use evaluator target `mini-go` for the explicit control loop and `tag` for the
+TAG implementation. `native` and `trpc-go` are not evaluator targets.
 
 The next steps assume `<path-to-preds.json>` points to that file.
 
@@ -140,9 +141,9 @@ official local harness:
 ```bash
 go run ./evaluator verify \
   --run-id <run-id> \
-  --target <baseline-or-mini-go> \
+  --target <baseline-or-mini-go-or-tag> \
   --predictions <path-to-preds.json> \
-  --output results/runs/<run-id>/local-harness-report/<baseline-or-mini-go> \
+  --output results/runs/<run-id>/local-harness-report/<target> \
   --harness-workers 1
 ```
 
@@ -153,7 +154,7 @@ prediction instance ids by default.
 
 ```bash
 go run ./evaluator import \
-  --target <baseline-or-mini-go> \
+  --target <baseline-or-mini-go-or-tag> \
   --cases data/generated/cases.jsonl \
   --predictions <path-to-preds.json> \
   --raw-dir <path-to-raw-run-dir> \
@@ -171,11 +172,11 @@ For a single runner manifest:
 ```bash
 go run ./evaluator run-config \
   --run-id <run-id> \
-  --target <baseline-or-mini-go> \
+  --target <baseline-or-mini-go-or-tag> \
   --cases-manifest data/generated/cases.manifest.json \
   --runner-manifest <path-to-runner-manifest.json> \
-  --verifier-manifest results/runs/<run-id>/local-harness-report/<baseline-or-mini-go>/verifier_manifest.json \
-  --import-summary results/runs/<run-id>/imported/summary/<baseline-or-mini-go>.json \
+  --verifier-manifest results/runs/<run-id>/local-harness-report/<target>/verifier_manifest.json \
+  --import-summary results/runs/<run-id>/imported/summary/<target>.json \
   --harness-report <path-to-harness-report.json> \
   --model-name <model-name> \
   --output results/runs/<run-id>/run_config.json

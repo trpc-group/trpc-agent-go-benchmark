@@ -24,8 +24,8 @@ gate. Manifests identify a passing build as
 explicitly separate adapters.
 
 This is not the tRPC-Agent-Go framework lane: it does not use `llmagent` or the
-tRPC-Agent-Go runner lifecycle. The name `trpc-agent-go-impl` is reserved for a
-future implementation built on those framework components.
+tRPC-Agent-Go runner lifecycle. The TAG framework implementation lives in
+[`trpc-agent-go-impl`](../trpc-agent-go-impl/README.md).
 
 ## Run
 

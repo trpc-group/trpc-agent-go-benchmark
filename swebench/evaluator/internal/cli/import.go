@@ -31,6 +31,7 @@ type importedCase struct {
 	BaseCommit string        `json:"base_commit,omitempty"`
 	Baseline   *targetResult `json:"baseline,omitempty"`
 	MiniGo     *targetResult `json:"mini_go,omitempty"`
+	TAG        *targetResult `json:"tag,omitempty"`
 }
 
 type targetResult struct {
@@ -154,7 +155,7 @@ func runImport(args []string) error {
 				caseRawDir = traceRawDirs[c.InstanceID]
 			}
 			if caseRawDir != "" {
-				tracePath, usage, err := copyScrubbedTrace(caseRawDir, traceDir, c.InstanceID)
+				tracePath, usage, err := copyScrubbedTrace(caseRawDir, traceDir, c.InstanceID, *target)
 				if err == nil && tracePath != "" {
 					result.TracePath = relPath(*output, tracePath)
 					result.Usage = usage
@@ -180,6 +181,8 @@ func runImport(args []string) error {
 			row.Baseline = &result
 		case targetMiniGo:
 			row.MiniGo = &result
+		case targetTAG:
+			row.TAG = &result
 		}
 		data, err := json.Marshal(row)
 		if err != nil {
@@ -331,14 +334,20 @@ func classify(instanceID string, hasPred bool, patch string, harness contract.Ha
 	return "incomplete", "missing harness result"
 }
 
-func copyScrubbedTrace(rawDir, traceDir, instanceID string) (string, usageStats, error) {
-	src := filepath.Join(rawDir, instanceID, instanceID+".traj.json")
+func copyScrubbedTrace(rawDir, traceDir, instanceID, target string) (string, usageStats, error) {
+	traceSuffix := ".traj.json"
+	responsesSuffix := ".trpc-responses.json"
+	if target == targetTAG {
+		traceSuffix = ".tag.json"
+		responsesSuffix = ".responses.json"
+	}
+	src := filepath.Join(rawDir, instanceID, instanceID+traceSuffix)
 	data, err := os.ReadFile(src)
 	if err != nil {
 		return "", usageStats{}, err
 	}
 	usage := extractUsage(data)
-	responsesPath := filepath.Join(rawDir, instanceID, instanceID+".trpc-responses.json")
+	responsesPath := filepath.Join(rawDir, instanceID, instanceID+responsesSuffix)
 	responsesData, responsesErr := os.ReadFile(responsesPath)
 	if responsesErr == nil {
 		responseUsage, usageErr := extractResponseUsage(responsesData)
@@ -405,7 +414,7 @@ func walkUsage(v any, stats *usageStats) {
 	case map[string]any:
 		for k, val := range x {
 			switch strings.ToLower(k) {
-			case "api_calls":
+			case "api_calls", "llm_calls":
 				stats.APICalls = maxInt(stats.APICalls, jsonNumberToInt(val))
 			case "prompt_tokens":
 				stats.PromptTokens = maxInt(stats.PromptTokens, jsonNumberToInt(val))
