@@ -7,24 +7,18 @@ mini-SWE-agent against a Go-native `trpc-agent-go` implementation.
 
 ## Results
 
-The committed baseline summary is
-[`results/baseline-mini-swe-agent-m2.5.json`](results/baseline-mini-swe-agent-m2.5.json).
-MiniMax M2.5 is kept as the evaluator-calibration baseline because it has a
+MiniMax M2.5 is used to validate the evaluator and baseline chain against a
 public SWE-Bench reference point. Subsequent mini-SWE-agent and Go-native
-experiments use the internal GLM-5.2 endpoint (`glm52`).
+experiments use GLM-5.2-Internal.
 
-| Metric | Value |
-| --- | ---: |
-| Total cases | 500 |
-| Submitted | 500 |
-| Completed | 495 |
-| Resolved | 380 |
-| Unresolved | 115 |
-| Empty patch | 1 |
-| Error | 4 |
-| Resolved rate | 76.00% |
+| Model | Agent | Resolved Rate |
+| --- | --- | ---: |
+| MiniMax M2.5 | mini-SWE-agent 2.1.0 | 76.00% |
+| GLM-5.2-Internal | mini-SWE-agent 2.1.0 | 76.40%, 76.60%, 78.80% |
 
-The internal GLM-5.2 repeat-run summary is tracked separately at
+Structured summaries are stored in
+[`results/baseline-mini-swe-agent-m2.5.json`](results/baseline-mini-swe-agent-m2.5.json)
+and
 [`results/experiments/mini-swe-agent-glm52-r3.json`](results/experiments/mini-swe-agent-glm52-r3.json).
 
 The full comparison report will be published in

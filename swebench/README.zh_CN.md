@@ -7,24 +7,18 @@ local harness 验证 patch，并对比 mini-SWE-agent 与 Go-native
 
 ## 结果
 
-已提交的 baseline 摘要文件为
-[`results/baseline-mini-swe-agent-m2.5.json`](results/baseline-mini-swe-agent-m2.5.json)。
-MiniMax M2.5 用作 evaluator 链路校准 baseline，因为它在 SWE-Bench 官网有
-公开参考结果。后续 mini-SWE-agent 和 Go-native 实验默认使用内部 GLM-5.2
-endpoint（`glm52`）。
+MiniMax M2.5 用于对齐 SWE-Bench 官网公开参考结果，验证 evaluator 和 baseline
+链路本身可信。后续 mini-SWE-agent 和 Go-native 实验默认使用
+GLM-5.2-Internal。
 
-| 指标 | 值 |
-| --- | ---: |
-| Total cases | 500 |
-| Submitted | 500 |
-| Completed | 495 |
-| Resolved | 380 |
-| Unresolved | 115 |
-| Empty patch | 1 |
-| Error | 4 |
-| Resolved rate | 76.00% |
+| Model | Agent | Resolved Rate |
+| --- | --- | ---: |
+| MiniMax M2.5 | mini-SWE-agent 2.1.0 | 76.00% |
+| GLM-5.2-Internal | mini-SWE-agent 2.1.0 | 76.40%, 76.60%, 78.80% |
 
-内部 GLM-5.2 三轮重复实验摘要单独记录在
+结构化摘要见
+[`results/baseline-mini-swe-agent-m2.5.json`](results/baseline-mini-swe-agent-m2.5.json)
+和
 [`results/experiments/mini-swe-agent-glm52-r3.json`](results/experiments/mini-swe-agent-glm52-r3.json)。
 
 完整对比报告将在原生 `trpc-agent-go` run 完成后发布到
