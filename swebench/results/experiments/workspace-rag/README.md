@@ -147,3 +147,37 @@ V2 first re-runs four representative cases from the same sample:
 The purpose is to verify that retrieval is actually consumed on every case and
 to reject V2 cheaply if it neither rescues an F00 case nor materially reduces
 model usage.
+
+## V2 first four-case result
+
+Run `tag-rag-preload4-20260716-r1` proactively injected four retrieved results
+for every case. The official local harness resolved 1/4 with no verifier errors:
+
+| Case | Historical E1/E2 | V1 | V2 | V1 cost | V2 cost |
+|---|---|---:|---:|---:|---:|
+| `astropy__astropy-13033` | U/R | U | U | 1.271488 | 0.307472 |
+| `astropy__astropy-13236` | U/U | U | R | 1.206516 | 1.287252 |
+| `django__django-10999` | U/U | U | U | 0.072224 | 0.146620 |
+| `django__django-11532` | R/U | R | U | 0.348820 | 0.326008 |
+
+V2 rescued one F00 case but regressed one V1-resolved F01 case, leaving the net
+result unchanged at 1/4. Total model usage fell from 1,003,790 to 743,945 tokens
+and estimated cost fell from 2.899048 to 2.067352 billing units (-28.7%). LLM
+calls fell from 92 to 74. No case invoked the follow-up `code_search` tool.
+
+The cost reduction is not yet stable evidence: it is dominated by
+`astropy__astropy-13033` ending much earlier, while two other cases became more
+expensive. Repeat the same four cases once before expanding the sample. Do not
+run the 136-case pool from this result.
+
+The repeat `tag-rag-preload4-20260716-r2` resolved 2/4:
+`astropy__astropy-13236` and `django__django-11532`. It used 2,022,390 total
+tokens, 135 LLM calls, and 5.331064 billing units. Per-case estimated costs were
+1.318996, 0.748032, 0.257608, and 3.006428 respectively in the table's order.
+
+Across the two V2 runs, `astropy__astropy-13236` is the only repeated F00 rescue
+and resolved 2/2. This is a weak quality signal worth preserving. The cost
+signal did not repeat: V2's mean cost was 3.699208, 27.6% above V1's 2.899048 on
+the same four cases, with individual V2 runs ranging from 2.067352 to 5.331064.
+Do not claim a cost reduction and do not expand to 136 cases. The next quality
+screen should use a new cost-bounded F00 sample and keep the rate card enabled.
