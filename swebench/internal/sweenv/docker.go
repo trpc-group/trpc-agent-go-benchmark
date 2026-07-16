@@ -138,6 +138,24 @@ func (e *dockerEnvironment) Execute(ctx context.Context, command string) Command
 	return result
 }
 
+func (e *dockerEnvironment) SnapshotWorkspace(ctx context.Context, destination string) error {
+	if err := os.MkdirAll(destination, 0o755); err != nil {
+		return fmt.Errorf("create workspace snapshot destination: %w", err)
+	}
+	out, err := e.commander.Run(
+		ctx,
+		dockerEnv(e.dockerHost),
+		"docker",
+		"cp",
+		e.name+":/testbed/.",
+		destination,
+	)
+	if err != nil {
+		return fmt.Errorf("snapshot Docker testbed: %w: %s", err, strings.TrimSpace(string(out)))
+	}
+	return nil
+}
+
 func (e *dockerEnvironment) Close(ctx context.Context) error {
 	out, err := e.commander.Run(ctx, dockerEnv(e.dockerHost), "docker", "rm", "-f", e.name)
 	if err != nil {

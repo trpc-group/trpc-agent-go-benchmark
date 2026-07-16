@@ -26,6 +26,12 @@ type Environment interface {
 	Close(ctx context.Context) error
 }
 
+// WorkspaceSnapshotter is an optional environment capability that copies the
+// current testbed workspace into a host directory for read-only indexing.
+type WorkspaceSnapshotter interface {
+	SnapshotWorkspace(ctx context.Context, destination string) error
+}
+
 // Factory starts one isolated environment per SWE-Bench instance.
 type Factory interface {
 	Start(ctx context.Context, instanceID string) (Environment, error)

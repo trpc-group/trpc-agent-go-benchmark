@@ -66,11 +66,18 @@ func TestDockerFactoryLifecycle(t *testing.T) {
 	if result := environment.Execute(context.Background(), "pwd"); result.ReturnCode != 0 || result.Output != "ok" {
 		t.Fatalf("Execute() = %+v", result)
 	}
+	snapshotter, ok := environment.(WorkspaceSnapshotter)
+	if !ok {
+		t.Fatal("Docker environment does not implement WorkspaceSnapshotter")
+	}
+	if err := snapshotter.SnapshotWorkspace(context.Background(), t.TempDir()); err != nil {
+		t.Fatal(err)
+	}
 	if err := environment.Close(context.Background()); err != nil {
 		t.Fatal(err)
 	}
-	if len(commander.commands) != 3 {
-		t.Fatalf("commands = %d, want 3", len(commander.commands))
+	if len(commander.commands) != 4 {
+		t.Fatalf("commands = %d, want 4", len(commander.commands))
 	}
 	start := strings.Join(commander.commands[0].args, " ")
 	if !strings.Contains(start, "--label tag-swebench.run_id=run-1") || !strings.Contains(start, "-w /testbed") || !strings.Contains(start, ImageForInstance("repo__repo-1")) {
@@ -79,6 +86,10 @@ func TestDockerFactoryLifecycle(t *testing.T) {
 	execute := strings.Join(commander.commands[1].args, " ")
 	if !strings.Contains(execute, "-e OMP_NUM_THREADS=1") || !strings.HasSuffix(execute, "tag-swebench-command pwd") {
 		t.Fatalf("execute command = %q", execute)
+	}
+	snapshot := strings.Join(commander.commands[2].args, " ")
+	if !strings.Contains(snapshot, "cp tag-swe-repo__repo-1") || !strings.Contains(snapshot, ":/testbed/.") {
+		t.Fatalf("snapshot command = %q", snapshot)
 	}
 	if got := commander.commands[0].env; len(got) != 1 || got[0] != "DOCKER_HOST=unix:///tmp/docker.sock" {
 		t.Fatalf("docker env = %#v", got)

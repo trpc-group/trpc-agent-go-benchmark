@@ -24,6 +24,7 @@ import (
 	"trpc.group/trpc-go/trpc-agent-go/event"
 	"trpc.group/trpc-go/trpc-agent-go/model"
 	tagrunner "trpc.group/trpc-go/trpc-agent-go/runner"
+	"trpc.group/trpc-go/trpc-agent-go/tool"
 )
 
 // CaseInfo records the minimal status needed for resume and result analysis.
@@ -36,15 +37,18 @@ type CaseInfo struct {
 
 // CaseResult is the TAG-native result artifact for one instance.
 type CaseResult struct {
-	InstanceID string            `json:"instance_id"`
-	Info       CaseInfo          `json:"info"`
-	ModelPatch string            `json:"model_patch,omitempty"`
-	DurationMS int64             `json:"duration_ms"`
-	LLMCalls   int               `json:"llm_calls"`
-	ToolCalls  int               `json:"tool_calls"`
-	Usage      model.Usage       `json:"usage"`
-	Events     []*event.Event    `json:"events,omitempty"`
-	Responses  []*model.Response `json:"-"`
+	InstanceID            string                       `json:"instance_id"`
+	Info                  CaseInfo                     `json:"info"`
+	ModelPatch            string                       `json:"model_patch,omitempty"`
+	DurationMS            int64                        `json:"duration_ms"`
+	LLMCalls              int                          `json:"llm_calls"`
+	ToolCalls             int                          `json:"tool_calls"`
+	CodeSearchCalls       int                          `json:"code_search_calls,omitempty"`
+	CodeSearchResultBytes int                          `json:"code_search_result_bytes,omitempty"`
+	WorkspaceIndex        tagagent.WorkspaceIndexStats `json:"workspace_index,omitempty"`
+	Usage                 model.Usage                  `json:"usage"`
+	Events                []*event.Event               `json:"events,omitempty"`
+	Responses             []*model.Response            `json:"-"`
 }
 
 // Executor owns the per-case TAG model and environment lifecycle.
@@ -54,6 +58,7 @@ type Executor struct {
 	ObservationCodec minicompat.ObservationCodec
 	CaseTimeout      time.Duration
 	ModelFactory     func(modelconfig.EnvConfig) model.Model
+	EnableCodeSearch bool
 }
 
 // Execute runs one case and drains the complete TAG event stream.
@@ -92,7 +97,19 @@ func (e Executor) Execute(ctx context.Context, c contract.Case) (result CaseResu
 		modelImpl = e.ModelFactory(e.ModelConfig)
 	}
 	state := &tagagent.State{}
-	agentImpl := tagagent.New(modelImpl, environment, e.ObservationCodec, generationConfig(e.ModelConfig), state)
+	var extraTools []tool.Tool
+	if e.EnableCodeSearch {
+		codeSearch, closeSearch, indexStats, searchErr := tagagent.NewWorkspaceCodeSearch(caseCtx, environment, c.InstanceID)
+		if searchErr != nil {
+			result.Info.Error = searchErr.Error()
+			result.Info.ErrorCategory = minicompat.ErrorCategoryEnvironment
+			return result
+		}
+		defer func() { _ = closeSearch() }()
+		extraTools = append(extraTools, codeSearch)
+		result.WorkspaceIndex = indexStats
+	}
+	agentImpl := tagagent.New(modelImpl, environment, e.ObservationCodec, generationConfig(e.ModelConfig), state, extraTools...)
 	run := tagrunner.NewRunner("tag-swebench", agentImpl)
 	defer run.Close()
 
@@ -123,6 +140,8 @@ func (e Executor) Execute(ctx context.Context, c contract.Case) (result CaseResu
 	result.ModelPatch = snapshot.Submission
 	result.LLMCalls = snapshot.LLMCalls
 	result.ToolCalls = snapshot.ToolCalls
+	result.CodeSearchCalls = snapshot.CodeSearchCalls
+	result.CodeSearchResultBytes = snapshot.CodeSearchResultBytes
 	result.Usage = snapshot.Usage
 	result.Responses = snapshot.Responses
 	switch {

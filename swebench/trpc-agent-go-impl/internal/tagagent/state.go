@@ -17,13 +17,21 @@ import (
 
 // State captures one case's terminal value and model accounting.
 type State struct {
-	mu         sync.Mutex
-	submission string
-	submitted  bool
-	llmCalls   int
-	toolCalls  int
-	usage      model.Usage
-	responses  []*model.Response
+	mu                    sync.Mutex
+	submission            string
+	submitted             bool
+	llmCalls              int
+	toolCalls             int
+	codeSearchCalls       int
+	codeSearchResultBytes int
+	usage                 model.Usage
+	responses             []*model.Response
+}
+
+func (s *State) recordCodeSearchResultBytes(size int) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.codeSearchResultBytes += size
 }
 
 func (s *State) setSubmission(patch string) {
@@ -56,10 +64,13 @@ func (s *State) recordResponse(response *model.Response) {
 	s.usage.CompletionTokensDetails.ReasoningTokens += response.Usage.CompletionTokensDetails.ReasoningTokens
 }
 
-func (s *State) recordToolCall() {
+func (s *State) recordToolCall(toolName string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.toolCalls++
+	if toolName == "code_search" {
+		s.codeSearchCalls++
+	}
 }
 
 // Snapshot returns a stable copy for result projection.
@@ -71,21 +82,25 @@ func (s *State) Snapshot() Snapshot {
 		responses[i] = response.Clone()
 	}
 	return Snapshot{
-		Submission: s.submission,
-		Submitted:  s.submitted,
-		LLMCalls:   s.llmCalls,
-		ToolCalls:  s.toolCalls,
-		Usage:      s.usage,
-		Responses:  responses,
+		Submission:            s.submission,
+		Submitted:             s.submitted,
+		LLMCalls:              s.llmCalls,
+		ToolCalls:             s.toolCalls,
+		CodeSearchCalls:       s.codeSearchCalls,
+		CodeSearchResultBytes: s.codeSearchResultBytes,
+		Usage:                 s.usage,
+		Responses:             responses,
 	}
 }
 
 // Snapshot is the immutable case state consumed by the runner.
 type Snapshot struct {
-	Submission string
-	Submitted  bool
-	LLMCalls   int
-	ToolCalls  int
-	Usage      model.Usage
-	Responses  []*model.Response
+	Submission            string
+	Submitted             bool
+	LLMCalls              int
+	ToolCalls             int
+	CodeSearchCalls       int
+	CodeSearchResultBytes int
+	Usage                 model.Usage
+	Responses             []*model.Response
 }

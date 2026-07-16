@@ -66,6 +66,7 @@ type manifest struct {
 	Environment       string            `json:"environment_config"`
 	CommandTimeout    string            `json:"command_timeout"`
 	CaseTimeout       string            `json:"case_timeout"`
+	CodeSearch        bool              `json:"code_search"`
 	ExitStatusCounts  map[string]int    `json:"exit_status_counts"`
 	LLMCalls          int               `json:"llm_calls"`
 	ToolCalls         int               `json:"tool_calls"`
@@ -114,6 +115,7 @@ func Run(args []string) error {
 	codecValue := fs.String("observation-codec", string(minicompat.ObservationCodecXML), "observation codec: xml, json, or text")
 	billingTag := fs.String("billing-tag", "", "suffix appended to X-SMG-Agent-Name for billing isolation")
 	experimentID := fs.String("experiment-id", "", "experiment identifier recorded with billing-tag")
+	codeSearch := fs.Bool("code-search", false, "enable local BM25 workspace code search")
 	if err := fs.Parse(args[1:]); err != nil {
 		return err
 	}
@@ -182,6 +184,7 @@ func Run(args []string) error {
 	}
 	exec := executor.Executor{
 		Factory: factory, ModelConfig: modelCfg, ObservationCodec: codec, CaseTimeout: *caseTimeout,
+		EnableCodeSearch: *codeSearch,
 	}
 	if err := exec.Validate(); err != nil {
 		return err
@@ -308,6 +311,7 @@ func Run(args []string) error {
 		Predictions: artifact.AbsPath(predictionsPath), Progress: artifact.AbsPath(progressPath),
 		ModelConfig: modelconfig.RedactSecrets(modelCfg), Environment: artifact.AbsPath(*environmentConfigPath),
 		CommandTimeout: commandTimeout.String(), CaseTimeout: caseTimeout.String(),
+		CodeSearch:       *codeSearch,
 		ExitStatusCounts: exitCounts, LLMCalls: llmCalls, ToolCalls: toolCalls, Usage: usage,
 		Status: status,
 		Notes: []string{

@@ -27,14 +27,21 @@ func New(
 	codec minicompat.ObservationCodec,
 	generationConfig model.GenerationConfig,
 	state *State,
+	extraTools ...tool.Tool,
 ) *llmagent.LLMAgent {
 	bash := &bashTool{environment: environment}
+	tools := []tool.Tool{bash}
+	tools = append(tools, extraTools...)
+	instruction := minicompat.SystemPrompt
+	if len(extraTools) > 0 {
+		instruction += " Use code_search for fast, focused code discovery before broad shell searches; precise identifiers, paths, errors, and behavior phrases work best."
+	}
 	return llmagent.New(
 		"tag-swe-agent",
 		llmagent.WithModel(modelImpl),
-		llmagent.WithGlobalInstruction(minicompat.SystemPrompt),
+		llmagent.WithGlobalInstruction(instruction),
 		llmagent.WithGenerationConfig(generationConfig),
-		llmagent.WithTools([]tool.Tool{bash}),
+		llmagent.WithTools(tools),
 		llmagent.WithMaxLLMCalls(maxLLMCalls),
 		llmagent.WithEnableParallelTools(false),
 		llmagent.WithPreserveSameBranch(true),

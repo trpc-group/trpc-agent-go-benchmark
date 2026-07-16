@@ -11,6 +11,7 @@ package tagagent
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 
@@ -38,7 +39,7 @@ func modelCallbacks(state *State) *model.Callbacks {
 		if len(response.Choices) == 0 {
 			return nil, errors.New("model response contains no choices")
 		}
-		_, err := minicompat.ParseActions(response.Choices[0].Message.ToolCalls)
+		_, err := parseBashActions(response.Choices[0].Message.ToolCalls)
 		if err == nil {
 			return nil, nil
 		}
@@ -55,11 +56,36 @@ func modelCallbacks(state *State) *model.Callbacks {
 	return callbacks
 }
 
+func parseBashActions(toolCalls []model.ToolCall) ([]minicompat.Action, error) {
+	bashCalls := make([]model.ToolCall, 0, len(toolCalls))
+	for _, call := range toolCalls {
+		if call.Function.Name == "bash" {
+			bashCalls = append(bashCalls, call)
+		}
+	}
+	if len(bashCalls) == 0 {
+		// Preserve the mini-SWE protocol requirement and its exact feedback for
+		// responses that contain no bash call, including code_search-only turns.
+		return minicompat.ParseActions(nil)
+	}
+	return minicompat.ParseActions(bashCalls)
+}
+
 func toolCallbacks(state *State, codec minicompat.ObservationCodec) *tool.Callbacks {
 	callbacks := tool.NewCallbacks()
 	callbacks.RegisterAfterTool(func(_ context.Context, args *tool.AfterToolArgs) (*tool.AfterToolResult, error) {
-		state.recordToolCall()
+		if args != nil {
+			state.recordToolCall(args.ToolName)
+		}
 		if args == nil || args.Error != nil {
+			return nil, nil
+		}
+		if args.ToolName != "bash" {
+			if args.ToolName == "code_search" {
+				if payload, err := json.Marshal(args.Result); err == nil {
+					state.recordCodeSearchResultBytes(len(payload))
+				}
+			}
 			return nil, nil
 		}
 		result, ok := args.Result.(sweenv.CommandResult)
@@ -76,6 +102,9 @@ func toolCallbacks(state *State, codec minicompat.ObservationCodec) *tool.Callba
 	callbacks.RegisterToolResultMessages(func(_ context.Context, input *tool.ToolResultMessagesInput) (any, error) {
 		if input == nil {
 			return nil, errors.New("nil tool result input")
+		}
+		if input.ToolName != "bash" {
+			return nil, nil
 		}
 		result, ok := input.Result.(sweenv.CommandResult)
 		if !ok {
