@@ -10,12 +10,14 @@
 package runner
 
 import (
+	"math"
 	"path/filepath"
 	"reflect"
 	"testing"
 
 	"trpc.group/trpc-go/trpc-agent-go-benchmark/swebench/internal/artifact"
 	"trpc.group/trpc-go/trpc-agent-go-benchmark/swebench/internal/contract"
+	"trpc.group/trpc-go/trpc-agent-go/model/pricing"
 )
 
 func TestPrepareResumeUsesPredictionsAsBoundary(t *testing.T) {
@@ -32,6 +34,21 @@ func TestPrepareResumeUsesPredictionsAsBoundary(t *testing.T) {
 	}
 	if len(preds) != 1 || !reflect.DeepEqual(pending, []contract.Case{{InstanceID: "case-b"}}) || !reflect.DeepEqual(skipped, []string{"case-a"}) {
 		t.Fatalf("preds=%#v pending=%#v skipped=%#v", preds, pending, skipped)
+	}
+}
+
+func TestEstimateUsageCostMatchesHistoricalBilling(t *testing.T) {
+	estimate, err := estimateUsageCost(pricing.RateCard{
+		Currency: "CNY", UncachedInput: 8, CachedInput: 2, Output: 28,
+	}, usageSummary{
+		PromptTokens: 254957626, CachedTokens: 250148160,
+		CompletionTokens: 3842970, TotalTokens: 258800596,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if math.Abs(estimate.TotalCost-646.375208) > 0.0000001 {
+		t.Fatalf("total cost = %.9f", estimate.TotalCost)
 	}
 }
 

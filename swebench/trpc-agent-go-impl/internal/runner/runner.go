@@ -29,6 +29,8 @@ import (
 	"trpc.group/trpc-go/trpc-agent-go-benchmark/swebench/internal/modelconfig"
 	"trpc.group/trpc-go/trpc-agent-go-benchmark/swebench/internal/sweenv"
 	"trpc.group/trpc-go/trpc-agent-go-benchmark/swebench/trpc-agent-go-impl/internal/executor"
+	"trpc.group/trpc-go/trpc-agent-go/model"
+	"trpc.group/trpc-go/trpc-agent-go/model/pricing"
 )
 
 const frameworkVersion = "v1.10.1-0.20260616104537-c6c3bb29ab60"
@@ -71,6 +73,8 @@ type manifest struct {
 	LLMCalls          int               `json:"llm_calls"`
 	ToolCalls         int               `json:"tool_calls"`
 	Usage             usageSummary      `json:"usage"`
+	Pricing           *pricing.RateCard `json:"pricing,omitempty"`
+	CostEstimate      *pricing.Estimate `json:"cost_estimate,omitempty"`
 	Status            string            `json:"status"`
 	Notes             []string          `json:"notes,omitempty"`
 }
@@ -166,6 +170,14 @@ func Run(args []string) error {
 	}
 	if strings.TrimSpace(modelCfg["MODEL_NAME"]) == "" {
 		return fmt.Errorf("model config has no model.model_name or MODEL_NAME")
+	}
+	rateCardValue, pricingEnabled, err := modelconfig.Pricing(modelCfg)
+	if err != nil {
+		return fmt.Errorf("load pricing: %w", err)
+	}
+	var rateCard *pricing.RateCard
+	if pricingEnabled {
+		rateCard = &rateCardValue
 	}
 	billingAgentName, err := resolveBillingAgentName(modelCfg["X_SMG_AGENT_NAME"], *billingTag, *experimentID)
 	if err != nil {
@@ -297,6 +309,13 @@ func Run(args []string) error {
 			status = "completed_with_errors"
 		}
 	}
+	var costEstimate *pricing.Estimate
+	if rateCard != nil {
+		costEstimate, err = estimateUsageCost(*rateCard, usage)
+		if err != nil {
+			return fmt.Errorf("estimate cost: %w", err)
+		}
+	}
 	doc := manifest{
 		RunID: *runID, RunnerType: "tag", FrameworkVersion: frameworkVersion,
 		AgentProtocol: agentProtocol(codec), UpstreamCommit: minicompat.UpstreamCommit,
@@ -313,6 +332,7 @@ func Run(args []string) error {
 		CommandTimeout: commandTimeout.String(), CaseTimeout: caseTimeout.String(),
 		CodeSearch:       *codeSearch,
 		ExitStatusCounts: exitCounts, LLMCalls: llmCalls, ToolCalls: toolCalls, Usage: usage,
+		Pricing: rateCard, CostEstimate: costEstimate,
 		Status: status,
 		Notes: []string{
 			"Each case runs through tRPC-Agent-Go llmagent and runner lifecycles in an independent official SWE-Bench container.",
@@ -326,6 +346,18 @@ func Run(args []string) error {
 	fmt.Printf("selected=%d attempted=%d skipped_existing=%d predictions=%s\nprogress=%s\nmanifest=%s\n",
 		len(selected), len(pending), len(skipped), predictionsPath, progressPath, manifestPath)
 	return nil
+}
+
+func estimateUsageCost(rateCard pricing.RateCard, usage usageSummary) (*pricing.Estimate, error) {
+	billableUsage, err := pricing.IncludedCachedInputUsage(&model.Usage{
+		PromptTokens: usage.PromptTokens, CompletionTokens: usage.CompletionTokens,
+		TotalTokens:         usage.TotalTokens,
+		PromptTokensDetails: model.PromptTokensDetails{CachedTokens: usage.CachedTokens},
+	})
+	if err != nil {
+		return nil, err
+	}
+	return pricing.Calculate(rateCard, billableUsage)
 }
 
 func agentProtocol(codec minicompat.ObservationCodec) string {

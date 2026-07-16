@@ -14,3 +14,12 @@ model:
       X-SMG-Routing-Key: ""
       X-SMG-Agent-Name: BenchSWE
       X-SMG-Provider: ""
+
+# Optional local cost estimate. Rates are per unit_tokens and should match the
+# deployment's billing contract.
+pricing:
+  currency: billing_unit
+  unit_tokens: 1000000
+  uncached_input: 8
+  cached_input: 2
+  output: 28

@@ -11,9 +11,12 @@ package modelconfig
 
 import (
 	"bufio"
+	"fmt"
 	"os"
 	"strconv"
 	"strings"
+
+	"trpc.group/trpc-go/trpc-agent-go/model/pricing"
 )
 
 // EnvConfig is the normalized model/environment configuration consumed by runners.
@@ -26,6 +29,51 @@ func Load(path string) (EnvConfig, error) {
 		return LoadMiniSWEAgentYAML(path)
 	}
 	return LoadEnvFile(path)
+}
+
+// Pricing reads an optional framework rate card from normalized model
+// configuration. The boolean is false when no pricing fields are present.
+func Pricing(cfg EnvConfig) (pricing.RateCard, bool, error) {
+	keys := []string{
+		"PRICE_CURRENCY", "PRICE_UNIT_TOKENS", "PRICE_UNCACHED_INPUT",
+		"PRICE_CACHED_INPUT", "PRICE_OUTPUT",
+	}
+	enabled := false
+	for _, key := range keys {
+		if strings.TrimSpace(cfg[key]) != "" {
+			enabled = true
+			break
+		}
+	}
+	if !enabled {
+		return pricing.RateCard{}, false, nil
+	}
+	card := pricing.RateCard{Currency: strings.TrimSpace(cfg["PRICE_CURRENCY"])}
+	var err error
+	if value := strings.TrimSpace(cfg["PRICE_UNIT_TOKENS"]); value != "" {
+		card.UnitTokens, err = strconv.ParseInt(value, 10, 64)
+		if err != nil {
+			return pricing.RateCard{}, false, fmt.Errorf("parse PRICE_UNIT_TOKENS: %w", err)
+		}
+	}
+	for key, target := range map[string]*float64{
+		"PRICE_UNCACHED_INPUT": &card.UncachedInput,
+		"PRICE_CACHED_INPUT":   &card.CachedInput,
+		"PRICE_OUTPUT":         &card.Output,
+	} {
+		value := strings.TrimSpace(cfg[key])
+		if value == "" {
+			return pricing.RateCard{}, false, fmt.Errorf("%s is required when pricing is enabled", key)
+		}
+		*target, err = strconv.ParseFloat(value, 64)
+		if err != nil {
+			return pricing.RateCard{}, false, fmt.Errorf("parse %s: %w", key, err)
+		}
+	}
+	if err := card.Validate(); err != nil {
+		return pricing.RateCard{}, false, err
+	}
+	return card, true, nil
 }
 
 // LoadEnvFile reads KEY=VALUE files.
@@ -158,5 +206,15 @@ func setMiniYAMLModelValue(cfg EnvConfig, path, value string) {
 		cfg["X_SMG_AGENT_NAME"] = value
 	case "model.model_kwargs.extra_headers.X-SMG-Provider":
 		cfg["X_SMG_PROVIDER"] = value
+	case "pricing.currency":
+		cfg["PRICE_CURRENCY"] = value
+	case "pricing.unit_tokens":
+		cfg["PRICE_UNIT_TOKENS"] = value
+	case "pricing.uncached_input":
+		cfg["PRICE_UNCACHED_INPUT"] = value
+	case "pricing.cached_input":
+		cfg["PRICE_CACHED_INPUT"] = value
+	case "pricing.output":
+		cfg["PRICE_OUTPUT"] = value
 	}
 }

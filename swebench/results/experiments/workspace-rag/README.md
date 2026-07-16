@@ -107,6 +107,12 @@ Compare quality and cost separately:
 - Retrieval cost: index duration, indexed document count, code-search calls,
   and code-search result payload size where available.
 
+When the model config contains a `pricing` rate card, the TAG runner writes a
+`cost_estimate` to its manifest. The current GLM-5.2 deployment's historical
+billing records fit the following per-million-token rates with rounding-only
+residuals: uncached input 8, cached input 2, and output 28. The currency must be
+declared by the deployment config rather than inferred by the framework.
+
 Python AST indexing and Dense+BM25 hybrid retrieval are follow-up variants.
 Dense retrieval requires an
 OpenAI-compatible embeddings endpoint, model name, dimensions if non-default,
