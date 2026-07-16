@@ -17,7 +17,8 @@ import (
 
 	"trpc.group/trpc-go/trpc-agent-go-benchmark/swebench/internal/sweenv"
 	"trpc.group/trpc-go/trpc-agent-go/knowledge"
-	_ "trpc.group/trpc-go/trpc-agent-go/knowledge/document/reader/python"
+	docreader "trpc.group/trpc-go/trpc-agent-go/knowledge/document/reader"
+	textreader "trpc.group/trpc-go/trpc-agent-go/knowledge/document/reader/text"
 	"trpc.group/trpc-go/trpc-agent-go/knowledge/source"
 	"trpc.group/trpc-go/trpc-agent-go/knowledge/source/repo"
 	knowledgetool "trpc.group/trpc-go/trpc-agent-go/knowledge/tool"
@@ -25,6 +26,10 @@ import (
 	"trpc.group/trpc-go/trpc-agent-go/knowledge/vectorstore/inmemory"
 	"trpc.group/trpc-go/trpc-agent-go/tool"
 )
+
+func init() {
+	docreader.RegisterReader([]string{".py"}, textreader.New)
+}
 
 // WorkspaceIndexStats captures per-case local indexing cost separately from
 // model token usage.

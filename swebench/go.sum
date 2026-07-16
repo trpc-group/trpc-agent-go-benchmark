@@ -109,3 +109,5 @@ gopkg.in/yaml.v3 v3.0.1 h1:fxVm/GzAzEWqLHuvctI91KS9hhNmmWOoWu0XTYJS7CA=
 gopkg.in/yaml.v3 v3.0.1/go.mod h1:K4uyk7z7BCEPqu6E+C64Yfv1cQ7kz7rIZviUmN+EgEM=
 trpc.group/trpc-go/trpc-a2a-go v0.2.5 h1:X3pAlWD128LaS9TtXsUDZoJWPVuPZDkZKUecKRxmWn4=
 trpc.group/trpc-go/trpc-a2a-go v0.2.5/go.mod h1:Gtytau9Uoc3oPo/dpHvKit+tQn9Qlk5XFG1RiZTGqfk=
+trpc.group/trpc-go/trpc-agent-go v1.10.1-0.20260616104537-c6c3bb29ab60 h1:XVURxTh+AxSYReMTyZlWHlmlh2d9kZUpgU+pzr6XN9c=
+trpc.group/trpc-go/trpc-agent-go v1.10.1-0.20260616104537-c6c3bb29ab60/go.mod h1:lksOlht6E+LR7AKOA0XoKrkI3AJNsfukTVes9BFmTow=
