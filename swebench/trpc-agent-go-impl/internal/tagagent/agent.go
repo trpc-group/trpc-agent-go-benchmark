@@ -34,7 +34,7 @@ func New(
 	tools = append(tools, extraTools...)
 	instruction := minicompat.SystemPrompt
 	if len(extraTools) > 0 {
-		instruction += " Use code_search for fast, focused code discovery before broad shell searches; precise identifiers, paths, errors, and behavior phrases work best."
+		instruction += " The initial task may include automatically retrieved workspace context; use it as a lead and verify it in the shell. Use code_search for additional focused discovery before broad shell searches."
 	}
 	return llmagent.New(
 		"tag-swe-agent",

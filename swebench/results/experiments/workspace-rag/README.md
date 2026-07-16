@@ -4,7 +4,9 @@ This experiment evaluates a framework-level workspace retrieval capability in
 `trpc-agent-go-impl`. It intentionally avoids repository-specific rules and
 business heuristics.
 
-## Variant
+## Variants
+
+### V1: tool-only retrieval
 
 - Materialize the current `/testbed` workspace through an optional environment
   capability.
@@ -15,8 +17,17 @@ business heuristics.
 - Record `workspace_index.documents`, `workspace_index.duration_ms`, and
   `code_search_calls` separately from model usage.
 
-The variant is opt-in with `--code-search`; an invocation without the flag is
-the unchanged baseline.
+### V2: proactive retrieval plus tool
+
+- Before the first model request, retrieve against the problem statement and
+  inject at most four results and 6,000 characters as `workspace_context`.
+- Keep `code_search` available for focused follow-up retrieval.
+- Record `workspace_index.preloaded_documents` and
+  `workspace_index.preloaded_chars` in addition to the V1 metrics.
+
+Both variants are framework-generic and use the same opt-in `--code-search`
+path. V2 replaces V1 in the current implementation; an invocation without the
+flag remains the unchanged baseline.
 
 ## First evaluation pool
 
@@ -59,8 +70,9 @@ go run ./trpc-agent-go-impl \
   --code-search
 ```
 
-After one case passes runner and official evaluator checks, run 5-10 cases.
-Then run the full historical pool:
+After one case passes runner and official evaluator checks, run a small
+stratified sample. Do not run the full historical pool until that sample shows
+a material quality or cost signal. The full-pool command is:
 
 ```bash
 CASE_FILTER="^($(paste -sd'|' data/case-lists/tag-impl-unstable-e1-e2-136.case_ids.txt))$"
@@ -99,3 +111,33 @@ Python AST indexing and Dense+BM25 hybrid retrieval are follow-up variants.
 Dense retrieval requires an
 OpenAI-compatible embeddings endpoint, model name, dimensions if non-default,
 and price information so embedding cost can be reported independently.
+
+## V1 observed result
+
+Run `tag-rag-smoke8-20260716-r1` evaluated eight cases with the official local
+harness:
+
+| Case | Historical E1/E2 | V1 | Search calls | Total tokens |
+|---|---|---:|---:|---:|
+| `astropy__astropy-13033` | U/R | U | 0 | 466,725 |
+| `astropy__astropy-13236` | U/U | U | 1 | 406,779 |
+| `astropy__astropy-14182` | R/U | R | 0 | 390,865 |
+| `django__django-10999` | U/U | U | 0 | 19,574 |
+| `django__django-11265` | U/R | R | 0 | 1,721,197 |
+| `django__django-11532` | R/U | R | 0 | 110,712 |
+| `matplotlib__matplotlib-20676` | U/U | U | 0 | 2,646,106 |
+| `psf__requests-2317` | U/U | U | 0 | 62,759 |
+
+V1 resolved 3/8, versus a historical per-run expectation of 2/8 for this
+sample. It rescued 0/4 F00 cases and used `code_search` in only 1/8 cases. The
+run consumed 5,824,717 total tokens. This is noise-level quality evidence and a
+negative cost signal, so V1 must not be expanded to 136 cases.
+
+V2 first re-runs four representative cases from the same sample:
+
+- F00: `astropy__astropy-13236`, `django__django-10999`
+- F01: `astropy__astropy-13033`, `django__django-11532`
+
+The purpose is to verify that retrieval is actually consumed on every case and
+to reject V2 cheaply if it neither rescues an F00 case nor materially reduces
+model usage.

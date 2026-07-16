@@ -34,8 +34,10 @@ func init() {
 // WorkspaceIndexStats captures per-case local indexing cost separately from
 // model token usage.
 type WorkspaceIndexStats struct {
-	Documents  int   `json:"documents"`
-	DurationMS int64 `json:"duration_ms"`
+	Documents          int   `json:"documents"`
+	DurationMS         int64 `json:"duration_ms"`
+	PreloadedDocuments int   `json:"preloaded_documents,omitempty"`
+	PreloadedChars     int   `json:"preloaded_chars,omitempty"`
 }
 
 // NewWorkspaceCodeSearch snapshots and indexes one environment, returning a
@@ -44,11 +46,12 @@ func NewWorkspaceCodeSearch(
 	ctx context.Context,
 	environment sweenv.Environment,
 	instanceID string,
-) (tool.Tool, func() error, WorkspaceIndexStats, error) {
+	query string,
+) (tool.Tool, func() error, WorkspaceIndexStats, string, error) {
 	started := time.Now()
 	snapshotter, ok := environment.(sweenv.WorkspaceSnapshotter)
 	if !ok {
-		return nil, nil, WorkspaceIndexStats{}, fmt.Errorf("environment does not support workspace snapshots")
+		return nil, nil, WorkspaceIndexStats{}, "", fmt.Errorf("environment does not support workspace snapshots")
 	}
 	src := repo.New(
 		repo.WithName("swebench-workspace"),
@@ -65,12 +68,19 @@ func NewWorkspaceCodeSearch(
 	)
 	if err := kb.Load(ctx, knowledge.WithShowProgress(false), knowledge.WithShowStats(false)); err != nil {
 		_ = kb.Close()
-		return nil, nil, WorkspaceIndexStats{}, fmt.Errorf("index workspace: %w", err)
+		return nil, nil, WorkspaceIndexStats{}, "", fmt.Errorf("index workspace: %w", err)
 	}
 	count, err := store.Count(ctx)
 	if err != nil {
 		_ = kb.Close()
-		return nil, nil, WorkspaceIndexStats{}, fmt.Errorf("count workspace documents: %w", err)
+		return nil, nil, WorkspaceIndexStats{}, "", fmt.Errorf("count workspace documents: %w", err)
+	}
+	preloaded, err := knowledge.BuildContext(ctx, kb, &knowledge.ContextRequest{
+		Query: query, MaxResults: 4, MaxChars: 6000, SearchMode: int(vectorstore.SearchModeKeyword),
+	})
+	if err != nil {
+		_ = kb.Close()
+		return nil, nil, WorkspaceIndexStats{}, "", fmt.Errorf("preload workspace context: %w", err)
 	}
 	search := knowledgetool.NewCompactCodeSearchTool(
 		kb,
@@ -81,7 +91,11 @@ func NewWorkspaceCodeSearch(
 			"file_mode", "file_size", "modified_at", "repo_path", "source", "source_name",
 		),
 	)
-	return search, kb.Close, WorkspaceIndexStats{Documents: count, DurationMS: time.Since(started).Milliseconds()}, nil
+	stats := WorkspaceIndexStats{
+		Documents: count, DurationMS: time.Since(started).Milliseconds(),
+		PreloadedDocuments: preloaded.Documents, PreloadedChars: preloaded.Chars,
+	}
+	return search, kb.Close, stats, preloaded.Text, nil
 }
 
 type workspaceMaterializer struct {

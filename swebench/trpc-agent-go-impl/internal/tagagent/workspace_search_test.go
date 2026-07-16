@@ -36,8 +36,8 @@ class UserStore:
 }
 
 func TestWorkspaceCodeSearchIndexesAndRetrievesPython(t *testing.T) {
-	search, closeSearch, stats, err := NewWorkspaceCodeSearch(
-		context.Background(), snapshotEnvironment{}, "repo__repo-1",
+	search, closeSearch, stats, preloaded, err := NewWorkspaceCodeSearch(
+		context.Background(), snapshotEnvironment{}, "repo__repo-1", "find user by email",
 	)
 	if err != nil {
 		t.Fatalf("NewWorkspaceCodeSearch() error = %v", err)
@@ -45,6 +45,9 @@ func TestWorkspaceCodeSearchIndexesAndRetrievesPython(t *testing.T) {
 	defer func() { _ = closeSearch() }()
 	if stats.Documents == 0 {
 		t.Fatalf("workspace stats = %+v", stats)
+	}
+	if stats.PreloadedDocuments == 0 || stats.PreloadedChars == 0 || preloaded == "" {
+		t.Fatalf("preloaded context = %q, stats = %+v", preloaded, stats)
 	}
 	callable, ok := search.(frameworktool.CallableTool)
 	if !ok {

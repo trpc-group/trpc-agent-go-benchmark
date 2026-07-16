@@ -98,8 +98,11 @@ func (e Executor) Execute(ctx context.Context, c contract.Case) (result CaseResu
 	}
 	state := &tagagent.State{}
 	var extraTools []tool.Tool
+	var workspaceContext string
 	if e.EnableCodeSearch {
-		codeSearch, closeSearch, indexStats, searchErr := tagagent.NewWorkspaceCodeSearch(caseCtx, environment, c.InstanceID)
+		codeSearch, closeSearch, indexStats, preloaded, searchErr := tagagent.NewWorkspaceCodeSearch(
+			caseCtx, environment, c.InstanceID, c.ProblemStatement,
+		)
 		if searchErr != nil {
 			result.Info.Error = searchErr.Error()
 			result.Info.ErrorCategory = minicompat.ErrorCategoryEnvironment
@@ -108,16 +111,21 @@ func (e Executor) Execute(ctx context.Context, c contract.Case) (result CaseResu
 		defer func() { _ = closeSearch() }()
 		extraTools = append(extraTools, codeSearch)
 		result.WorkspaceIndex = indexStats
+		workspaceContext = preloaded
 	}
 	agentImpl := tagagent.New(modelImpl, environment, e.ObservationCodec, generationConfig(e.ModelConfig), state, extraTools...)
 	run := tagrunner.NewRunner("tag-swebench", agentImpl)
 	defer run.Close()
 
+	taskPrompt := minicompat.PromptForTask(c.ProblemStatement)
+	if workspaceContext != "" {
+		taskPrompt += "\n\n<workspace_context>\n" + workspaceContext + "\n</workspace_context>"
+	}
 	events, err := run.Run(
 		caseCtx,
 		c.InstanceID,
 		c.InstanceID,
-		model.NewUserMessage(minicompat.PromptForTask(c.ProblemStatement)),
+		model.NewUserMessage(taskPrompt),
 		agent.WithStream(false),
 		agent.WithModelRequestExtraFields(map[string]any{"parallel_tool_calls": true}),
 	)
