@@ -373,7 +373,7 @@ one framework-level variable at a time: persistent content-hash embedding
 cache, lexical candidate prefiltering before dense embedding, or a larger
 embedding batch.
 
-### Decision
+### R1 decision
 
 This is a strong, verifiable resolve-rate signal and a positive
 model-cost-per-resolved signal. It is not yet a stability result: the exact
@@ -387,3 +387,142 @@ speed change cannot be confused with a quality change.
 
 The machine-readable result is
 [`v3-bge-m3-unstable136-r1.json`](./v3-bge-m3-unstable136-r1.json).
+
+## V3 exact repeat result
+
+Run `tag-rag-bge-m3-unstable136-20260717-r2` repeated the same 136 cases with
+the same model, prompts, retrieval configuration, framework binary, and
+official harness. It used the established 15-case-worker strategy from the
+start instead of R1's initial 21-case two-worker warm-up.
+
+| Metric | Historical E1 | Historical E2 | V3 R1 | V3 R2 |
+|---|---:|---:|---:|---:|
+| Resolved | 19/136 | 35/136 | **53/136** | **50/136** |
+| Resolve rate | 14.0% | 25.7% | **39.0%** | **36.8%** |
+| Completed by harness | 134 | 130 | 135 | 134 |
+| Empty patches | 2 | 5 | 1 | 2 |
+| Harness errors | 0 | 1 | 0 | 0 |
+
+R2 is three cases below R1 but eight cases above the predeclared 42-case repeat
+gate. The two RAG runs average 51.5/136 (37.9%), versus the historical
+two-run mean of 27/136 (19.9%): a repeated gain of 24.5 cases and 18.0
+percentage points. The aggregate resolve-rate signal therefore reproduced.
+
+R2's two empty patches were
+`scikit-learn__scikit-learn-14894` and `sympy__sympy-17318`; both reached the
+250-call model limit. The official harness itself reported no errors.
+
+### Repeatability and transitions
+
+Aggregate quality repeated, but individual case identity remained volatile:
+
+| Repeat transition | Count |
+|---|---:|
+| Resolved in both R1 and R2 | 32 |
+| Resolved only in R1 | 21 |
+| Resolved only in R2 | 18 |
+| Unresolved in both | 65 |
+| Resolved union | 71 |
+| R1/R2 resolved-set Jaccard | 45.1% |
+
+Only 32/136 cases resolved in both runs. Of those, 12 were persistent F00
+rescues and 20 were persistent F01 holds. R1 and R2 therefore support the
+framework-level aggregate effect, not a claim that any individual rescue is
+deterministic.
+
+| Historical transition | V3 R1 | V3 R2 |
+|---|---:|---:|
+| F00 rescued | 20/82 | **21/82** |
+| F00 still unresolved | 62/82 | 61/82 |
+| F01 held | **33/54** | 29/54 |
+| F01 regressed | 21/54 | 25/54 |
+
+R2 rescued one more F00 case than R1 but held four fewer F01 cases. Its net
+resolved count was therefore three lower.
+
+| Repository | R1 | R2 | Both | R1 only | R2 only |
+|---|---:|---:|---:|---:|---:|
+| astropy | 2 | 2 | 1 | 1 | 1 |
+| django | 26 | 27 | 18 | 8 | 9 |
+| matplotlib | 3 | 4 | 2 | 1 | 2 |
+| mwaskom | 0 | 0 | 0 | 0 | 0 |
+| psf | 0 | 0 | 0 | 0 | 0 |
+| pydata | 1 | 0 | 0 | 1 | 0 |
+| pylint-dev | 2 | 1 | 0 | 2 | 1 |
+| pytest-dev | 1 | 1 | 0 | 1 | 1 |
+| scikit-learn | 3 | 2 | 2 | 1 | 0 |
+| sphinx-doc | 5 | 7 | 4 | 1 | 3 |
+| sympy | 10 | 6 | 5 | 5 | 1 |
+
+### Repeat cost
+
+| Metric | Historical E1 | Historical E2 | V3 R1 | V3 R2 |
+|---|---:|---:|---:|---:|
+| Total tokens | 88,169,079 | 125,123,574 | 99,850,618 | 116,340,055 |
+| LLM calls | 4,593 | 5,077 | 4,691 | 5,085 |
+| Estimated model cost | 222.458736 | 301.143640 | 247.421572 | 286.944040 |
+| Tokens per resolved | 4,640,478 | 3,574,959 | **1,883,974** | **2,326,801** |
+| Cost per resolved | 11.708355 | 8.604104 | **4.668332** | **5.738881** |
+
+R2 was 16.5% higher in total tokens and 16.0% higher in estimated model cost
+than R1, so R1's exact efficiency did not repeat. It remained materially more
+efficient than E2: 7.0% fewer total tokens, 4.7% lower total model cost, 34.9%
+fewer tokens per resolved, and 33.3% lower cost per resolved while resolving
+15 more cases.
+
+Across the two runs in each lane:
+
+| Two-run aggregate | Historical E1+E2 | V3 R1+R2 | Change |
+|---|---:|---:|---:|
+| Resolved outcomes | 54 | **103** | +90.7% |
+| Total tokens | 213,292,653 | 216,190,673 | +1.4% |
+| Estimated model cost | 523.602376 | 534.365612 | +2.1% |
+| Tokens per resolved outcome | 3,949,864 | **2,098,939** | -46.9% |
+| Cost per resolved outcome | 9.696340 | **5.188016** | -46.5% |
+
+This is the stable cost conclusion: nearly twice as many resolved outcomes for
+approximately the same two-run model spend. Embedding remains self-hosted and
+is excluded from monetary cost.
+
+### Repeat runtime
+
+| Metric | V3 R1 | V3 R2 |
+|---|---:|---:|
+| Prediction wall time | about 6h 43m | 6h 36m |
+| Harness wall time | about 23m | 22m 24s |
+| Indexed documents | 1,611,873 | 1,611,873 |
+| Embedding requests | 25,409 | 25,412 |
+| Recovered HTTP 502 retries | 22 | 47 |
+| Final embedding errors | 0 | 0 |
+| Aggregate embedding duration | 243,667,641 ms | 302,308,138 ms |
+| Aggregate case duration | 270,089,490 ms | 332,754,039 ms |
+| Follow-up `code_search` calls | 24 | 27 |
+
+Embedding represented 90.9% of R2 aggregate case duration. R2's median
+embedding duration was close to R1 (35.9 versus 35.7 minutes), but its tail
+grew: maximum embedding duration increased from 75.5 to 104.9 minutes. The
+service recovered every retry and prediction wall time remained comparable,
+but embedding is still the dominant operational cost.
+
+### Repeat decision
+
+V3 passes the predeclared repeat gate and should be promoted to a full-500
+candidate. The full-500 validation should retain the current configuration so
+that a quality result is not confounded by a simultaneous retrieval-speed
+change.
+
+The evidence boundary is important:
+
+- claim a repeated aggregate resolve-rate improvement and a repeated
+  model-cost-per-resolved improvement;
+- do not claim deterministic case-level rescue, because the resolved-set
+  Jaccard is only 45.1%;
+- do not claim lower absolute model cost than every baseline run;
+- treat repository-wide embedding latency as the primary production blocker.
+
+After the unchanged full-500 quality run, evaluate persistent content-hash
+embedding cache first, then lexical candidate prefiltering or larger embedding
+batches as isolated performance changes.
+
+The repeat comparison is stored in
+[`v3-bge-m3-unstable136-repeat.json`](./v3-bge-m3-unstable136-repeat.json).

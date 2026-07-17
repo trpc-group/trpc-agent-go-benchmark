@@ -27,3 +27,6 @@ Committed files:
 - `experiments/workspace-rag/v3-bge-m3-unstable136-r1.json`: machine-readable
   official-harness, F00/F01 transition, model-cost, and retrieval-runtime data
   for the V3 result.
+- `experiments/workspace-rag/v3-bge-m3-unstable136-repeat.json`:
+  machine-readable R1/R2 repeatability, two-run efficiency, and promotion
+  decision for the V3 result.
