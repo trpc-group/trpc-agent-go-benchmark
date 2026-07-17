@@ -22,3 +22,8 @@ Committed files:
 - `experiments/observation-codec/json-vs-xml-e1.json`: machine-readable run,
   verifier, usage, billing, reconciliation, and comparison data for that
   experiment.
+- `experiments/workspace-rag/README.md`: framework-generic workspace retrieval
+  variants, decision gates, and the 136-case batched hybrid RAG result.
+- `experiments/workspace-rag/v3-bge-m3-unstable136-r1.json`: machine-readable
+  official-harness, F00/F01 transition, model-cost, and retrieval-runtime data
+  for the V3 result.

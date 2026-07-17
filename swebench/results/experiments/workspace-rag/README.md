@@ -29,7 +29,8 @@ business heuristics.
 
 - Embed repository chunks and the query with an OpenAI-compatible endpoint.
 - Combine dense and BM25 rankings with reciprocal rank fusion.
-- Batch up to 64 chunks per embedding request with four concurrent batches.
+- Batch repository chunks and make embedding concurrency configurable. The
+  136-case experiment used batches of 64 with one embedding worker per case.
 - Validate response count, vector dimensions, and response indices before
   attaching vectors to documents.
 - Record embedding requests, batch requests, inputs, tokens, errors, and
@@ -208,3 +209,181 @@ signal did not repeat: V2's mean cost was 3.699208, 27.6% above V1's 2.899048 on
 the same four cases, with individual V2 runs ranging from 2.067352 to 5.331064.
 Do not claim a cost reduction and do not expand to 136 cases. The next quality
 screen should use a new cost-bounded F00 sample and keep the rate card enabled.
+
+## V3 136-case result
+
+Run `tag-rag-bge-m3-unstable136-20260717-r1` evaluated the entire historical
+instability pool with batched `bge-m3` Dense+BM25 retrieval. The official local
+harness, run with four workers, produced the following result:
+
+| Metric | Historical E1 | Historical E2 | V3 RAG |
+|---|---:|---:|---:|
+| Resolved | 19/136 (14.0%) | 35/136 (25.7%) | **53/136 (39.0%)** |
+| Change from V3 | +34 cases / +25.0 pp | +18 cases / +13.2 pp | - |
+| Submitted | 136 | 136 | 136 |
+| Completed by harness | 134 | 130 | 135 |
+| Empty patches | 2 | 5 | 1 |
+| Harness errors | 0 | 1 | 0 |
+
+The V3 result is 26 cases and 19.1 percentage points above the historical
+two-run mean of 27/136. It therefore clears the predeclared `>=42/136` repeat
+gate by 11 cases. `sphinx-doc__sphinx-9367` reached the 250-call model limit,
+produced no patch, and is the single empty-patch case.
+
+### Case-level transitions
+
+The pool contains 82 F00 cases unresolved in both historical runs and 54 F01
+cases resolved in exactly one historical run:
+
+| Transition | Count |
+|---|---:|
+| F00 rescued | **20/82** |
+| F00 still unresolved | 62/82 |
+| F01 held | **33/54** |
+| F01 regressed | 21/54 |
+
+The 53 resolved cases are exactly the 20 F00 rescues plus the 33 F01 holds.
+The net gain is material, but 21 F01 regressions show that this single run
+cannot establish stability by itself.
+
+| Repository | Cases | E1 | E2 | V3 | F00 rescued | F01 held | F01 regressed |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| astropy | 8 | 1 | 1 | 2 | 1 | 1 | 1 |
+| django | 64 | 9 | 18 | 26 | 10 | 16 | 11 |
+| matplotlib | 9 | 2 | 1 | 3 | 1 | 2 | 1 |
+| mwaskom | 1 | 0 | 1 | 0 | 0 | 0 | 1 |
+| psf | 3 | 0 | 0 | 0 | 0 | 0 | 0 |
+| pydata | 3 | 0 | 1 | 1 | 0 | 1 | 0 |
+| pylint-dev | 5 | 0 | 1 | 2 | 1 | 1 | 0 |
+| pytest-dev | 3 | 1 | 0 | 1 | 1 | 0 | 1 |
+| scikit-learn | 5 | 1 | 2 | 3 | 0 | 3 | 0 |
+| sphinx-doc | 13 | 1 | 6 | 5 | 2 | 3 | 4 |
+| sympy | 22 | 4 | 4 | 10 | 4 | 6 | 2 |
+
+<details>
+<summary>F00 rescues (20)</summary>
+
+- `astropy__astropy-13236`
+- `django__django-11728`
+- `django__django-11885`
+- `django__django-12308`
+- `django__django-13590`
+- `django__django-13820`
+- `django__django-14155`
+- `django__django-14792`
+- `django__django-15629`
+- `django__django-15916`
+- `django__django-16454`
+- `matplotlib__matplotlib-20676`
+- `pylint-dev__pylint-4551`
+- `pytest-dev__pytest-7324`
+- `sphinx-doc__sphinx-10435`
+- `sphinx-doc__sphinx-11510`
+- `sympy__sympy-15017`
+- `sympy__sympy-15875`
+- `sympy__sympy-17318`
+- `sympy__sympy-20916`
+
+</details>
+
+<details>
+<summary>F01 regressions (21)</summary>
+
+- `astropy__astropy-14182`
+- `django__django-11532`
+- `django__django-12325`
+- `django__django-13401`
+- `django__django-13406`
+- `django__django-13807`
+- `django__django-14376`
+- `django__django-14404`
+- `django__django-15563`
+- `django__django-16263`
+- `django__django-16502`
+- `django__django-16631`
+- `matplotlib__matplotlib-21568`
+- `mwaskom__seaborn-3069`
+- `pytest-dev__pytest-5840`
+- `sphinx-doc__sphinx-7985`
+- `sphinx-doc__sphinx-8548`
+- `sphinx-doc__sphinx-9281`
+- `sphinx-doc__sphinx-9367`
+- `sympy__sympy-18763`
+- `sympy__sympy-22080`
+
+</details>
+
+### Model cost
+
+The cost comparison below re-aggregates the exact same 136 case files from E1
+and E2. All three columns use the configured GLM-5.2 rate card of 8 billing
+units per million uncached input tokens, 2 per million cached input tokens, and
+28 per million output tokens.
+
+| Metric | Historical E1 | Historical E2 | V3 RAG |
+|---|---:|---:|---:|
+| Prompt tokens | 86,755,137 | 123,528,628 | 98,440,497 |
+| Cached input tokens | 85,195,456 | 121,957,312 | 96,597,632 |
+| Uncached input tokens | 1,559,681 | 1,571,316 | 1,842,865 |
+| Completion tokens | 1,413,942 | 1,594,946 | 1,410,121 |
+| Total tokens | 88,169,079 | 125,123,574 | 99,850,618 |
+| LLM calls | 4,593 | 5,077 | 4,691 |
+| Estimated model cost | 222.458736 | 301.143640 | 247.421572 |
+| Tokens per resolved | 4,640,478 | 3,574,959 | **1,883,974** |
+| Cost per resolved | 11.708355 | 8.604104 | **4.668332** |
+
+V3 used 20.2% fewer total tokens and 17.8% less estimated model cost than E2
+while resolving 18 more cases. Against E1, V3 used 13.2% more total tokens and
+11.2% more model cost while resolving 34 more cases. The efficiency result is
+therefore positive even though absolute cost is not lower than both historical
+runs: cost per resolved fell 45.7% versus E2 and 60.1% versus E1.
+
+Embedding was self-hosted and has no monetary charge in this experiment. Its
+operational cost is significant and is reported separately.
+
+### Retrieval and runtime
+
+The run indexed and proactively retrieved workspace context for every case:
+
+| Metric | V3 RAG |
+|---|---:|
+| Indexed documents | 1,611,873 |
+| Preloaded documents | 544 (4 per case) |
+| Preloaded characters | 646,780 |
+| Follow-up `code_search` calls | 24 |
+| Embedding requests / batched requests | 25,409 / 25,249 |
+| Embedded inputs | 1,612,033 |
+| Final embedding errors | 0 |
+| Recovered HTTP 502 retries in runner log | 22 |
+| Aggregate embedding duration | 243,667,641 ms |
+| Aggregate case duration | 270,089,490 ms |
+| Mean / median case duration | 33.1 / 37.2 minutes |
+
+Embedding accounts for 90.2% of aggregate case duration. These are accumulated
+per-case durations and must not be interpreted as serial wall time because
+cases ran concurrently. The first 21 predictions were produced with two case
+workers; the remaining 115 resumed safely with 15 workers. End-to-end
+prediction generation spanned about 6 hours 43 minutes, and the official
+four-worker harness took about 23 minutes.
+
+The bottleneck is repository-wide embedding, not the model loop. Batching kept
+the service healthy at 15 concurrent cases, but retrieval latency is too high
+for a production default. The next performance experiment should change only
+one framework-level variable at a time: persistent content-hash embedding
+cache, lexical candidate prefiltering before dense embedding, or a larger
+embedding batch.
+
+### Decision
+
+This is a strong, verifiable resolve-rate signal and a positive
+model-cost-per-resolved signal. It is not yet a stability result: the exact
+same 136 cases and configuration must be repeated once because 21 F01 cases
+regressed and the historical pool itself was selected for variance.
+
+Do not expand directly to 500 cases. Promote V3 to a full-500 candidate only if
+the repeat again reaches at least 42/136 without materially worsening F01
+retention or model efficiency. Optimize embedding latency separately so a
+speed change cannot be confused with a quality change.
+
+The machine-readable result is
+[`v3-bge-m3-unstable136-r1.json`](./v3-bge-m3-unstable136-r1.json).
