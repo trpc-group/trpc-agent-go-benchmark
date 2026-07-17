@@ -19,6 +19,7 @@ import (
 	"trpc.group/trpc-go/trpc-agent-go/knowledge"
 	docreader "trpc.group/trpc-go/trpc-agent-go/knowledge/document/reader"
 	textreader "trpc.group/trpc-go/trpc-agent-go/knowledge/document/reader/text"
+	"trpc.group/trpc-go/trpc-agent-go/knowledge/embedder"
 	"trpc.group/trpc-go/trpc-agent-go/knowledge/source"
 	"trpc.group/trpc-go/trpc-agent-go/knowledge/source/repo"
 	knowledgetool "trpc.group/trpc-go/trpc-agent-go/knowledge/tool"
@@ -34,10 +35,21 @@ func init() {
 // WorkspaceIndexStats captures per-case local indexing cost separately from
 // model token usage.
 type WorkspaceIndexStats struct {
-	Documents          int   `json:"documents"`
-	DurationMS         int64 `json:"duration_ms"`
-	PreloadedDocuments int   `json:"preloaded_documents,omitempty"`
-	PreloadedChars     int   `json:"preloaded_chars,omitempty"`
+	Documents          int    `json:"documents"`
+	DurationMS         int64  `json:"duration_ms"`
+	PreloadedDocuments int    `json:"preloaded_documents,omitempty"`
+	PreloadedChars     int    `json:"preloaded_chars,omitempty"`
+	RetrievalMode      string `json:"retrieval_mode,omitempty"`
+}
+
+// WorkspaceSearchConfig controls optional dense retrieval and context bounds.
+type WorkspaceSearchConfig struct {
+	Embedder       embedder.Embedder
+	SearchMode     vectorstore.SearchMode
+	BatchSize      int
+	DocConcurrency int
+	MaxResults     int
+	MaxChars       int
 }
 
 // NewWorkspaceCodeSearch snapshots and indexes one environment, returning a
@@ -47,8 +59,10 @@ func NewWorkspaceCodeSearch(
 	environment sweenv.Environment,
 	instanceID string,
 	query string,
+	config *WorkspaceSearchConfig,
 ) (tool.Tool, func() error, WorkspaceIndexStats, string, error) {
 	started := time.Now()
+	config = normalizeWorkspaceSearchConfig(config)
 	snapshotter, ok := environment.(sweenv.WorkspaceSnapshotter)
 	if !ok {
 		return nil, nil, WorkspaceIndexStats{}, "", fmt.Errorf("environment does not support workspace snapshots")
@@ -62,11 +76,21 @@ func NewWorkspaceCodeSearch(
 		repo.WithSkipSuffixes([]string{".pyc"}),
 	)
 	store := inmemory.New(inmemory.WithBM25(true))
-	kb := knowledge.New(
+	knowledgeOptions := []knowledge.Option{
 		knowledge.WithVectorStore(store),
 		knowledge.WithSources([]source.Source{src}),
-	)
-	if err := kb.Load(ctx, knowledge.WithShowProgress(false), knowledge.WithShowStats(false)); err != nil {
+	}
+	if config.Embedder != nil {
+		knowledgeOptions = append(knowledgeOptions, knowledge.WithEmbedder(config.Embedder))
+	}
+	kb := knowledge.New(knowledgeOptions...)
+	if err := kb.Load(
+		ctx,
+		knowledge.WithShowProgress(false),
+		knowledge.WithShowStats(false),
+		knowledge.WithDocConcurrency(config.DocConcurrency),
+		knowledge.WithEmbeddingBatchSize(config.BatchSize),
+	); err != nil {
 		_ = kb.Close()
 		return nil, nil, WorkspaceIndexStats{}, "", fmt.Errorf("index workspace: %w", err)
 	}
@@ -76,7 +100,10 @@ func NewWorkspaceCodeSearch(
 		return nil, nil, WorkspaceIndexStats{}, "", fmt.Errorf("count workspace documents: %w", err)
 	}
 	preloaded, err := knowledge.BuildContext(ctx, kb, &knowledge.ContextRequest{
-		Query: query, MaxResults: 4, MaxChars: 6000, SearchMode: int(vectorstore.SearchModeKeyword),
+		Query:      query,
+		MaxResults: config.MaxResults,
+		MaxChars:   config.MaxChars,
+		SearchMode: int(config.SearchMode),
 	})
 	if err != nil {
 		_ = kb.Close()
@@ -84,7 +111,7 @@ func NewWorkspaceCodeSearch(
 	}
 	search := knowledgetool.NewCompactCodeSearchTool(
 		kb,
-		knowledgetool.WithCodeSearchMode(vectorstore.SearchModeKeyword),
+		knowledgetool.WithCodeSearchMode(config.SearchMode),
 		knowledgetool.WithCodeSearchMaxResults(6),
 		knowledgetool.WithCodeSearchMinScore(0),
 		knowledgetool.WithCodeSearchExtraExcludeMetadataKeys(
@@ -94,8 +121,42 @@ func NewWorkspaceCodeSearch(
 	stats := WorkspaceIndexStats{
 		Documents: count, DurationMS: time.Since(started).Milliseconds(),
 		PreloadedDocuments: preloaded.Documents, PreloadedChars: preloaded.Chars,
+		RetrievalMode: searchModeName(config.SearchMode),
 	}
 	return search, kb.Close, stats, preloaded.Text, nil
+}
+
+func normalizeWorkspaceSearchConfig(config *WorkspaceSearchConfig) *WorkspaceSearchConfig {
+	if config == nil {
+		config = &WorkspaceSearchConfig{SearchMode: vectorstore.SearchModeKeyword}
+	}
+	normalized := *config
+	if normalized.BatchSize <= 0 {
+		normalized.BatchSize = 1
+	}
+	if normalized.DocConcurrency <= 0 {
+		normalized.DocConcurrency = 1
+	}
+	if normalized.MaxResults <= 0 {
+		normalized.MaxResults = 4
+	}
+	if normalized.MaxChars <= 0 {
+		normalized.MaxChars = 6000
+	}
+	return &normalized
+}
+
+func searchModeName(mode vectorstore.SearchMode) string {
+	switch mode {
+	case vectorstore.SearchModeHybrid:
+		return "hybrid"
+	case vectorstore.SearchModeVector:
+		return "vector"
+	case vectorstore.SearchModeKeyword:
+		return "keyword"
+	default:
+		return fmt.Sprintf("mode-%d", mode)
+	}
 }
 
 type workspaceMaterializer struct {

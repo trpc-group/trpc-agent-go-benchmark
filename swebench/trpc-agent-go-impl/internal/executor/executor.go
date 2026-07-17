@@ -19,6 +19,7 @@ import (
 	"trpc.group/trpc-go/trpc-agent-go-benchmark/swebench/internal/minicompat"
 	"trpc.group/trpc-go/trpc-agent-go-benchmark/swebench/internal/modelconfig"
 	"trpc.group/trpc-go/trpc-agent-go-benchmark/swebench/internal/sweenv"
+	"trpc.group/trpc-go/trpc-agent-go-benchmark/swebench/trpc-agent-go-impl/internal/embeddingconfig"
 	"trpc.group/trpc-go/trpc-agent-go-benchmark/swebench/trpc-agent-go-impl/internal/tagagent"
 	"trpc.group/trpc-go/trpc-agent-go/agent"
 	"trpc.group/trpc-go/trpc-agent-go/event"
@@ -46,6 +47,7 @@ type CaseResult struct {
 	CodeSearchCalls       int                          `json:"code_search_calls,omitempty"`
 	CodeSearchResultBytes int                          `json:"code_search_result_bytes,omitempty"`
 	WorkspaceIndex        tagagent.WorkspaceIndexStats `json:"workspace_index,omitempty"`
+	Embedding             *embeddingconfig.Metrics     `json:"embedding,omitempty"`
 	Usage                 model.Usage                  `json:"usage"`
 	Events                []*event.Event               `json:"events,omitempty"`
 	Responses             []*model.Response            `json:"-"`
@@ -59,6 +61,7 @@ type Executor struct {
 	CaseTimeout      time.Duration
 	ModelFactory     func(modelconfig.EnvConfig) model.Model
 	EnableCodeSearch bool
+	EmbeddingConfig  *embeddingconfig.Config
 }
 
 // Execute runs one case and drains the complete TAG event stream.
@@ -100,8 +103,30 @@ func (e Executor) Execute(ctx context.Context, c contract.Case) (result CaseResu
 	var extraTools []tool.Tool
 	var workspaceContext string
 	if e.EnableCodeSearch {
+		var workspaceSearchConfig *tagagent.WorkspaceSearchConfig
+		if e.EmbeddingConfig != nil {
+			searchMode, searchModeErr := e.EmbeddingConfig.SearchMode()
+			if searchModeErr != nil {
+				result.Info.Error = searchModeErr.Error()
+				result.Info.ErrorCategory = minicompat.ErrorCategoryEnvironment
+				return result
+			}
+			metered := embeddingconfig.NewMetered(e.EmbeddingConfig.NewEmbedder())
+			defer func() {
+				snapshot := metered.Snapshot()
+				result.Embedding = &snapshot
+			}()
+			workspaceSearchConfig = &tagagent.WorkspaceSearchConfig{
+				Embedder:       metered,
+				SearchMode:     searchMode,
+				BatchSize:      e.EmbeddingConfig.Embedding.BatchSize,
+				DocConcurrency: e.EmbeddingConfig.Embedding.Concurrency,
+				MaxResults:     e.EmbeddingConfig.Retrieval.MaxResults,
+				MaxChars:       e.EmbeddingConfig.Retrieval.MaxChars,
+			}
+		}
 		codeSearch, closeSearch, indexStats, preloaded, searchErr := tagagent.NewWorkspaceCodeSearch(
-			caseCtx, environment, c.InstanceID, c.ProblemStatement,
+			caseCtx, environment, c.InstanceID, c.ProblemStatement, workspaceSearchConfig,
 		)
 		if searchErr != nil {
 			result.Info.Error = searchErr.Error()
@@ -177,6 +202,14 @@ func (e Executor) Validate() error {
 	}
 	if e.ModelFactory == nil && e.ModelConfig["MODEL_NAME"] == "" {
 		return fmt.Errorf("MODEL_NAME is required")
+	}
+	if e.EmbeddingConfig != nil {
+		if !e.EnableCodeSearch {
+			return fmt.Errorf("embedding config requires code search")
+		}
+		if err := e.EmbeddingConfig.Validate(); err != nil {
+			return err
+		}
 	}
 	return nil
 }

@@ -8,6 +8,8 @@ embedding:
   dimensions: 0
   timeout: 120
   max_retries: 2
+  batch_size: 64
+  concurrency: 4
   extra_headers:
     X-SMG-Routing-Key: ""
     X-SMG-Agent-Name: BenchSWE-RAG

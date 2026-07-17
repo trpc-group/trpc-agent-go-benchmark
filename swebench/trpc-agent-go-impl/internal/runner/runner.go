@@ -28,6 +28,7 @@ import (
 	"trpc.group/trpc-go/trpc-agent-go-benchmark/swebench/internal/minicompat"
 	"trpc.group/trpc-go/trpc-agent-go-benchmark/swebench/internal/modelconfig"
 	"trpc.group/trpc-go/trpc-agent-go-benchmark/swebench/internal/sweenv"
+	"trpc.group/trpc-go/trpc-agent-go-benchmark/swebench/trpc-agent-go-impl/internal/embeddingconfig"
 	"trpc.group/trpc-go/trpc-agent-go-benchmark/swebench/trpc-agent-go-impl/internal/executor"
 	"trpc.group/trpc-go/trpc-agent-go/model"
 	"trpc.group/trpc-go/trpc-agent-go/model/pricing"
@@ -36,47 +37,50 @@ import (
 const frameworkVersion = "v1.10.1-0.20260616104537-c6c3bb29ab60"
 
 type manifest struct {
-	RunID             string            `json:"run_id"`
-	RunnerType        string            `json:"runner_type"`
-	FrameworkVersion  string            `json:"framework_version"`
-	AgentProtocol     string            `json:"agent_protocol"`
-	UpstreamCommit    string            `json:"upstream_commit"`
-	ObservationCodec  string            `json:"observation_codec"`
-	BillingAgentName  string            `json:"billing_agent_name,omitempty"`
-	BillingTag        string            `json:"billing_tag,omitempty"`
-	ExperimentID      string            `json:"experiment_id,omitempty"`
-	SourceRevision    string            `json:"source_revision,omitempty"`
-	SourceModified    bool              `json:"source_modified"`
-	BinarySHA256      string            `json:"binary_sha256,omitempty"`
-	CasesSHA256       string            `json:"cases_sha256"`
-	ModelConfigSHA256 string            `json:"model_config_sha256"`
-	StartedAt         time.Time         `json:"started_at"`
-	FinishedAt        time.Time         `json:"finished_at"`
-	DurationMS        int64             `json:"duration_ms"`
-	Cases             string            `json:"cases"`
-	OutputDir         string            `json:"output_dir"`
-	Filter            string            `json:"filter,omitempty"`
-	CaseCount         int               `json:"case_count"`
-	AttemptedCount    int               `json:"attempted_count"`
-	SkippedExisting   int               `json:"skipped_existing"`
-	PredictionCount   int               `json:"prediction_count"`
-	Workers           int               `json:"workers"`
-	RedoExisting      bool              `json:"redo_existing"`
-	Predictions       string            `json:"predictions"`
-	Progress          string            `json:"progress"`
-	ModelConfig       map[string]string `json:"model_config,omitempty"`
-	Environment       string            `json:"environment_config"`
-	CommandTimeout    string            `json:"command_timeout"`
-	CaseTimeout       string            `json:"case_timeout"`
-	CodeSearch        bool              `json:"code_search"`
-	ExitStatusCounts  map[string]int    `json:"exit_status_counts"`
-	LLMCalls          int               `json:"llm_calls"`
-	ToolCalls         int               `json:"tool_calls"`
-	Usage             usageSummary      `json:"usage"`
-	Pricing           *pricing.RateCard `json:"pricing,omitempty"`
-	CostEstimate      *pricing.Estimate `json:"cost_estimate,omitempty"`
-	Status            string            `json:"status"`
-	Notes             []string          `json:"notes,omitempty"`
+	RunID                 string                  `json:"run_id"`
+	RunnerType            string                  `json:"runner_type"`
+	FrameworkVersion      string                  `json:"framework_version"`
+	AgentProtocol         string                  `json:"agent_protocol"`
+	UpstreamCommit        string                  `json:"upstream_commit"`
+	ObservationCodec      string                  `json:"observation_codec"`
+	BillingAgentName      string                  `json:"billing_agent_name,omitempty"`
+	BillingTag            string                  `json:"billing_tag,omitempty"`
+	ExperimentID          string                  `json:"experiment_id,omitempty"`
+	SourceRevision        string                  `json:"source_revision,omitempty"`
+	SourceModified        bool                    `json:"source_modified"`
+	BinarySHA256          string                  `json:"binary_sha256,omitempty"`
+	CasesSHA256           string                  `json:"cases_sha256"`
+	ModelConfigSHA256     string                  `json:"model_config_sha256"`
+	EmbeddingConfigSHA256 string                  `json:"embedding_config_sha256,omitempty"`
+	StartedAt             time.Time               `json:"started_at"`
+	FinishedAt            time.Time               `json:"finished_at"`
+	DurationMS            int64                   `json:"duration_ms"`
+	Cases                 string                  `json:"cases"`
+	OutputDir             string                  `json:"output_dir"`
+	Filter                string                  `json:"filter,omitempty"`
+	CaseCount             int                     `json:"case_count"`
+	AttemptedCount        int                     `json:"attempted_count"`
+	SkippedExisting       int                     `json:"skipped_existing"`
+	PredictionCount       int                     `json:"prediction_count"`
+	Workers               int                     `json:"workers"`
+	RedoExisting          bool                    `json:"redo_existing"`
+	Predictions           string                  `json:"predictions"`
+	Progress              string                  `json:"progress"`
+	ModelConfig           map[string]string       `json:"model_config,omitempty"`
+	EmbeddingConfig       map[string]any          `json:"embedding_config,omitempty"`
+	Environment           string                  `json:"environment_config"`
+	CommandTimeout        string                  `json:"command_timeout"`
+	CaseTimeout           string                  `json:"case_timeout"`
+	CodeSearch            bool                    `json:"code_search"`
+	Embedding             embeddingconfig.Metrics `json:"embedding"`
+	ExitStatusCounts      map[string]int          `json:"exit_status_counts"`
+	LLMCalls              int                     `json:"llm_calls"`
+	ToolCalls             int                     `json:"tool_calls"`
+	Usage                 usageSummary            `json:"usage"`
+	Pricing               *pricing.RateCard       `json:"pricing,omitempty"`
+	CostEstimate          *pricing.Estimate       `json:"cost_estimate,omitempty"`
+	Status                string                  `json:"status"`
+	Notes                 []string                `json:"notes,omitempty"`
 }
 
 type usageSummary struct {
@@ -108,6 +112,7 @@ func Run(args []string) error {
 	runID := fs.String("run-id", "", "run id")
 	casesPath := fs.String("cases", "data/generated/cases.jsonl", "safe SWE-Bench cases.jsonl")
 	modelConfigPath := fs.String("model-config", "", "model config YAML/env path")
+	embeddingConfigPath := fs.String("embedding-config", "", "optional workspace embedding YAML path")
 	environmentConfigPath := fs.String("environment-config", "config/environments/swebench-testbed.yaml", "environment YAML path")
 	output := fs.String("output", "", "output directory; defaults to results/runs/<run-id>/raw/tag")
 	filter := fs.String("filter", "", "optional instance id regexp")
@@ -119,7 +124,7 @@ func Run(args []string) error {
 	codecValue := fs.String("observation-codec", string(minicompat.ObservationCodecXML), "observation codec: xml, json, or text")
 	billingTag := fs.String("billing-tag", "", "suffix appended to X-SMG-Agent-Name for billing isolation")
 	experimentID := fs.String("experiment-id", "", "experiment identifier recorded with billing-tag")
-	codeSearch := fs.Bool("code-search", false, "enable local BM25 workspace code search")
+	codeSearch := fs.Bool("code-search", false, "enable local workspace code retrieval")
 	if err := fs.Parse(args[1:]); err != nil {
 		return err
 	}
@@ -131,6 +136,9 @@ func Run(args []string) error {
 	}
 	if *workers <= 0 {
 		return fmt.Errorf("-agent-workers must be positive")
+	}
+	if strings.TrimSpace(*embeddingConfigPath) != "" && !*codeSearch {
+		return fmt.Errorf("-embedding-config requires -code-search")
 	}
 	codec, err := minicompat.ParseObservationCodec(*codecValue)
 	if err != nil {
@@ -155,6 +163,18 @@ func Run(args []string) error {
 	modelHash, err := fileSHA256(*modelConfigPath)
 	if err != nil {
 		return fmt.Errorf("hash model config: %w", err)
+	}
+	var embeddingHash string
+	var embeddingCfg *embeddingconfig.Config
+	if strings.TrimSpace(*embeddingConfigPath) != "" {
+		embeddingHash, err = fileSHA256(*embeddingConfigPath)
+		if err != nil {
+			return fmt.Errorf("hash embedding config: %w", err)
+		}
+		embeddingCfg, err = embeddingconfig.Load(*embeddingConfigPath)
+		if err != nil {
+			return fmt.Errorf("load embedding config: %w", err)
+		}
 	}
 	cases, err := artifact.ReadCasesJSONL(*casesPath)
 	if err != nil {
@@ -196,7 +216,7 @@ func Run(args []string) error {
 	}
 	exec := executor.Executor{
 		Factory: factory, ModelConfig: modelCfg, ObservationCodec: codec, CaseTimeout: *caseTimeout,
-		EnableCodeSearch: *codeSearch,
+		EnableCodeSearch: *codeSearch, EmbeddingConfig: embeddingCfg,
 	}
 	if err := exec.Validate(); err != nil {
 		return err
@@ -295,6 +315,7 @@ func Run(args []string) error {
 	}
 	var llmCalls, toolCalls int
 	var usage usageSummary
+	var embeddingUsage embeddingconfig.Metrics
 	status := "completed"
 	for _, result := range results {
 		exitCounts[result.Info.ExitStatus]++
@@ -305,6 +326,15 @@ func Run(args []string) error {
 		usage.CompletionTokens += result.Usage.CompletionTokens
 		usage.ReasoningTokens += result.Usage.CompletionTokensDetails.ReasoningTokens
 		usage.TotalTokens += result.Usage.TotalTokens
+		if result.Embedding != nil {
+			embeddingUsage.Requests += result.Embedding.Requests
+			embeddingUsage.BatchRequests += result.Embedding.BatchRequests
+			embeddingUsage.Inputs += result.Embedding.Inputs
+			embeddingUsage.Errors += result.Embedding.Errors
+			embeddingUsage.PromptTokens += result.Embedding.PromptTokens
+			embeddingUsage.TotalTokens += result.Embedding.TotalTokens
+			embeddingUsage.DurationMS += result.Embedding.DurationMS
+		}
 		if result.Info.ExitStatus == "Error" || result.Info.ExitStatus == "ArtifactError" {
 			status = "completed_with_errors"
 		}
@@ -322,7 +352,8 @@ func Run(args []string) error {
 		ObservationCodec: string(codec), BillingAgentName: billingAgentName,
 		BillingTag: strings.TrimSpace(*billingTag), ExperimentID: strings.TrimSpace(*experimentID),
 		SourceRevision: build.SourceRevision, SourceModified: build.SourceModified, BinarySHA256: build.BinarySHA256,
-		CasesSHA256: casesHash, ModelConfigSHA256: modelHash, StartedAt: started.UTC(),
+		CasesSHA256: casesHash, ModelConfigSHA256: modelHash,
+		EmbeddingConfigSHA256: embeddingHash, StartedAt: started.UTC(),
 		FinishedAt: finished.UTC(), DurationMS: finished.Sub(started).Milliseconds(),
 		Cases: artifact.AbsPath(*casesPath), OutputDir: artifact.AbsPath(*output), Filter: *filter,
 		CaseCount: len(selected), AttemptedCount: len(pending), SkippedExisting: len(skipped),
@@ -331,6 +362,7 @@ func Run(args []string) error {
 		ModelConfig: modelconfig.RedactSecrets(modelCfg), Environment: artifact.AbsPath(*environmentConfigPath),
 		CommandTimeout: commandTimeout.String(), CaseTimeout: caseTimeout.String(),
 		CodeSearch:       *codeSearch,
+		Embedding:        embeddingUsage,
 		ExitStatusCounts: exitCounts, LLMCalls: llmCalls, ToolCalls: toolCalls, Usage: usage,
 		Pricing: rateCard, CostEstimate: costEstimate,
 		Status: status,
@@ -338,6 +370,9 @@ func Run(args []string) error {
 			"Each case runs through tRPC-Agent-Go llmagent and runner lifecycles in an independent official SWE-Bench container.",
 			"OpenAI SDK retry is configured with max retries 9; preds.json is the resume boundary.",
 		},
+	}
+	if embeddingCfg != nil {
+		doc.EmbeddingConfig = embeddingCfg.Redacted()
 	}
 	manifestPath := filepath.Join(*output, "tag-runner-manifest.json")
 	if err := artifact.WriteJSON(manifestPath, doc); err != nil {

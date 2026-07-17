@@ -25,8 +25,18 @@ business heuristics.
 - Record `workspace_index.preloaded_documents` and
   `workspace_index.preloaded_chars` in addition to the V1 metrics.
 
-Both variants are framework-generic and use the same opt-in `--code-search`
-path. V2 replaces V1 in the current implementation; an invocation without the
+### V3: batched Dense+BM25 retrieval
+
+- Embed repository chunks and the query with an OpenAI-compatible endpoint.
+- Combine dense and BM25 rankings with reciprocal rank fusion.
+- Batch up to 64 chunks per embedding request with four concurrent batches.
+- Validate response count, vector dimensions, and response indices before
+  attaching vectors to documents.
+- Record embedding requests, batch requests, inputs, tokens, errors, and
+  aggregate request duration for every case.
+
+All variants are framework-generic and use the same opt-in `--code-search`
+path. V3 additionally requires `--embedding-config`; an invocation without the
 flag remains the unchanged baseline.
 
 ## First evaluation pool
@@ -70,6 +80,18 @@ go run ./trpc-agent-go-impl \
   --code-search
 ```
 
+For V3:
+
+```bash
+go run ./trpc-agent-go-impl \
+  --run-id tag-rag-bge-m3-smoke-1 \
+  --cases data/generated/cases.jsonl \
+  --filter '^astropy__astropy-13033$' \
+  --model-config config/models/glm-5.2.local.yaml \
+  --code-search \
+  --embedding-config config/embeddings/workspace-rag.local.yaml
+```
+
 After one case passes runner and official evaluator checks, run a small
 stratified sample. Do not run the full historical pool until that sample shows
 a material quality or cost signal. The full-pool command is:
@@ -82,7 +104,8 @@ go run ./trpc-agent-go-impl \
   --cases data/generated/cases.jsonl \
   --filter "$CASE_FILTER" \
   --model-config config/models/glm-5.2.local.yaml \
-  --code-search
+  --code-search \
+  --embedding-config config/embeddings/workspace-rag.local.yaml
 ```
 
 Use the official local harness as the resolution source. Do not infer resolution
@@ -117,6 +140,10 @@ Python AST indexing and Dense+BM25 hybrid retrieval are follow-up variants.
 Dense retrieval requires an
 OpenAI-compatible embeddings endpoint, model name, dimensions if non-default,
 and price information so embedding cost can be reported independently.
+
+V3 uses a self-hosted `bge-m3` deployment returning 1,024-dimensional vectors.
+Monetary embedding cost is out of scope for this run; request count, tokens,
+index duration, and wall time remain operational metrics.
 
 ## V1 observed result
 
