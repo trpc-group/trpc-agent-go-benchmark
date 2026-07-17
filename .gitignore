@@ -33,6 +33,7 @@ pnpm-lock.yaml
 .DS_Store
 swebench/config/models/*.local.yaml
 swebench/config/environments/*.local.yaml
+swebench/config/embeddings/*.local.yaml
 swebench/results/runs/
 swebench/results/artifacts/
 swebench/results/**/*.log

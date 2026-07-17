@@ -1,0 +1,25 @@
+embedding:
+  provider: openai
+  api_base: "https://<embedding-gateway>/v1"
+  api_key: "sk-***"
+  model: "<embedding-model>"
+  # Set the model's actual output dimension. Use 0 only when the endpoint
+  # requires dimensions to be omitted.
+  dimensions: 0
+  timeout: 120
+  max_retries: 2
+  extra_headers:
+    X-SMG-Routing-Key: ""
+    X-SMG-Agent-Name: BenchSWE-RAG
+    X-SMG-Provider: ""
+
+retrieval:
+  mode: hybrid
+  max_results: 4
+  max_chars: 6000
+
+# Optional embedding cost estimate. The input rate is per unit_tokens.
+pricing:
+  currency: billing_unit
+  unit_tokens: 1000000
+  input: 0
