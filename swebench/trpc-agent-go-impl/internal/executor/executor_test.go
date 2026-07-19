@@ -229,3 +229,13 @@ func TestEmptyPatchSubmissionIsSubmitted(t *testing.T) {
 		t.Fatalf("calls = llm %d, tool %d", result.LLMCalls, result.ToolCalls)
 	}
 }
+
+func TestWorkspacePreloadOptOutKeepsPromptUnchanged(t *testing.T) {
+	preloaded := "retrieved code"
+	if got := workspaceContextForPrompt(preloaded, false); got != preloaded {
+		t.Fatalf("enabled workspace context = %q, want %q", got, preloaded)
+	}
+	if got := workspaceContextForPrompt(preloaded, true); got != "" {
+		t.Fatalf("disabled workspace context = %q, want empty", got)
+	}
+}

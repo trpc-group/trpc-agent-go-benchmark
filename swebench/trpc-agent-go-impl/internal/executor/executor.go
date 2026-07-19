@@ -55,13 +55,14 @@ type CaseResult struct {
 
 // Executor owns the per-case TAG model and environment lifecycle.
 type Executor struct {
-	Factory          sweenv.Factory
-	ModelConfig      modelconfig.EnvConfig
-	ObservationCodec minicompat.ObservationCodec
-	CaseTimeout      time.Duration
-	ModelFactory     func(modelconfig.EnvConfig) model.Model
-	EnableCodeSearch bool
-	EmbeddingConfig  *embeddingconfig.Config
+	Factory                 sweenv.Factory
+	ModelConfig             modelconfig.EnvConfig
+	ObservationCodec        minicompat.ObservationCodec
+	CaseTimeout             time.Duration
+	ModelFactory            func(modelconfig.EnvConfig) model.Model
+	EnableCodeSearch        bool
+	DisableWorkspacePreload bool
+	EmbeddingConfig         *embeddingconfig.Config
 }
 
 // Execute runs one case and drains the complete TAG event stream.
@@ -135,8 +136,9 @@ func (e Executor) Execute(ctx context.Context, c contract.Case) (result CaseResu
 		}
 		defer func() { _ = closeSearch() }()
 		extraTools = append(extraTools, codeSearch)
+		indexStats.PreloadInjected = !e.DisableWorkspacePreload
 		result.WorkspaceIndex = indexStats
-		workspaceContext = preloaded
+		workspaceContext = workspaceContextForPrompt(preloaded, e.DisableWorkspacePreload)
 	}
 	agentImpl := tagagent.New(modelImpl, environment, e.ObservationCodec, generationConfig(e.ModelConfig), state, extraTools...)
 	run := tagrunner.NewRunner("tag-swebench", agentImpl)
@@ -193,6 +195,13 @@ func (e Executor) Execute(ctx context.Context, c contract.Case) (result CaseResu
 		result.Info.ErrorCategory = minicompat.ErrorCategoryAgentLimit
 	}
 	return result
+}
+
+func workspaceContextForPrompt(preloaded string, disabled bool) string {
+	if disabled {
+		return ""
+	}
+	return preloaded
 }
 
 // Validate checks the executor's required dependencies before workers start.

@@ -39,6 +39,7 @@ type WorkspaceIndexStats struct {
 	DurationMS         int64  `json:"duration_ms"`
 	PreloadedDocuments int    `json:"preloaded_documents,omitempty"`
 	PreloadedChars     int    `json:"preloaded_chars,omitempty"`
+	PreloadInjected    bool   `json:"preload_injected"`
 	RetrievalMode      string `json:"retrieval_mode,omitempty"`
 }
 

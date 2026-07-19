@@ -1,0 +1,244 @@
+{
+  "schema_version": 1,
+  "status": "planned",
+  "created_on": "2026-07-20",
+  "question": "Does initial Top-4 workspace preload causally reduce solve reliability while the same hybrid index and code_search tool remain available?",
+  "source_runs": {
+    "historical_e1": "tag-impl-full500-20260715-e1",
+    "historical_e2": "tag-impl-full500-20260716-e2",
+    "rag_full500": "tag-rag-bge-m3-full500-20260718-r1"
+  },
+  "panel": {
+    "all": {
+      "case_list": "data/case-lists/tag-rag-preload-ablation-54.case_ids.txt",
+      "case_count": 54,
+      "sha256": "b70ede78c4ff8bb13ebb087a12c8ed204dfe7256a72d98410239697a17325d0d"
+    },
+    "f11_regressed": {
+      "case_list": "data/case-lists/tag-rag-preload-ablation-f11-regressed-19.case_ids.txt",
+      "case_count": 19,
+      "sha256": "21633ceed30dbc3a3ea0e68282d6e41632e5a2b61704adc8e3b4a4187c8e2f55"
+    },
+    "f11_matched_hold": {
+      "case_list": "data/case-lists/tag-rag-preload-ablation-f11-matched-hold-19.case_ids.txt",
+      "case_count": 19,
+      "sha256": "3a5de514ba4acd7514ed3698f4ae9099cfb33285b0646d41488e4f4687f174dd"
+    },
+    "f00_rescued": {
+      "case_list": "data/case-lists/tag-rag-preload-ablation-f00-rescued-16.case_ids.txt",
+      "case_count": 16,
+      "sha256": "a46646c34c40c10f8edc9527f9de526222c32955bd3b56789112221f2c2f6d3d"
+    }
+  },
+  "matching": {
+    "candidate_pool": "F11 cases held by the RAG full500 run",
+    "constraints": [
+      "exact repository",
+      "without replacement"
+    ],
+    "features": [
+      "log1p(problem_statement_characters)",
+      "log1p(mean historical E1/E2 LLM calls)"
+    ],
+    "objective": "minimum standardized squared Euclidean distance with Hungarian assignment",
+    "pairs": [
+      {
+        "regressed": "django__django-10973",
+        "control": "django__django-12050",
+        "regressed_problem_chars": 357,
+        "control_problem_chars": 347,
+        "regressed_historical_mean_llm_calls": 9.5,
+        "control_historical_mean_llm_calls": 10.0
+      },
+      {
+        "regressed": "django__django-11239",
+        "control": "django__django-17087",
+        "regressed_problem_chars": 1056,
+        "control_problem_chars": 1135,
+        "regressed_historical_mean_llm_calls": 14.5,
+        "control_historical_mean_llm_calls": 14.0
+      },
+      {
+        "regressed": "django__django-13346",
+        "control": "django__django-15930",
+        "regressed_problem_chars": 620,
+        "control_problem_chars": 689,
+        "regressed_historical_mean_llm_calls": 55.0,
+        "control_historical_mean_llm_calls": 41.5
+      },
+      {
+        "regressed": "django__django-13810",
+        "control": "django__django-14349",
+        "regressed_problem_chars": 2259,
+        "control_problem_chars": 2383,
+        "regressed_historical_mean_llm_calls": 16.5,
+        "control_historical_mean_llm_calls": 14.5
+      },
+      {
+        "regressed": "django__django-14311",
+        "control": "django__django-17084",
+        "regressed_problem_chars": 605,
+        "control_problem_chars": 648,
+        "regressed_historical_mean_llm_calls": 27.5,
+        "control_historical_mean_llm_calls": 26.0
+      },
+      {
+        "regressed": "django__django-14559",
+        "control": "django__django-13023",
+        "regressed_problem_chars": 476,
+        "control_problem_chars": 522,
+        "regressed_historical_mean_llm_calls": 14.5,
+        "control_historical_mean_llm_calls": 13.5
+      },
+      {
+        "regressed": "django__django-15268",
+        "control": "django__django-13343",
+        "regressed_problem_chars": 1305,
+        "control_problem_chars": 1260,
+        "regressed_historical_mean_llm_calls": 25.0,
+        "control_historical_mean_llm_calls": 27.0
+      },
+      {
+        "regressed": "django__django-15987",
+        "control": "django__django-14434",
+        "regressed_problem_chars": 176,
+        "control_problem_chars": 190,
+        "regressed_historical_mean_llm_calls": 15.5,
+        "control_historical_mean_llm_calls": 18.0
+      },
+      {
+        "regressed": "django__django-16938",
+        "control": "django__django-13925",
+        "regressed_problem_chars": 4015,
+        "control_problem_chars": 4086,
+        "regressed_historical_mean_llm_calls": 30.0,
+        "control_historical_mean_llm_calls": 31.5
+      },
+      {
+        "regressed": "matplotlib__matplotlib-25287",
+        "control": "matplotlib__matplotlib-23412",
+        "regressed_problem_chars": 2097,
+        "control_problem_chars": 1859,
+        "regressed_historical_mean_llm_calls": 13.5,
+        "control_historical_mean_llm_calls": 15.0
+      },
+      {
+        "regressed": "psf__requests-6028",
+        "control": "psf__requests-1921",
+        "regressed_problem_chars": 1268,
+        "control_problem_chars": 708,
+        "regressed_historical_mean_llm_calls": 34.5,
+        "control_historical_mean_llm_calls": 18.5
+      },
+      {
+        "regressed": "pydata__xarray-4687",
+        "control": "pydata__xarray-6599",
+        "regressed_problem_chars": 3990,
+        "control_problem_chars": 4310,
+        "regressed_historical_mean_llm_calls": 55.5,
+        "control_historical_mean_llm_calls": 53.0
+      },
+      {
+        "regressed": "pydata__xarray-7229",
+        "control": "pydata__xarray-7393",
+        "regressed_problem_chars": 2824,
+        "control_problem_chars": 2362,
+        "regressed_historical_mean_llm_calls": 49.0,
+        "control_historical_mean_llm_calls": 23.5
+      },
+      {
+        "regressed": "scikit-learn__scikit-learn-12973",
+        "control": "scikit-learn__scikit-learn-10297",
+        "regressed_problem_chars": 1575,
+        "control_problem_chars": 1519,
+        "regressed_historical_mean_llm_calls": 13.0,
+        "control_historical_mean_llm_calls": 12.0
+      },
+      {
+        "regressed": "sphinx-doc__sphinx-10673",
+        "control": "sphinx-doc__sphinx-8056",
+        "regressed_problem_chars": 1333,
+        "control_problem_chars": 1565,
+        "regressed_historical_mean_llm_calls": 54.0,
+        "control_historical_mean_llm_calls": 45.5
+      },
+      {
+        "regressed": "sphinx-doc__sphinx-9258",
+        "control": "sphinx-doc__sphinx-8593",
+        "regressed_problem_chars": 516,
+        "control_problem_chars": 638,
+        "regressed_historical_mean_llm_calls": 30.5,
+        "control_historical_mean_llm_calls": 31.0
+      },
+      {
+        "regressed": "sympy__sympy-12489",
+        "control": "sympy__sympy-23262",
+        "regressed_problem_chars": 1214,
+        "control_problem_chars": 1033,
+        "regressed_historical_mean_llm_calls": 28.0,
+        "control_historical_mean_llm_calls": 24.0
+      },
+      {
+        "regressed": "sympy__sympy-13877",
+        "control": "sympy__sympy-21379",
+        "regressed_problem_chars": 4361,
+        "control_problem_chars": 1781,
+        "regressed_historical_mean_llm_calls": 17.5,
+        "control_historical_mean_llm_calls": 19.0
+      },
+      {
+        "regressed": "sympy__sympy-15809",
+        "control": "sympy__sympy-19346",
+        "regressed_problem_chars": 350,
+        "control_problem_chars": 480,
+        "regressed_historical_mean_llm_calls": 16.5,
+        "control_historical_mean_llm_calls": 16.5
+      }
+    ]
+  },
+  "design": {
+    "arms": {
+      "A": {
+        "workspace_preload": true,
+        "description": "Current Top-4 preload plus code_search"
+      },
+      "B": {
+        "workspace_preload": false,
+        "description": "No initial preload; identical index and code_search remain available"
+      }
+    },
+    "generation_order": [
+      "A1",
+      "B1",
+      "B2",
+      "A2"
+    ],
+    "repetitions_per_arm": 2,
+    "fixed_parameters": {
+      "model": "GLM-5.2",
+      "agent_workers": 15,
+      "embedding_batch_size": 64,
+      "embedding_concurrency": 1,
+      "observation_codec": "xml",
+      "code_search": true
+    },
+    "binary_policy": "one fixed binary and SHA-256 for all four generations",
+    "evaluation": {
+      "harness": "official SWE-bench local evaluator verify",
+      "target": "tag",
+      "workers": 4,
+      "timing": "after all four generations"
+    }
+  },
+  "primary_estimands": [
+    "paired no-preload minus preload resolved probability on the 19 F11-regressed cases",
+    "difference-in-differences versus the 19 matched F11-held controls",
+    "retention of the 16 historical F00 rescues",
+    "within-arm repeatability across two generations"
+  ],
+  "limitations": [
+    "The 19 regressions were selected after observing the full500 RAG outcome, so regression to the mean remains possible.",
+    "Some repositories have few eligible controls; requests, xarray-7229, and sympy-13877 have weaker matches.",
+    "Two repetitions per arm estimate direction and gross effect size but do not provide high statistical power."
+  ]
+}

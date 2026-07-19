@@ -40,6 +40,12 @@ All variants are framework-generic and use the same opt-in `--code-search`
 path. V3 additionally requires `--embedding-config`; an invocation without the
 flag remains the unchanged baseline.
 
+The runner defaults to `--workspace-preload=true`. A controlled preload
+ablation may pass `--workspace-preload=false`; this still builds the identical
+workspace index and keeps `code_search` available, but does not append
+`workspace_context` to the initial prompt. The manifest records
+`workspace_preload`, and each case records `workspace_index.preload_injected`.
+
 ## First evaluation pool
 
 The pool contains every case not resolved in both historical TAG runs:
@@ -657,3 +663,31 @@ batches follow only after cache behavior is measured.
 
 The machine-readable full-pool result is
 [`v3-bge-m3-full500-r1.json`](./v3-bge-m3-full500-r1.json).
+
+## V3 initial-preload ablation
+
+The full-500 run regressed on 19 of the 364 cases resolved by both historical
+TAG runs. A single rerun of those observed regressions would be confounded by
+selection and regression to the mean, so the preload ablation uses a fixed
+54-case panel:
+
+- the 19 observed F11 regressions;
+- 19 F11 cases that RAG held, matched without replacement within repository on
+  problem length and historical E1/E2 mean LLM calls;
+- all 16 F00 cases rescued by the full-500 RAG run.
+
+Arm A retains the current Top-4 initial preload and `code_search`. Arm B
+withholds only the initial preload while building the same hybrid index and
+retaining the same `code_search` tool. Both arms run twice with one fixed
+binary, model, case list, worker count, embedding configuration, and XML
+observation codec. Generation order is A1, B1, B2, A2 to balance time drift;
+the official four-worker harness runs only after all four generations.
+
+The primary comparison is the paired no-preload minus preload resolution rate
+on the 19 regressions, interpreted alongside the matched F11 controls, F00
+rescue retention, and within-arm repeatability. Two repetitions can establish
+direction and expose a large effect, but they are not a high-power significance
+test.
+
+The frozen panel, matching metadata, protocol, and predeclared estimands are in
+[`v3-bge-m3-preload-ablation-54-plan.json`](./v3-bge-m3-preload-ablation-54-plan.json).

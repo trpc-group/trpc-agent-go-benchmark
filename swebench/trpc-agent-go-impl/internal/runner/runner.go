@@ -72,6 +72,7 @@ type manifest struct {
 	CommandTimeout        string                  `json:"command_timeout"`
 	CaseTimeout           string                  `json:"case_timeout"`
 	CodeSearch            bool                    `json:"code_search"`
+	WorkspacePreload      bool                    `json:"workspace_preload"`
 	Embedding             embeddingconfig.Metrics `json:"embedding"`
 	ExitStatusCounts      map[string]int          `json:"exit_status_counts"`
 	LLMCalls              int                     `json:"llm_calls"`
@@ -125,6 +126,7 @@ func Run(args []string) error {
 	billingTag := fs.String("billing-tag", "", "suffix appended to X-SMG-Agent-Name for billing isolation")
 	experimentID := fs.String("experiment-id", "", "experiment identifier recorded with billing-tag")
 	codeSearch := fs.Bool("code-search", false, "enable local workspace code retrieval")
+	workspacePreload := fs.Bool("workspace-preload", true, "inject retrieved workspace context into the initial prompt")
 	if err := fs.Parse(args[1:]); err != nil {
 		return err
 	}
@@ -139,6 +141,9 @@ func Run(args []string) error {
 	}
 	if strings.TrimSpace(*embeddingConfigPath) != "" && !*codeSearch {
 		return fmt.Errorf("-embedding-config requires -code-search")
+	}
+	if !*workspacePreload && !*codeSearch {
+		return fmt.Errorf("-workspace-preload=false requires -code-search")
 	}
 	codec, err := minicompat.ParseObservationCodec(*codecValue)
 	if err != nil {
@@ -216,7 +221,7 @@ func Run(args []string) error {
 	}
 	exec := executor.Executor{
 		Factory: factory, ModelConfig: modelCfg, ObservationCodec: codec, CaseTimeout: *caseTimeout,
-		EnableCodeSearch: *codeSearch, EmbeddingConfig: embeddingCfg,
+		EnableCodeSearch: *codeSearch, DisableWorkspacePreload: !*workspacePreload, EmbeddingConfig: embeddingCfg,
 	}
 	if err := exec.Validate(); err != nil {
 		return err
@@ -361,7 +366,7 @@ func Run(args []string) error {
 		Predictions: artifact.AbsPath(predictionsPath), Progress: artifact.AbsPath(progressPath),
 		ModelConfig: modelconfig.RedactSecrets(modelCfg), Environment: artifact.AbsPath(*environmentConfigPath),
 		CommandTimeout: commandTimeout.String(), CaseTimeout: caseTimeout.String(),
-		CodeSearch:       *codeSearch,
+		CodeSearch: *codeSearch, WorkspacePreload: *codeSearch && *workspacePreload,
 		Embedding:        embeddingUsage,
 		ExitStatusCounts: exitCounts, LLMCalls: llmCalls, ToolCalls: toolCalls, Usage: usage,
 		Pricing: rateCard, CostEstimate: costEstimate,

@@ -36,6 +36,10 @@ go run ./trpc-agent-go-impl \
 `--observation-codec` accepts `xml`, `json`, or `text`. Runs resume by skipping
 instance IDs already present in `preds.json`; pass `--redo-existing` to rerun
 them. `--billing-tag` and `--experiment-id` must be provided together.
+Workspace retrieval preloads context by default when `--code-search` is set.
+Use `--workspace-preload=false` to keep the same index and `code_search` tool
+while withholding retrieved context from the initial prompt for a controlled
+ablation.
 
 Each output directory contains:
 

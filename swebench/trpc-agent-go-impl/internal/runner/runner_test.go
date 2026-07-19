@@ -13,6 +13,7 @@ import (
 	"math"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 
 	"trpc.group/trpc-go/trpc-agent-go-benchmark/swebench/internal/artifact"
@@ -77,5 +78,17 @@ func TestResolveBillingAgentName(t *testing.T) {
 	}
 	if _, err := resolveBillingAgentName("swebench", "codec xml", "codec-e1"); err == nil {
 		t.Fatal("invalid billing tag succeeded")
+	}
+}
+
+func TestWorkspacePreloadOptOutRequiresCodeSearch(t *testing.T) {
+	err := Run([]string{
+		"trpc-agent-go-impl",
+		"-run-id=test",
+		"-model-config=unused",
+		"-workspace-preload=false",
+	})
+	if err == nil || !strings.Contains(err.Error(), "requires -code-search") {
+		t.Fatalf("error = %v, want code-search requirement", err)
 	}
 }
