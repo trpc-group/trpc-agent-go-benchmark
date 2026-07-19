@@ -1,0 +1,235 @@
+{
+  "schema_version": 1,
+  "run": {
+    "run_id": "tag-rag-bge-m3-full500-20260718-r1",
+    "framework_revision": "1e1d0694",
+    "benchmark_revision": "4e74da1",
+    "binary_sha256": "d15ae1cf8df0917690e1fc8485c6fd14f7d2ae7fb9ab95b5049793151b63df2c",
+    "model": "GLM-5.2",
+    "retrieval": "bge-m3 Dense+BM25 hybrid",
+    "agent_workers": 15,
+    "embedding_batch_size": 64,
+    "embedding_concurrency": 1,
+    "case_list": "data/case-lists/verified-test-500.case_ids.txt",
+    "case_count": 500,
+    "case_list_sha256": "a6b0fd7c8c2969a0eef892e032250adcfa6d32362d395c246930e61b575ac9b9",
+    "predictions_sha256": "41c28aa81e94909521605837fdca1171693b9719d0929034da4a36eb2cc5d2cc"
+  },
+  "official_harness": {
+    "dataset": "princeton-nlp/SWE-bench_Verified",
+    "split": "test",
+    "target": "tag",
+    "workers": 4,
+    "verifier_mode": "calibrated",
+    "total_instances": 500,
+    "submitted_instances": 500,
+    "completed_instances": 499,
+    "resolved_instances": 394,
+    "resolved_rate": 0.788,
+    "unresolved_instances": 105,
+    "empty_patch_instances": 1,
+    "empty_patch_ids": [
+      "sphinx-doc__sphinx-10435"
+    ],
+    "error_instances": 0,
+    "error_ids": [],
+    "duration_ms": 5317770
+  },
+  "quality_comparison": {
+    "historical_e1": {
+      "run_id": "tag-impl-full500-20260715-e1",
+      "resolved_instances": 383,
+      "resolved_rate": 0.766,
+      "completed_instances": 498,
+      "empty_patch_instances": 2,
+      "error_instances": 0
+    },
+    "historical_e2": {
+      "run_id": "tag-impl-full500-20260716-e2",
+      "resolved_instances": 399,
+      "resolved_rate": 0.798,
+      "completed_instances": 494,
+      "empty_patch_instances": 5,
+      "error_instances": 1
+    },
+    "historical_mean_resolved": 391,
+    "historical_mean_resolved_rate": 0.782,
+    "rag_gain_vs_historical_mean_cases": 3,
+    "rag_gain_vs_historical_mean_percentage_points": 0.6,
+    "rag_change_vs_e1_cases": 11,
+    "rag_change_vs_e1_percentage_points": 2.2,
+    "rag_change_vs_e2_cases": -5,
+    "rag_change_vs_e2_percentage_points": -1.0,
+    "submitted_id_sets_equal": true,
+    "historical_classification": {
+      "f11_total": 364,
+      "f11_held_count": 345,
+      "f11_regressed_count": 19,
+      "f00_total": 82,
+      "f00_rescued_count": 16,
+      "f00_still_unresolved_count": 66,
+      "f01_total": 54,
+      "f01_held_count": 33,
+      "f01_regressed_count": 21
+    },
+    "resolved_set_comparison": {
+      "e1_intersection_count": 358,
+      "e1_rag_only_count": 36,
+      "e1_only_count": 25,
+      "e1_jaccard": 0.8544152744630071,
+      "e2_intersection_count": 365,
+      "e2_rag_only_count": 29,
+      "e2_only_count": 34,
+      "e2_jaccard": 0.852803738317757
+    }
+  },
+  "unstable_136_projection": {
+    "case_list": "data/case-lists/tag-impl-unstable-e1-e2-136.case_ids.txt",
+    "case_count": 136,
+    "case_list_sha256": "90b071ba6ac1407df571ecc585efcb12b7cc2d14b6ed8e791ee99d0a80de2044",
+    "repeat_gate_resolved": 42,
+    "historical_e1_resolved": 19,
+    "historical_e2_resolved": 35,
+    "historical_mean_resolved": 27,
+    "rag_r1_resolved": 53,
+    "rag_r2_resolved": 50,
+    "full500_projection_resolved": 49,
+    "full500_projection_resolved_rate": 0.3602941176470588,
+    "full500_projection_gate_passed": true,
+    "three_rag_run_mean_resolved": 50.666666666666664,
+    "three_rag_run_mean_resolved_rate": 0.37254901960784315,
+    "gain_vs_historical_mean_cases": 23.666666666666664,
+    "gain_vs_historical_mean_percentage_points": 17.401960784313726,
+    "full500_projection_transitions": {
+      "f00_total": 82,
+      "f00_rescued_count": 16,
+      "f00_still_unresolved_count": 66,
+      "f01_total": 54,
+      "f01_held_count": 33,
+      "f01_regressed_count": 21
+    },
+    "repeatability": {
+      "r1_intersection_count": 36,
+      "r1_jaccard": 0.5454545454545454,
+      "r2_intersection_count": 30,
+      "r2_jaccard": 0.43478260869565216,
+      "r1_r2_persistent_resolved_count": 32,
+      "persistent_resolved_held_count": 24,
+      "persistent_f00_rescued_count": 12,
+      "persistent_f00_rescues_held_count": 6,
+      "persistent_f01_held_count": 20,
+      "persistent_f01_holds_held_count": 18
+    },
+    "model_metrics": {
+      "prompt_tokens": 84756223,
+      "cached_input_tokens": 82873280,
+      "uncached_input_tokens": 1882943,
+      "completion_tokens": 1362200,
+      "total_tokens": 86118423,
+      "llm_calls": 4321,
+      "tool_calls": 4606,
+      "estimated_model_cost": 218.951704,
+      "tokens_per_resolved": 1757518.836734694,
+      "cost_per_resolved": 4.46840212244898
+    }
+  },
+  "model_metrics": {
+    "rate_card": {
+      "currency": "billing_unit",
+      "unit_tokens": 1000000,
+      "uncached_input": 8,
+      "cached_input": 2,
+      "output": 28
+    },
+    "historical_e1": {
+      "prompt_tokens": 206203477,
+      "cached_input_tokens": 201521216,
+      "uncached_input_tokens": 4682261,
+      "completion_tokens": 3600312,
+      "total_tokens": 209803789,
+      "llm_calls": 13090,
+      "estimated_model_cost": 541.309256,
+      "tokens_per_resolved": 547790.5718015666,
+      "cost_per_resolved": 1.413340093994778
+    },
+    "historical_e2": {
+      "prompt_tokens": 254957626,
+      "cached_input_tokens": 250148160,
+      "uncached_input_tokens": 4809466,
+      "completion_tokens": 3842970,
+      "total_tokens": 258800596,
+      "llm_calls": 13829,
+      "estimated_model_cost": 646.375208,
+      "tokens_per_resolved": 648623.0476190476,
+      "cost_per_resolved": 1.6199879899749374
+    },
+    "rag_full500": {
+      "prompt_tokens": 210729897,
+      "cached_input_tokens": 205124672,
+      "uncached_input_tokens": 5605225,
+      "completion_tokens": 3485052,
+      "total_tokens": 214214949,
+      "llm_calls": 12813,
+      "estimated_model_cost": 552.6726,
+      "tokens_per_resolved": 543692.7639593908,
+      "cost_per_resolved": 1.4027223350253806
+    },
+    "rag_change_vs_e1_percent": {
+      "total_tokens": 2.102516842534241,
+      "llm_calls": -2.116119174942699,
+      "estimated_model_cost": 2.099233270823664,
+      "tokens_per_resolved": -0.7480610388563291,
+      "cost_per_resolved": -0.7512529372450283
+    },
+    "rag_change_vs_e2_percent": {
+      "total_tokens": -17.227799197185778,
+      "llm_calls": -7.346879745462431,
+      "estimated_model_cost": -14.496627785266181,
+      "tokens_per_resolved": -16.17739055755616,
+      "cost_per_resolved": -13.411559609952306
+    }
+  },
+  "retrieval_metrics": {
+    "indexed_documents": 5693838,
+    "preloaded_documents": 2000,
+    "preloaded_characters": 2389034,
+    "code_search_calls": 86,
+    "embedding_requests": 89804,
+    "embedding_batch_requests": 89218,
+    "embedding_inputs": 5694424,
+    "embedding_tokens": 5694424,
+    "embedding_errors_final": 0,
+    "embedding_http_502_retries_recovered": 209,
+    "embedding_duration_ms_aggregate": 996008745,
+    "workspace_index_duration_ms_aggregate": 997982046,
+    "case_duration_ms_aggregate": 1056741067,
+    "embedding_share_of_case_duration": 0.9425286629841935,
+    "case_duration_ms_mean": 2113482.134,
+    "case_duration_ms_median": 2308041,
+    "case_duration_ms_max": 4761893
+  },
+  "runtime": {
+    "prediction_wall_time_ms": 71283991,
+    "harness_wall_time_ms": 5317770,
+    "runner_exit_status_counts": {
+      "Submitted": 499,
+      "Error": 1
+    },
+    "runner_error_ids": [
+      "sphinx-doc__sphinx-10435"
+    ],
+    "runner_error_kind": "endpoint_timeout",
+    "embedding_fatal_or_panic_count": 0
+  },
+  "decision": {
+    "unstable_136_aggregate_signal_reproduced_in_full_run": true,
+    "case_level_stability_established": false,
+    "material_full500_resolve_rate_gain_established": false,
+    "model_cost_per_resolved_improved_vs_both_baselines": true,
+    "absolute_model_cost_lower_than_both_baselines": false,
+    "promote_as_unconditional_default": false,
+    "embedding_latency_is_primary_operational_blocker": true,
+    "next_quality_priority": "selective retrieval routing that preserves historically stable cases",
+    "next_performance_priority": "persistent content-hash embedding cache"
+  }
+}

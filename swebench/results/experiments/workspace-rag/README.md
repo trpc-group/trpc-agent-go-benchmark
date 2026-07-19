@@ -526,3 +526,134 @@ batches as isolated performance changes.
 
 The repeat comparison is stored in
 [`v3-bge-m3-unstable136-repeat.json`](./v3-bge-m3-unstable136-repeat.json).
+
+## V3 full-500 result
+
+Run `tag-rag-bge-m3-full500-20260718-r1` evaluated all 500 SWE-Bench Verified
+cases with the unchanged R2 framework, model, retrieval configuration, and
+15-case-worker strategy. The submitted ID sets are identical to historical E1
+and E2. The checked-in 500-case list has SHA-256
+`a6b0fd7c8c2969a0eef892e032250adcfa6d32362d395c246930e61b575ac9b9`.
+
+The official local harness used four workers and calibrated verifier mode:
+
+| Metric | Historical E1 | Historical E2 | V3 RAG full-500 |
+|---|---:|---:|---:|
+| Resolved | 383/500 | **399/500** | 394/500 |
+| Resolve rate | 76.6% | **79.8%** | 78.8% |
+| Completed by harness | 498 | 494 | 499 |
+| Empty patches | 2 | 5 | 1 |
+| Harness errors | 0 | 1 | 0 |
+
+V3 is 11 cases and 2.2 percentage points above E1, but five cases and one
+percentage point below E2. It is only three cases and 0.6 percentage points
+above the historical two-run mean of 391/500 (78.2%). This does not establish a
+material full-500 resolve-rate gain.
+
+The single empty patch was `sphinx-doc__sphinx-10435`. Its generation hit an
+endpoint timeout after about 71.5 minutes; the runner recorded one error while
+the official harness correctly classified the submitted empty patch and
+reported no evaluator errors.
+
+### Full-pool transitions
+
+Historical E1/E2 divide the pool into 364 F11 cases resolved in both runs, 82
+F00 cases unresolved in both, and 54 F01 cases resolved in exactly one:
+
+| Historical class | V3 resolved | V3 unresolved |
+|---|---:|---:|
+| F11 baseline-consensus cases | **345/364** | 19/364 |
+| F00 rescues | **16/82** | 66/82 |
+| F01 holds | **33/54** | 21/54 |
+
+The 49 resolved cases from the historical instability pool plus 345 F11 holds
+produce the 394 full-pool total. Retrieval adds difficult-case rescues, but
+regressions in 19 baseline-consensus cases offset that gain. V3 therefore
+should not become an unconditional default from this result.
+
+### Does the 136-case signal survive?
+
+Yes at the aggregate level. Projecting the full-500 run onto the exact original
+136 IDs gives 49/136 (36.0%), seven cases above the predeclared 42-case gate:
+
+| Exact 136-case run | Resolved | F00 rescued | F01 held |
+|---|---:|---:|---:|
+| V3 R1 | 53/136 | 20/82 | 33/54 |
+| V3 R2 | 50/136 | 21/82 | 29/54 |
+| Full-500 projection | 49/136 | 16/82 | 33/54 |
+
+The three V3 observations average 50.7/136 (37.3%), versus the historical mean
+of 27/136 (19.9%): +23.7 cases and +17.4 percentage points. The difficult-pool
+aggregate signal has therefore repeated a third time.
+
+Case identity remains unstable. The full-500 projection shares 36 resolved
+cases with R1 (54.5% Jaccard) and 30 with R2 (43.5% Jaccard). It preserves
+24/32 cases resolved in both R1 and R2, but only 6/12 persistent F00 rescues.
+This supports a population-level retrieval effect, not deterministic rescue of
+individual cases.
+
+### Full-500 model cost
+
+All columns use the same GLM-5.2 rate card: 8 billing units per million
+uncached input tokens, 2 per million cached input tokens, and 28 per million
+output tokens.
+
+| Metric | Historical E1 | Historical E2 | V3 RAG full-500 |
+|---|---:|---:|---:|
+| Prompt tokens | 206,203,477 | 254,957,626 | 210,729,897 |
+| Cached input tokens | 201,521,216 | 250,148,160 | 205,124,672 |
+| Uncached input tokens | 4,682,261 | 4,809,466 | 5,605,225 |
+| Completion tokens | 3,600,312 | 3,842,970 | 3,485,052 |
+| Total tokens | 209,803,789 | 258,800,596 | 214,214,949 |
+| LLM calls | 13,090 | 13,829 | 12,813 |
+| Estimated model cost | 541.309256 | 646.375208 | 552.672600 |
+| Tokens per resolved | 547,791 | 648,623 | **543,693** |
+| Cost per resolved | 1.413340 | 1.619988 | **1.402722** |
+
+V3's absolute model cost is between the two baselines: +2.1% versus E1 and
+-14.5% versus E2. Its cost per resolved is the lowest, but only 0.8% below E1
+and 13.4% below E2. Claim the efficiency result; do not claim lower absolute
+model spend than both baselines.
+
+On the exact 136-case projection, V3 used 86,118,423 total tokens and 218.951704
+billing units, or 1,757,519 tokens and 4.468402 billing units per resolved
+case. The model-efficiency signal from R1/R2 therefore also survives in the
+full run.
+
+### Full-500 retrieval and runtime
+
+| Metric | V3 RAG full-500 |
+|---|---:|
+| Indexed documents | 5,693,838 |
+| Preloaded documents / characters | 2,000 / 2,389,034 |
+| Follow-up `code_search` calls | 86 |
+| Embedding requests / batched requests | 89,804 / 89,218 |
+| Embedded inputs | 5,694,424 |
+| Final embedding errors | 0 |
+| Recovered HTTP 502 retries | 209 |
+| Aggregate embedding duration | 996,008,745 ms |
+| Aggregate case duration | 1,056,741,067 ms |
+| Mean / median / maximum case duration | 35.2 / 38.5 / 79.4 minutes |
+| Prediction wall time | 19h 48m |
+| Four-worker harness wall time | 1h 28m 38s |
+
+Embedding accounts for 94.3% of aggregate case duration. Every one of the 209
+observed HTTP 502 retries recovered on the first retry; there were no final
+embedding errors, fatal errors, or panics. Operational reliability is
+acceptable, but repository-wide embedding makes the prediction wall time about
+seven times the 2h48m-2h59m historical baseline range.
+
+### Full-500 decision
+
+V3 demonstrates a repeated aggregate improvement on the deliberately difficult
+136-case pool and competitive model cost per resolved case. It does not
+demonstrate a material full-500 resolve-rate gain, deterministic case-level
+rescue, or acceptable retrieval latency for a default-on production path.
+
+The next quality experiment should route retrieval selectively while measuring
+F11 preservation. The first isolated performance change should remain a
+persistent content-hash embedding cache; lexical prefiltering and larger
+batches follow only after cache behavior is measured.
+
+The machine-readable full-pool result is
+[`v3-bge-m3-full500-r1.json`](./v3-bge-m3-full500-r1.json).

@@ -23,10 +23,14 @@ Committed files:
   verifier, usage, billing, reconciliation, and comparison data for that
   experiment.
 - `experiments/workspace-rag/README.md`: framework-generic workspace retrieval
-  variants, decision gates, and the 136-case batched hybrid RAG result.
+  variants, decision gates, 136-case repeat, and full-500 batched hybrid RAG
+  result.
 - `experiments/workspace-rag/v3-bge-m3-unstable136-r1.json`: machine-readable
   official-harness, F00/F01 transition, model-cost, and retrieval-runtime data
   for the V3 result.
 - `experiments/workspace-rag/v3-bge-m3-unstable136-repeat.json`:
   machine-readable R1/R2 repeatability, two-run efficiency, and promotion
   decision for the V3 result.
+- `experiments/workspace-rag/v3-bge-m3-full500-r1.json`: machine-readable
+  full-500 official-harness result, baseline comparison, 136-case projection,
+  model cost, retrieval runtime, and default-promotion decision.
