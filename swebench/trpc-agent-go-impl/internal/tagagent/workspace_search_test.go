@@ -234,6 +234,33 @@ func TestWorkspaceRepresentationHashesStableAcrossCheckoutRoots(t *testing.T) {
 	}
 }
 
+func TestWorkspaceIndexCoverageCountsOnlyEligibleFiles(t *testing.T) {
+	stats := buildWorkspaceIndexStats(
+		WorkspaceRepresentationASTCode,
+		[]string{"expected.py"},
+		[]*document.Document{
+			{
+				Content: "def expected():\n    pass\n",
+				Metadata: map[string]any{
+					"trpc_ast_file_path": "expected.py",
+				},
+			},
+			{
+				Content: "def extra():\n    pass\n",
+				Metadata: map[string]any{
+					"trpc_ast_file_path": "extra.py",
+				},
+			},
+		},
+	)
+	if stats.EligibleFiles != 1 || stats.IndexedFiles != 2 || stats.FileCoverage != 1 {
+		t.Fatalf("coverage stats = %+v, want one eligible file covered by two indexed files", stats)
+	}
+	if len(stats.MissingFiles) != 1 || stats.MissingFiles[0] != "unexpected:extra.py" {
+		t.Fatalf("missing files = %v, want unexpected extra.py", stats.MissingFiles)
+	}
+}
+
 func TestParseWorkspaceRepresentation(t *testing.T) {
 	got, err := ParseWorkspaceRepresentation("")
 	if err != nil || got != WorkspaceRepresentationCurrentFixed {
@@ -257,6 +284,7 @@ func writeRepresentationWorkspace(t *testing.T) string {
 `,
 		"pkg/broken.py":    "def broken(:\n",
 		"pkg/constants.py": "# constants only\n",
+		"pkg/empty.py":     "",
 		".ci/check.py":     "def check():\n    return True\n",
 	}
 	for name, content := range files {

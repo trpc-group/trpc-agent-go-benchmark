@@ -582,17 +582,20 @@ func buildWorkspaceIndexStats(
 	stats.IndexedFiles = len(indexedFilesList)
 	stats.IndexedFileSetSHA256 = hashStrings(indexedFilesList)
 	stats.DocumentSetSHA256 = hashStrings(documentFingerprints)
-	if stats.EligibleFiles > 0 {
-		stats.FileCoverage = float64(stats.IndexedFiles) / float64(stats.EligibleFiles)
-	}
 	eligibleSet := make(map[string]struct{}, len(eligibleFiles))
 	for _, path := range eligibleFiles {
 		eligibleSet[path] = struct{}{}
 	}
+	coveredEligibleFiles := 0
 	for _, path := range eligibleFiles {
-		if _, ok := indexedFiles[path]; !ok {
+		if _, ok := indexedFiles[path]; ok {
+			coveredEligibleFiles++
+		} else {
 			stats.MissingFiles = append(stats.MissingFiles, path)
 		}
+	}
+	if stats.EligibleFiles > 0 {
+		stats.FileCoverage = float64(coveredEligibleFiles) / float64(stats.EligibleFiles)
 	}
 	for path := range indexedFiles {
 		if _, ok := eligibleSet[path]; !ok {
