@@ -691,3 +691,133 @@ test.
 
 The frozen panel, matching metadata, protocol, and predeclared estimands are in
 [`v3-bge-m3-preload-ablation-54-plan.json`](./v3-bge-m3-preload-ablation-54-plan.json).
+
+### Preload-ablation result
+
+All four generations completed with 54 non-empty predictions, and all four
+official local-harness evaluations completed without empty patches or evaluator
+errors. The evaluator used the calibrated verifier, four workers, and
+`clean=false`.
+
+| Run | Initial preload | Resolved | Unresolved | Harness time |
+|---|---:|---:|---:|---:|
+| A1 | yes | 40/54 | 14 | 7m47s |
+| B1 | no | 41/54 | 13 | 7m27s |
+| B2 | no | 39/54 | 15 | 8m07s |
+| A2 | yes | 38/54 | 16 | 7m25s |
+
+The ablation boundary matters: both arms build the same hybrid index, retrieve
+the same initial Top-4 candidates, and expose `code_search`. The B arm only
+withholds those candidates from the first task prompt. It does not disable RAG,
+index construction, or initial retrieval.
+
+### Primary causal comparison
+
+Pooling the two repetitions within each arm gives:
+
+| Fixed subgroup | Preload A | No-preload B | B minus A |
+|---|---:|---:|---:|
+| 19 observed F11 regressions | 26/38 (68.4%) | 26/38 (68.4%) | **0/38 (0.0pp)** |
+| 19 matched F11 holds | 35/38 (92.1%) | 36/38 (94.7%) | +1/38 (+2.6pp) |
+| 16 observed F00 rescues | 17/32 (53.1%) | 18/32 (56.3%) | +1/32 (+3.1pp) |
+| Entire 54-case panel | 78/108 (72.2%) | 80/108 (74.1%) | +2/108 (+1.9pp) |
+
+The predeclared difference-in-differences is therefore
+`0.0pp - 2.6pp = -2.6pp`. Disabling initial prompt injection does not improve
+the selected 19 regressions relative to their matched controls.
+
+Twelve of the 19 target cases resolve in both no-preload repetitions, but that
+number is not evidence of preload harm by itself: the cases were selected
+because one earlier RAG run failed them, so reruns are expected to regress
+toward their historically successful outcome. The two-arm comparison removes
+that misleading recovery signal.
+
+### The 19 target cases
+
+`1` means resolved by the official harness. Delta is the number of B successes
+minus the number of A successes across the two repetitions.
+
+| Instance | A1 | A2 | B1 | B2 | Delta | Read |
+|---|---:|---:|---:|---:|---:|---|
+| `django__django-10973` | 0 | 0 | 0 | 0 | 0 | stable failure |
+| `django__django-11239` | 1 | 1 | 0 | 0 | -2 | strict reverse of hypothesis |
+| `django__django-13346` | 1 | 0 | 0 | 1 | 0 | unstable, arm tie |
+| `django__django-13810` | 1 | 1 | 1 | 1 | 0 | stable success |
+| `django__django-14311` | 1 | 0 | 1 | 1 | +1 | directional B signal |
+| `django__django-14559` | 1 | 1 | 1 | 1 | 0 | stable success |
+| `django__django-15268` | 1 | 1 | 1 | 1 | 0 | stable success |
+| `django__django-15987` | 0 | 0 | 0 | 0 | 0 | stable failure |
+| `django__django-16938` | 0 | 1 | 1 | 1 | +1 | directional B signal |
+| `matplotlib__matplotlib-25287` | 1 | 1 | 1 | 1 | 0 | stable success |
+| `psf__requests-6028` | 1 | 1 | 1 | 1 | 0 | stable success |
+| `pydata__xarray-4687` | 1 | 0 | 0 | 0 | -1 | directional A signal |
+| `pydata__xarray-7229` | 0 | 0 | 1 | 0 | +1 | single-run B recovery |
+| `scikit-learn__scikit-learn-12973` | 1 | 1 | 0 | 0 | -2 | strict reverse of hypothesis |
+| `sphinx-doc__sphinx-10673` | 1 | 1 | 1 | 1 | 0 | stable success |
+| `sphinx-doc__sphinx-9258` | 1 | 1 | 1 | 1 | 0 | stable success |
+| `sympy__sympy-12489` | 0 | 0 | 1 | 1 | +2 | only strict hypothesized case |
+| `sympy__sympy-13877` | 1 | 1 | 1 | 1 | 0 | stable success |
+| `sympy__sympy-15809` | 1 | 1 | 1 | 1 | 0 | stable success |
+
+Only `sympy__sympy-12489` shows the strict hypothesized pattern
+`A1=A2=0, B1=B2=1`. Two cases show the strict reverse pattern. At the looser
+directional level, four cases favor B, three favor A, and twelve tie. This is
+not a coherent case-level signature of misleading initial preload.
+
+### Repeatability and rescue identity
+
+| Arm | Both resolved | First only | Second only | Neither | Agreement | Resolved-set Jaccard |
+|---|---:|---:|---:|---:|---:|---:|
+| Preload A | 33 | 7 | 5 | 9 | 77.8% | 73.3% |
+| No-preload B | 36 | 5 | 3 | 10 | 85.2% | 81.8% |
+
+No-preload is descriptively more repeatable on this panel, but two repetitions
+and one time-ordered block are insufficient to attribute that difference to
+the arm. The original 16 F00 rescues are especially unstable: only 5/16 are
+resolved in both A runs and 6/16 in both B runs, with Jaccard values of 41.7%
+and 50.0%. The earlier full-run rescue identities should not be treated as
+deterministic.
+
+### Cost and retrieval behavior
+
+| Pooled arm metric | Preload A | No-preload B | B versus A |
+|---|---:|---:|---:|
+| Resolved outcomes | 78/108 | 80/108 | +2 |
+| Total model tokens | 58,649,286 | 61,641,366 | +5.1% |
+| Estimated model cost | 149.403076 | 155.757900 | +4.3% |
+| Tokens per resolved outcome | 751,914 | 770,517 | +2.5% |
+| Cost per resolved outcome | 1.915424 | 1.946974 | +1.6% |
+| Follow-up `code_search` calls | 22 | 69 | **3.14x** |
+| Embedded inputs | 1,220,012 | 1,220,059 | +47 |
+| Aggregate embedding duration | 191,466,370 ms | 192,483,460 ms | +0.5% |
+
+Both arms indexed exactly 609,941 documents per repetition and selected 216
+initial candidates with 259,042 characters. The preload arm injected those
+candidates in all 108 case-runs; the no-preload arm injected none. The latter
+then made 47 more dynamic `code_search` calls and exactly 47 more embedding
+inputs, showing that the agent partly compensates for missing initial context.
+
+Embedding still consumed 90.8% of aggregate case time in A and 92.7% in B.
+Withholding prompt injection therefore cannot provide the desired indexing
+speedup. All 100 observed embedding retry log entries across the four runs
+recovered; there were no final embedding errors, fatal errors, or panics.
+
+### Preload-ablation decision
+
+This experiment rejects the operational hypothesis that unconditional initial
+preload is the main cause of the 19 observed full-run regressions. It does not
+justify making no-preload the default: target-group quality is unchanged,
+matched-control-adjusted quality is slightly worse, and no-preload uses more
+tokens, model cost, and follow-up search while remaining subject to the same
+indexing latency.
+
+The result is compatible with regression to the mean plus ordinary agent
+stochasticity, with isolated case-specific preload effects in both directions.
+The next quality experiment should test relevance-gated or selective initial
+injection rather than globally removing preload. The first performance change
+should remain persistent content-hash embeddings, because that is the work
+shared by both arms.
+
+The complete provenance, per-run metrics, primary estimands, and all 54
+case-level outcomes are in
+[`v3-bge-m3-preload-ablation-54-result.json`](./v3-bge-m3-preload-ablation-54-result.json).

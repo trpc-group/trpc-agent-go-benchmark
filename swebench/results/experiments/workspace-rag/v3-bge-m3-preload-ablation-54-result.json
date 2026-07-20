@@ -1,0 +1,803 @@
+{
+  "schema_version": 1,
+  "status": "completed",
+  "completed_on": "2026-07-20",
+  "question": "Does initial Top-4 workspace preload causally reduce solve reliability while the same hybrid index and code_search tool remain available?",
+  "plan": {
+    "path": "results/experiments/workspace-rag/v3-bge-m3-preload-ablation-54-plan.json",
+    "generation_order": [
+      "A1",
+      "B1",
+      "B2",
+      "A2"
+    ],
+    "repetitions_per_arm": 2
+  },
+  "provenance": {
+    "framework_revision": "1e1d06945031ad1de3c9b2f93b59d5f7efd3aee8",
+    "benchmark_revision": "dcb1134a2058458cabd78d099eb8a6c2e2dc23bd",
+    "binary": "/data/validation/bin/trpc-agent-go-impl-preload-ablation-dcb1134",
+    "binary_sha256": "ef3c260de48e0e888f2ee386057963782f942e110131653ffb92f7024ab45abe",
+    "case_list": "data/case-lists/tag-rag-preload-ablation-54.case_ids.txt",
+    "case_count": 54,
+    "case_list_sha256": "b70ede78c4ff8bb13ebb087a12c8ed204dfe7256a72d98410239697a17325d0d",
+    "model": "GLM-5.2",
+    "model_config": "config/models/glm-5.2.local.yaml",
+    "environment_config": "config/environments/swebench-testbed.yaml",
+    "embedding_config": "config/embeddings/workspace-rag.local.yaml",
+    "retrieval": "bge-m3 Dense+BM25 hybrid",
+    "code_search": true,
+    "agent_workers": 15,
+    "embedding_batch_size": 64,
+    "embedding_concurrency": 1,
+    "observation_codec": "xml"
+  },
+  "ablation_boundary": {
+    "only_changed_variable": "initial workspace preload prompt injection",
+    "arm_a": "Build the hybrid index, retrieve Top-4 initial candidates, inject them into the first task prompt, and retain code_search.",
+    "arm_b": "Build the same hybrid index, retrieve the same Top-4 initial candidates, withhold them from the first task prompt, and retain code_search.",
+    "indexing_disabled_in_arm_b": false,
+    "initial_candidate_retrieval_disabled_in_arm_b": false,
+    "prompt_injection_disabled_in_arm_b": true,
+    "implementation_evidence": [
+      "trpc-agent-go-impl/internal/executor/executor.go constructs NewWorkspaceCodeSearch before consulting DisableWorkspacePreload",
+      "workspaceContextForPrompt returns an empty string only after initial candidates have been retrieved",
+      "WorkspaceIndex.PreloadInjected records whether the candidates entered the prompt"
+    ]
+  },
+  "official_harness": {
+    "dataset": "princeton-nlp/SWE-bench_Verified",
+    "split": "test",
+    "target": "tag",
+    "python": "/data/validation/swebench-py/bin/python",
+    "workers": 4,
+    "verifier_mode": "calibrated",
+    "cache_level": "instance",
+    "clean": false,
+    "compat_patch": true,
+    "evaluation_order": [
+      "A1",
+      "B1",
+      "B2",
+      "A2"
+    ]
+  },
+  "rate_card": {
+    "currency": "billing_unit",
+    "unit_tokens": 1000000,
+    "uncached_input": 8,
+    "cached_input": 2,
+    "output": 28
+  },
+  "runs": {
+    "A1": {
+      "run_id": "tag-rag-preload-ablation54-a1-20260720",
+      "arm": "preload",
+      "workspace_preload": true,
+      "predictions_path": "results/runs/tag-rag-preload-ablation54-a1-20260720/raw/tag/preds.json",
+      "predictions_sha256": "37b2e5adc06b1bc820598259ee7575a087fc296ee0b276c936a6b92c47aa5ae8",
+      "harness_report_path": "results/runs/tag-rag-preload-ablation54-a1-20260720/local-harness-report/tag/tag__glm52.tag-rag-preload-ablation54-a1-20260720-tag.json",
+      "harness_report_sha256": "78798d19581b52cf9132befa7265ad9836d0aa1a45ae08d43b07cb1adccabf81",
+      "verifier_manifest_sha256": "a349635dad787689f83bc253f9186278e2151661a3d5ad436f676b0133064f10",
+      "harness": {
+        "submitted_instances": 54,
+        "completed_instances": 54,
+        "resolved_instances": 40,
+        "resolved_rate": 0.7407407407407407,
+        "unresolved_instances": 14,
+        "empty_patch_instances": 0,
+        "error_instances": 0,
+        "duration_ms": 467041
+      },
+      "model_metrics": {
+        "total_tokens": 30699593,
+        "llm_calls": 1663,
+        "tool_calls": 1734,
+        "estimated_model_cost": 78.12422
+      },
+      "retrieval_metrics": {
+        "indexed_documents": 609941,
+        "preloaded_candidate_documents": 216,
+        "preloaded_candidate_characters": 259042,
+        "preload_injected_case_runs": 54,
+        "code_search_calls": 11,
+        "case_runs_with_code_search": 10,
+        "embedding_requests": 9620,
+        "embedding_batch_requests": 9555,
+        "embedding_inputs": 610006,
+        "embedding_duration_ms_aggregate": 93976413,
+        "case_duration_ms_aggregate": 103091618,
+        "embedding_share_of_case_duration": 0.9115815118936246,
+        "recovered_retry_log_entries": 30,
+        "final_embedding_errors": 0,
+        "embedding_fatal_or_panic_count": 0
+      },
+      "prediction_wall_time_ms": 8275766
+    },
+    "B1": {
+      "run_id": "tag-rag-preload-ablation54-b1-20260720",
+      "arm": "no_preload",
+      "workspace_preload": false,
+      "predictions_path": "results/runs/tag-rag-preload-ablation54-b1-20260720/raw/tag/preds.json",
+      "predictions_sha256": "2734ad54ea6926a86a19a72625663aff3905efe8a76a3f3e35cf466ecc621370",
+      "harness_report_path": "results/runs/tag-rag-preload-ablation54-b1-20260720/local-harness-report/tag/tag__glm52.tag-rag-preload-ablation54-b1-20260720-tag.json",
+      "harness_report_sha256": "fae271371c0b85b5003e7cd21c00911962a8a65a78d660fcda857b53124a9858",
+      "verifier_manifest_sha256": "5137b5eeeceaa3e3f8d58a64962d0202ed4cf51795de6e0a2afa3a3f73b8b3f4",
+      "harness": {
+        "submitted_instances": 54,
+        "completed_instances": 54,
+        "resolved_instances": 41,
+        "resolved_rate": 0.7592592592592593,
+        "unresolved_instances": 13,
+        "empty_patch_instances": 0,
+        "error_instances": 0,
+        "duration_ms": 447263
+      },
+      "model_metrics": {
+        "total_tokens": 27659757,
+        "llm_calls": 1656,
+        "tool_calls": 1735,
+        "estimated_model_cost": 71.193276
+      },
+      "retrieval_metrics": {
+        "indexed_documents": 609941,
+        "preloaded_candidate_documents": 216,
+        "preloaded_candidate_characters": 259042,
+        "preload_injected_case_runs": 0,
+        "code_search_calls": 34,
+        "case_runs_with_code_search": 34,
+        "embedding_requests": 9643,
+        "embedding_batch_requests": 9555,
+        "embedding_inputs": 610029,
+        "embedding_duration_ms_aggregate": 97611972,
+        "case_duration_ms_aggregate": 104665240,
+        "embedding_share_of_case_duration": 0.9326111706235996,
+        "recovered_retry_log_entries": 31,
+        "final_embedding_errors": 0,
+        "embedding_fatal_or_panic_count": 0
+      },
+      "prediction_wall_time_ms": 8354526
+    },
+    "B2": {
+      "run_id": "tag-rag-preload-ablation54-b2-20260720",
+      "arm": "no_preload",
+      "workspace_preload": false,
+      "predictions_path": "results/runs/tag-rag-preload-ablation54-b2-20260720/raw/tag/preds.json",
+      "predictions_sha256": "c684369aa24e5a4d52548455a0b1ce6928f4e9e227036396a01fcd5c46f094b1",
+      "harness_report_path": "results/runs/tag-rag-preload-ablation54-b2-20260720/local-harness-report/tag/tag__glm52.tag-rag-preload-ablation54-b2-20260720-tag.json",
+      "harness_report_sha256": "998277eb3693c95e2e787cac08094a6893e3319942757aca93929c4422129d42",
+      "verifier_manifest_sha256": "385e524f50e853d6a5d0db7340f3ab5f2dd4cb20fa7afab48c6040503c0eb20f",
+      "harness": {
+        "submitted_instances": 54,
+        "completed_instances": 54,
+        "resolved_instances": 39,
+        "resolved_rate": 0.7222222222222222,
+        "unresolved_instances": 15,
+        "empty_patch_instances": 0,
+        "error_instances": 0,
+        "duration_ms": 487093
+      },
+      "model_metrics": {
+        "total_tokens": 33981609,
+        "llm_calls": 1783,
+        "tool_calls": 1875,
+        "estimated_model_cost": 84.564624
+      },
+      "retrieval_metrics": {
+        "indexed_documents": 609941,
+        "preloaded_candidate_documents": 216,
+        "preloaded_candidate_characters": 259042,
+        "preload_injected_case_runs": 0,
+        "code_search_calls": 35,
+        "case_runs_with_code_search": 33,
+        "embedding_requests": 9644,
+        "embedding_batch_requests": 9555,
+        "embedding_inputs": 610030,
+        "embedding_duration_ms_aggregate": 94871488,
+        "case_duration_ms_aggregate": 103074579,
+        "embedding_share_of_case_duration": 0.9204159640564722,
+        "recovered_retry_log_entries": 32,
+        "final_embedding_errors": 0,
+        "embedding_fatal_or_panic_count": 0
+      },
+      "prediction_wall_time_ms": 8237487
+    },
+    "A2": {
+      "run_id": "tag-rag-preload-ablation54-a2-20260720",
+      "arm": "preload",
+      "workspace_preload": true,
+      "predictions_path": "results/runs/tag-rag-preload-ablation54-a2-20260720/raw/tag/preds.json",
+      "predictions_sha256": "efabe9f5f573325c3824dff9f341d3e53106818069a43d49d42dea03d0797e8c",
+      "harness_report_path": "results/runs/tag-rag-preload-ablation54-a2-20260720/local-harness-report/tag/tag__glm52.tag-rag-preload-ablation54-a2-20260720-tag.json",
+      "harness_report_sha256": "e7c83067daa2ab0b8bd381288722dbf360070c52de74e03bd360eadc24f259ce",
+      "verifier_manifest_sha256": "16b1bb7ddb3bbe131b7b87bdb30cf034ee003f0165065f64d8e8284b18b62cdb",
+      "harness": {
+        "submitted_instances": 54,
+        "completed_instances": 54,
+        "resolved_instances": 38,
+        "resolved_rate": 0.7037037037037037,
+        "unresolved_instances": 16,
+        "empty_patch_instances": 0,
+        "error_instances": 0,
+        "duration_ms": 444854
+      },
+      "model_metrics": {
+        "total_tokens": 27949693,
+        "llm_calls": 1568,
+        "tool_calls": 1652,
+        "estimated_model_cost": 71.278856
+      },
+      "retrieval_metrics": {
+        "indexed_documents": 609941,
+        "preloaded_candidate_documents": 216,
+        "preloaded_candidate_characters": 259042,
+        "preload_injected_case_runs": 54,
+        "code_search_calls": 11,
+        "case_runs_with_code_search": 11,
+        "embedding_requests": 9620,
+        "embedding_batch_requests": 9555,
+        "embedding_inputs": 610006,
+        "embedding_duration_ms_aggregate": 97489957,
+        "case_duration_ms_aggregate": 107805543,
+        "embedding_share_of_case_duration": 0.9043130277633312,
+        "recovered_retry_log_entries": 7,
+        "final_embedding_errors": 0,
+        "embedding_fatal_or_panic_count": 0
+      },
+      "prediction_wall_time_ms": 8647086
+    }
+  },
+  "arm_pooled": {
+    "preload": {
+      "resolved_outcomes": 78,
+      "total_outcomes": 108,
+      "resolved_probability": 0.7222222222222222,
+      "total_tokens": 58649286,
+      "estimated_model_cost": 149.403076,
+      "llm_calls": 3231,
+      "tool_calls": 3386,
+      "tokens_per_resolved_outcome": 751913.9230769231,
+      "cost_per_resolved_outcome": 1.9154240512820513,
+      "code_search_calls": 22,
+      "case_runs_with_code_search": 21,
+      "embedding_inputs": 1220012,
+      "embedding_duration_ms_aggregate": 191466370,
+      "case_duration_ms_aggregate": 210897161,
+      "embedding_share_of_case_duration": 0.9078660380828929,
+      "recovered_retry_log_entries": 37,
+      "prediction_wall_time_ms": 16922852
+    },
+    "no_preload": {
+      "resolved_outcomes": 80,
+      "total_outcomes": 108,
+      "resolved_probability": 0.7407407407407407,
+      "total_tokens": 61641366,
+      "estimated_model_cost": 155.7579,
+      "llm_calls": 3439,
+      "tool_calls": 3610,
+      "tokens_per_resolved_outcome": 770517.075,
+      "cost_per_resolved_outcome": 1.9469737500000002,
+      "code_search_calls": 69,
+      "case_runs_with_code_search": 67,
+      "embedding_inputs": 1220059,
+      "embedding_duration_ms_aggregate": 192483460,
+      "case_duration_ms_aggregate": 207739819,
+      "embedding_share_of_case_duration": 0.9265602566063659,
+      "recovered_retry_log_entries": 63,
+      "prediction_wall_time_ms": 16592013
+    },
+    "no_preload_minus_preload": {
+      "resolved_outcomes": 2,
+      "resolved_probability_percentage_points": 1.8518518518518547,
+      "total_tokens": 2992080,
+      "total_tokens_percent": 5.1016477847658726,
+      "estimated_model_cost": 6.354824,
+      "estimated_model_cost_percent": 4.253476012769641,
+      "tokens_per_resolved_outcome_percent": 2.4741065901467074,
+      "cost_per_resolved_outcome_percent": 1.647139112450402,
+      "code_search_calls": 47,
+      "code_search_call_ratio": 3.1363636363636362,
+      "embedding_inputs": 47
+    }
+  },
+  "primary_estimands": {
+    "f11_regressed": {
+      "case_count": 19,
+      "preload_resolved_outcomes": 26,
+      "no_preload_resolved_outcomes": 26,
+      "outcomes_per_arm": 38,
+      "preload_resolved_probability": 0.6842105263157895,
+      "no_preload_resolved_probability": 0.6842105263157895,
+      "no_preload_minus_preload_probability": 0,
+      "no_preload_minus_preload_percentage_points": 0,
+      "no_preload_stably_resolved_cases": 12,
+      "strict_no_preload_causal_pattern_cases": [
+        "sympy__sympy-12489"
+      ],
+      "strict_preload_better_pattern_cases": [
+        "django__django-11239",
+        "scikit-learn__scikit-learn-12973"
+      ],
+      "directional_case_counts": {
+        "no_preload_better": 4,
+        "preload_better": 3,
+        "tie": 12
+      }
+    },
+    "f11_matched_hold": {
+      "case_count": 19,
+      "preload_resolved_outcomes": 35,
+      "no_preload_resolved_outcomes": 36,
+      "outcomes_per_arm": 38,
+      "preload_resolved_probability": 0.9210526315789473,
+      "no_preload_resolved_probability": 0.9473684210526315,
+      "no_preload_minus_preload_probability": 0.02631578947368418,
+      "no_preload_minus_preload_percentage_points": 2.631578947368418
+    },
+    "difference_in_differences": {
+      "definition": "(B-A on F11 regressions) - (B-A on matched F11 holds)",
+      "probability": -0.02631578947368418,
+      "percentage_points": -2.631578947368418
+    },
+    "f00_rescued": {
+      "case_count": 16,
+      "preload_resolved_outcomes": 17,
+      "no_preload_resolved_outcomes": 18,
+      "outcomes_per_arm": 32,
+      "preload_resolved_probability": 0.53125,
+      "no_preload_resolved_probability": 0.5625,
+      "no_preload_minus_preload_probability": 0.03125,
+      "no_preload_minus_preload_percentage_points": 3.125,
+      "preload_stably_resolved_cases": 5,
+      "no_preload_stably_resolved_cases": 6
+    }
+  },
+  "within_arm_repeatability": {
+    "preload": {
+      "both_resolved": 33,
+      "a1_only": 7,
+      "a2_only": 5,
+      "neither_resolved": 9,
+      "agreement_probability": 0.7777777777777778,
+      "resolved_set_jaccard": 0.7333333333333333
+    },
+    "no_preload": {
+      "both_resolved": 36,
+      "b1_only": 5,
+      "b2_only": 3,
+      "neither_resolved": 10,
+      "agreement_probability": 0.8518518518518519,
+      "resolved_set_jaccard": 0.8181818181818182
+    },
+    "f00_rescue_stability": {
+      "preload_both_resolved": 5,
+      "preload_resolved_set_jaccard": 0.4166666666666667,
+      "no_preload_both_resolved": 6,
+      "no_preload_resolved_set_jaccard": 0.5
+    }
+  },
+  "case_outcomes": {
+    "encoding": "true means resolved by the official local harness",
+    "f11_regressed": [
+      {
+        "instance_id": "django__django-10973",
+        "A1": false,
+        "A2": false,
+        "B1": false,
+        "B2": false,
+        "b_minus_a_successes": 0
+      },
+      {
+        "instance_id": "django__django-11239",
+        "A1": true,
+        "A2": true,
+        "B1": false,
+        "B2": false,
+        "b_minus_a_successes": -2
+      },
+      {
+        "instance_id": "django__django-13346",
+        "A1": true,
+        "A2": false,
+        "B1": false,
+        "B2": true,
+        "b_minus_a_successes": 0
+      },
+      {
+        "instance_id": "django__django-13810",
+        "A1": true,
+        "A2": true,
+        "B1": true,
+        "B2": true,
+        "b_minus_a_successes": 0
+      },
+      {
+        "instance_id": "django__django-14311",
+        "A1": true,
+        "A2": false,
+        "B1": true,
+        "B2": true,
+        "b_minus_a_successes": 1
+      },
+      {
+        "instance_id": "django__django-14559",
+        "A1": true,
+        "A2": true,
+        "B1": true,
+        "B2": true,
+        "b_minus_a_successes": 0
+      },
+      {
+        "instance_id": "django__django-15268",
+        "A1": true,
+        "A2": true,
+        "B1": true,
+        "B2": true,
+        "b_minus_a_successes": 0
+      },
+      {
+        "instance_id": "django__django-15987",
+        "A1": false,
+        "A2": false,
+        "B1": false,
+        "B2": false,
+        "b_minus_a_successes": 0
+      },
+      {
+        "instance_id": "django__django-16938",
+        "A1": false,
+        "A2": true,
+        "B1": true,
+        "B2": true,
+        "b_minus_a_successes": 1
+      },
+      {
+        "instance_id": "matplotlib__matplotlib-25287",
+        "A1": true,
+        "A2": true,
+        "B1": true,
+        "B2": true,
+        "b_minus_a_successes": 0
+      },
+      {
+        "instance_id": "psf__requests-6028",
+        "A1": true,
+        "A2": true,
+        "B1": true,
+        "B2": true,
+        "b_minus_a_successes": 0
+      },
+      {
+        "instance_id": "pydata__xarray-4687",
+        "A1": true,
+        "A2": false,
+        "B1": false,
+        "B2": false,
+        "b_minus_a_successes": -1
+      },
+      {
+        "instance_id": "pydata__xarray-7229",
+        "A1": false,
+        "A2": false,
+        "B1": true,
+        "B2": false,
+        "b_minus_a_successes": 1
+      },
+      {
+        "instance_id": "scikit-learn__scikit-learn-12973",
+        "A1": true,
+        "A2": true,
+        "B1": false,
+        "B2": false,
+        "b_minus_a_successes": -2
+      },
+      {
+        "instance_id": "sphinx-doc__sphinx-10673",
+        "A1": true,
+        "A2": true,
+        "B1": true,
+        "B2": true,
+        "b_minus_a_successes": 0
+      },
+      {
+        "instance_id": "sphinx-doc__sphinx-9258",
+        "A1": true,
+        "A2": true,
+        "B1": true,
+        "B2": true,
+        "b_minus_a_successes": 0
+      },
+      {
+        "instance_id": "sympy__sympy-12489",
+        "A1": false,
+        "A2": false,
+        "B1": true,
+        "B2": true,
+        "b_minus_a_successes": 2
+      },
+      {
+        "instance_id": "sympy__sympy-13877",
+        "A1": true,
+        "A2": true,
+        "B1": true,
+        "B2": true,
+        "b_minus_a_successes": 0
+      },
+      {
+        "instance_id": "sympy__sympy-15809",
+        "A1": true,
+        "A2": true,
+        "B1": true,
+        "B2": true,
+        "b_minus_a_successes": 0
+      }
+    ],
+    "f11_matched_hold": [
+      {
+        "instance_id": "django__django-12050",
+        "A1": true,
+        "A2": true,
+        "B1": true,
+        "B2": true
+      },
+      {
+        "instance_id": "django__django-13023",
+        "A1": true,
+        "A2": true,
+        "B1": true,
+        "B2": true
+      },
+      {
+        "instance_id": "django__django-13343",
+        "A1": true,
+        "A2": true,
+        "B1": true,
+        "B2": true
+      },
+      {
+        "instance_id": "django__django-13925",
+        "A1": true,
+        "A2": true,
+        "B1": true,
+        "B2": true
+      },
+      {
+        "instance_id": "django__django-14349",
+        "A1": true,
+        "A2": true,
+        "B1": true,
+        "B2": true
+      },
+      {
+        "instance_id": "django__django-14434",
+        "A1": true,
+        "A2": true,
+        "B1": true,
+        "B2": true
+      },
+      {
+        "instance_id": "django__django-15930",
+        "A1": true,
+        "A2": true,
+        "B1": true,
+        "B2": true
+      },
+      {
+        "instance_id": "django__django-17084",
+        "A1": true,
+        "A2": true,
+        "B1": true,
+        "B2": true
+      },
+      {
+        "instance_id": "django__django-17087",
+        "A1": true,
+        "A2": true,
+        "B1": true,
+        "B2": true
+      },
+      {
+        "instance_id": "matplotlib__matplotlib-23412",
+        "A1": true,
+        "A2": true,
+        "B1": true,
+        "B2": true
+      },
+      {
+        "instance_id": "psf__requests-1921",
+        "A1": true,
+        "A2": true,
+        "B1": true,
+        "B2": true
+      },
+      {
+        "instance_id": "pydata__xarray-6599",
+        "A1": true,
+        "A2": true,
+        "B1": false,
+        "B2": false
+      },
+      {
+        "instance_id": "pydata__xarray-7393",
+        "A1": true,
+        "A2": true,
+        "B1": true,
+        "B2": true
+      },
+      {
+        "instance_id": "scikit-learn__scikit-learn-10297",
+        "A1": true,
+        "A2": true,
+        "B1": true,
+        "B2": true
+      },
+      {
+        "instance_id": "sphinx-doc__sphinx-8056",
+        "A1": false,
+        "A2": true,
+        "B1": true,
+        "B2": true
+      },
+      {
+        "instance_id": "sphinx-doc__sphinx-8593",
+        "A1": true,
+        "A2": true,
+        "B1": true,
+        "B2": true
+      },
+      {
+        "instance_id": "sympy__sympy-19346",
+        "A1": false,
+        "A2": false,
+        "B1": true,
+        "B2": true
+      },
+      {
+        "instance_id": "sympy__sympy-21379",
+        "A1": true,
+        "A2": true,
+        "B1": true,
+        "B2": true
+      },
+      {
+        "instance_id": "sympy__sympy-23262",
+        "A1": true,
+        "A2": true,
+        "B1": true,
+        "B2": true
+      }
+    ],
+    "f00_rescued": [
+      {
+        "instance_id": "astropy__astropy-13236",
+        "A1": false,
+        "A2": true,
+        "B1": true,
+        "B2": false
+      },
+      {
+        "instance_id": "django__django-11885",
+        "A1": false,
+        "A2": true,
+        "B1": true,
+        "B2": true
+      },
+      {
+        "instance_id": "django__django-13344",
+        "A1": true,
+        "A2": false,
+        "B1": false,
+        "B2": true
+      },
+      {
+        "instance_id": "django__django-13820",
+        "A1": true,
+        "A2": true,
+        "B1": true,
+        "B2": true
+      },
+      {
+        "instance_id": "django__django-14792",
+        "A1": true,
+        "A2": false,
+        "B1": true,
+        "B2": true
+      },
+      {
+        "instance_id": "django__django-15732",
+        "A1": false,
+        "A2": false,
+        "B1": false,
+        "B2": false
+      },
+      {
+        "instance_id": "django__django-15957",
+        "A1": true,
+        "A2": true,
+        "B1": true,
+        "B2": true
+      },
+      {
+        "instance_id": "django__django-16454",
+        "A1": true,
+        "A2": false,
+        "B1": true,
+        "B2": false
+      },
+      {
+        "instance_id": "matplotlib__matplotlib-20676",
+        "A1": false,
+        "A2": true,
+        "B1": true,
+        "B2": true
+      },
+      {
+        "instance_id": "matplotlib__matplotlib-23299",
+        "A1": true,
+        "A2": true,
+        "B1": false,
+        "B2": false
+      },
+      {
+        "instance_id": "pylint-dev__pylint-4551",
+        "A1": true,
+        "A2": true,
+        "B1": false,
+        "B2": false
+      },
+      {
+        "instance_id": "pytest-dev__pytest-7324",
+        "A1": false,
+        "A2": false,
+        "B1": true,
+        "B2": true
+      },
+      {
+        "instance_id": "sphinx-doc__sphinx-11510",
+        "A1": false,
+        "A2": false,
+        "B1": false,
+        "B2": false
+      },
+      {
+        "instance_id": "sympy__sympy-13091",
+        "A1": true,
+        "A2": false,
+        "B1": false,
+        "B2": true
+      },
+      {
+        "instance_id": "sympy__sympy-15017",
+        "A1": true,
+        "A2": true,
+        "B1": true,
+        "B2": false
+      },
+      {
+        "instance_id": "sympy__sympy-17318",
+        "A1": false,
+        "A2": false,
+        "B1": true,
+        "B2": false
+      }
+    ]
+  },
+  "conclusion": {
+    "initial_preload_causally_explains_the_19_observed_regressions": false,
+    "large_no_preload_quality_gain_established": false,
+    "disable_preload_recommended_as_default": false,
+    "regression_to_mean_and_agent_stochasticity_are_material": true,
+    "no_preload_reduces_indexing_or_embedding_work": false,
+    "no_preload_is_more_model_efficient": false,
+    "summary": "The target F11-regression estimand is exactly zero and the matched-control-adjusted difference-in-differences is negative. One target case shows the strict hypothesized pattern, while two show the strict reverse pattern. No-preload triggers 3.14x as many follow-up code_search calls and increases tokens, model cost, and cost per resolved outcome.",
+    "next_quality_priority": "Test relevance-gated or selectively injected initial context rather than globally removing preload.",
+    "next_performance_priority": "Persist content-hash embeddings because both arms still spend almost all retrieval time rebuilding the same index."
+  },
+  "limitations": [
+    "The 19 target regressions were selected after observing the full-500 RAG result, so their high apparent recovery rate in both arms is subject to regression to the mean.",
+    "Two repetitions per arm can expose large effects and instability but do not provide high statistical power.",
+    "Generation order balances first-order drift but does not eliminate model-service, endpoint, or time-period confounding.",
+    "Several matched controls are weak within-repository matches, as documented in the predeclared plan.",
+    "The ablation withholds prompt injection only; it does not test disabling indexing, candidate retrieval, or code_search."
+  ]
+}
