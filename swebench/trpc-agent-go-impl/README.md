@@ -83,6 +83,7 @@ go run ./trpc-agent-go-impl/cmd/retrieval-replay \
   --labels /data/private/swebench-verified-gold.jsonl \
   --environment-config config/environments/swebench-testbed.yaml \
   --embedding-config config/embeddings/workspace-rag.local.yaml \
+  --source-revision "$(git rev-parse HEAD)" \
   --framework-revision "$(git -C /data/validation/trpc-agent-go rev-parse HEAD)" \
   --representations current-fixed,fixed-raw,ast-code,ast-structured \
   --max-results 6 \

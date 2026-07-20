@@ -61,6 +61,7 @@ func Run(args []string) error {
 	commandTimeout := fs.Duration("command-timeout", time.Minute, "timeout for Docker commands")
 	caseTimeout := fs.Duration("case-timeout", 2*time.Hour, "timeout for one replay case")
 	dockerHost := fs.String("docker-host", "", "optional Docker daemon endpoint")
+	sourceRevision := fs.String("source-revision", "", "benchmark commit used for this binary")
 	frameworkRevision := fs.String("framework-revision", "", "framework commit used for this binary")
 	if err := fs.Parse(args[1:]); err != nil {
 		return err
@@ -73,6 +74,9 @@ func Run(args []string) error {
 	}
 	if strings.TrimSpace(*frameworkRevision) == "" {
 		return fmt.Errorf("-framework-revision is required")
+	}
+	if strings.TrimSpace(*sourceRevision) == "" {
+		return fmt.Errorf("-source-revision is required")
 	}
 	if *maxResults < 6 {
 		return fmt.Errorf("-max-results must be at least 6 for Recall@6")
@@ -187,7 +191,7 @@ func Run(args []string) error {
 		SchemaVersion:     reportSchemaVersion,
 		RunID:             strings.TrimSpace(*runID),
 		Status:            "running",
-		SourceRevision:    build.SourceRevision,
+		SourceRevision:    strings.TrimSpace(*sourceRevision),
 		SourceModified:    build.SourceModified,
 		BinarySHA256:      build.BinarySHA256,
 		FrameworkRevision: strings.TrimSpace(*frameworkRevision),
