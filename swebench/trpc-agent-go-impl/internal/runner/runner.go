@@ -28,8 +28,10 @@ import (
 	"trpc.group/trpc-go/trpc-agent-go-benchmark/swebench/internal/minicompat"
 	"trpc.group/trpc-go/trpc-agent-go-benchmark/swebench/internal/modelconfig"
 	"trpc.group/trpc-go/trpc-agent-go-benchmark/swebench/internal/sweenv"
+	"trpc.group/trpc-go/trpc-agent-go-benchmark/swebench/trpc-agent-go-impl/internal/embeddingcache"
 	"trpc.group/trpc-go/trpc-agent-go-benchmark/swebench/trpc-agent-go-impl/internal/embeddingconfig"
 	"trpc.group/trpc-go/trpc-agent-go-benchmark/swebench/trpc-agent-go-impl/internal/executor"
+	"trpc.group/trpc-go/trpc-agent-go-benchmark/swebench/trpc-agent-go-impl/internal/tagagent"
 	"trpc.group/trpc-go/trpc-agent-go/model"
 	"trpc.group/trpc-go/trpc-agent-go/model/pricing"
 )
@@ -37,51 +39,56 @@ import (
 const frameworkVersion = "v1.10.1-0.20260616104537-c6c3bb29ab60"
 
 type manifest struct {
-	RunID                 string                  `json:"run_id"`
-	RunnerType            string                  `json:"runner_type"`
-	FrameworkVersion      string                  `json:"framework_version"`
-	AgentProtocol         string                  `json:"agent_protocol"`
-	UpstreamCommit        string                  `json:"upstream_commit"`
-	ObservationCodec      string                  `json:"observation_codec"`
-	BillingAgentName      string                  `json:"billing_agent_name,omitempty"`
-	BillingTag            string                  `json:"billing_tag,omitempty"`
-	ExperimentID          string                  `json:"experiment_id,omitempty"`
-	SourceRevision        string                  `json:"source_revision,omitempty"`
-	SourceModified        bool                    `json:"source_modified"`
-	BinarySHA256          string                  `json:"binary_sha256,omitempty"`
-	CasesSHA256           string                  `json:"cases_sha256"`
-	ModelConfigSHA256     string                  `json:"model_config_sha256"`
-	EmbeddingConfigSHA256 string                  `json:"embedding_config_sha256,omitempty"`
-	StartedAt             time.Time               `json:"started_at"`
-	FinishedAt            time.Time               `json:"finished_at"`
-	DurationMS            int64                   `json:"duration_ms"`
-	Cases                 string                  `json:"cases"`
-	OutputDir             string                  `json:"output_dir"`
-	Filter                string                  `json:"filter,omitempty"`
-	CaseCount             int                     `json:"case_count"`
-	AttemptedCount        int                     `json:"attempted_count"`
-	SkippedExisting       int                     `json:"skipped_existing"`
-	PredictionCount       int                     `json:"prediction_count"`
-	Workers               int                     `json:"workers"`
-	RedoExisting          bool                    `json:"redo_existing"`
-	Predictions           string                  `json:"predictions"`
-	Progress              string                  `json:"progress"`
-	ModelConfig           map[string]string       `json:"model_config,omitempty"`
-	EmbeddingConfig       map[string]any          `json:"embedding_config,omitempty"`
-	Environment           string                  `json:"environment_config"`
-	CommandTimeout        string                  `json:"command_timeout"`
-	CaseTimeout           string                  `json:"case_timeout"`
-	CodeSearch            bool                    `json:"code_search"`
-	WorkspacePreload      bool                    `json:"workspace_preload"`
-	Embedding             embeddingconfig.Metrics `json:"embedding"`
-	ExitStatusCounts      map[string]int          `json:"exit_status_counts"`
-	LLMCalls              int                     `json:"llm_calls"`
-	ToolCalls             int                     `json:"tool_calls"`
-	Usage                 usageSummary            `json:"usage"`
-	Pricing               *pricing.RateCard       `json:"pricing,omitempty"`
-	CostEstimate          *pricing.Estimate       `json:"cost_estimate,omitempty"`
-	Status                string                  `json:"status"`
-	Notes                 []string                `json:"notes,omitempty"`
+	RunID                         string                  `json:"run_id"`
+	RunnerType                    string                  `json:"runner_type"`
+	FrameworkVersion              string                  `json:"framework_version"`
+	AgentProtocol                 string                  `json:"agent_protocol"`
+	UpstreamCommit                string                  `json:"upstream_commit"`
+	ObservationCodec              string                  `json:"observation_codec"`
+	BillingAgentName              string                  `json:"billing_agent_name,omitempty"`
+	BillingTag                    string                  `json:"billing_tag,omitempty"`
+	ExperimentID                  string                  `json:"experiment_id,omitempty"`
+	SourceRevision                string                  `json:"source_revision,omitempty"`
+	SourceModified                bool                    `json:"source_modified"`
+	BinarySHA256                  string                  `json:"binary_sha256,omitempty"`
+	CasesSHA256                   string                  `json:"cases_sha256"`
+	ModelConfigSHA256             string                  `json:"model_config_sha256"`
+	EmbeddingConfigSHA256         string                  `json:"embedding_config_sha256,omitempty"`
+	StartedAt                     time.Time               `json:"started_at"`
+	FinishedAt                    time.Time               `json:"finished_at"`
+	DurationMS                    int64                   `json:"duration_ms"`
+	Cases                         string                  `json:"cases"`
+	OutputDir                     string                  `json:"output_dir"`
+	Filter                        string                  `json:"filter,omitempty"`
+	CaseCount                     int                     `json:"case_count"`
+	AttemptedCount                int                     `json:"attempted_count"`
+	SkippedExisting               int                     `json:"skipped_existing"`
+	PredictionCount               int                     `json:"prediction_count"`
+	Workers                       int                     `json:"workers"`
+	RedoExisting                  bool                    `json:"redo_existing"`
+	Predictions                   string                  `json:"predictions"`
+	Progress                      string                  `json:"progress"`
+	ModelConfig                   map[string]string       `json:"model_config,omitempty"`
+	EmbeddingConfig               map[string]any          `json:"embedding_config,omitempty"`
+	EmbeddingCacheDB              string                  `json:"embedding_cache_db,omitempty"`
+	Environment                   string                  `json:"environment_config"`
+	CommandTimeout                string                  `json:"command_timeout"`
+	CaseTimeout                   string                  `json:"case_timeout"`
+	CodeSearch                    bool                    `json:"code_search"`
+	WorkspacePreload              bool                    `json:"workspace_preload"`
+	WorkspaceRepresentation       string                  `json:"workspace_representation"`
+	WorkspaceRepresentationSchema string                  `json:"workspace_representation_schema"`
+	WorkspaceRepresentationSHA256 string                  `json:"workspace_representation_sha256"`
+	Embedding                     embeddingconfig.Metrics `json:"embedding"`
+	EmbeddingCache                *embeddingcache.Metrics `json:"embedding_cache,omitempty"`
+	ExitStatusCounts              map[string]int          `json:"exit_status_counts"`
+	LLMCalls                      int                     `json:"llm_calls"`
+	ToolCalls                     int                     `json:"tool_calls"`
+	Usage                         usageSummary            `json:"usage"`
+	Pricing                       *pricing.RateCard       `json:"pricing,omitempty"`
+	CostEstimate                  *pricing.Estimate       `json:"cost_estimate,omitempty"`
+	Status                        string                  `json:"status"`
+	Notes                         []string                `json:"notes,omitempty"`
 }
 
 type usageSummary struct {
@@ -127,6 +134,11 @@ func Run(args []string) error {
 	experimentID := fs.String("experiment-id", "", "experiment identifier recorded with billing-tag")
 	codeSearch := fs.Bool("code-search", false, "enable local workspace code retrieval")
 	workspacePreload := fs.Bool("workspace-preload", true, "inject retrieved workspace context into the initial prompt")
+	workspaceRepresentationValue := fs.String(
+		"workspace-representation",
+		string(tagagent.WorkspaceRepresentationCurrentFixed),
+		"workspace representation: current-fixed, fixed-raw, ast-code, or ast-structured",
+	)
 	if err := fs.Parse(args[1:]); err != nil {
 		return err
 	}
@@ -144,6 +156,13 @@ func Run(args []string) error {
 	}
 	if !*workspacePreload && !*codeSearch {
 		return fmt.Errorf("-workspace-preload=false requires -code-search")
+	}
+	workspaceRepresentation, err := tagagent.ParseWorkspaceRepresentation(*workspaceRepresentationValue)
+	if err != nil {
+		return err
+	}
+	if !*codeSearch && workspaceRepresentation != tagagent.WorkspaceRepresentationCurrentFixed {
+		return fmt.Errorf("-workspace-representation=%s requires -code-search", workspaceRepresentation)
 	}
 	codec, err := minicompat.ParseObservationCodec(*codecValue)
 	if err != nil {
@@ -215,6 +234,18 @@ func Run(args []string) error {
 	if err != nil {
 		return err
 	}
+	var embeddingCache *embeddingcache.Store
+	if embeddingCfg != nil && embeddingCfg.Cache.Enabled {
+		embeddingCache, err = embeddingcache.Open(
+			context.Background(),
+			embeddingCfg.Cache.Directory,
+			embeddingCfg.CacheIdentity(),
+		)
+		if err != nil {
+			return fmt.Errorf("open embedding cache: %w", err)
+		}
+		defer func() { _ = embeddingCache.Close() }()
+	}
 	factory := sweenv.DockerFactory{
 		Config: envCfg, DockerHost: *dockerHost, CommandTimeout: *commandTimeout, CaseTimeout: *caseTimeout,
 		Labels: map[string]string{"tag-swebench.run_id": *runID},
@@ -222,6 +253,7 @@ func Run(args []string) error {
 	exec := executor.Executor{
 		Factory: factory, ModelConfig: modelCfg, ObservationCodec: codec, CaseTimeout: *caseTimeout,
 		EnableCodeSearch: *codeSearch, DisableWorkspacePreload: !*workspacePreload, EmbeddingConfig: embeddingCfg,
+		EmbeddingCache: embeddingCache, WorkspaceRepresentation: workspaceRepresentation,
 	}
 	if err := exec.Validate(); err != nil {
 		return err
@@ -321,6 +353,7 @@ func Run(args []string) error {
 	var llmCalls, toolCalls int
 	var usage usageSummary
 	var embeddingUsage embeddingconfig.Metrics
+	var embeddingCacheUsage embeddingcache.Metrics
 	status := "completed"
 	for _, result := range results {
 		exitCounts[result.Info.ExitStatus]++
@@ -339,6 +372,9 @@ func Run(args []string) error {
 			embeddingUsage.PromptTokens += result.Embedding.PromptTokens
 			embeddingUsage.TotalTokens += result.Embedding.TotalTokens
 			embeddingUsage.DurationMS += result.Embedding.DurationMS
+		}
+		if result.EmbeddingCache != nil {
+			embeddingCacheUsage.Add(*result.EmbeddingCache)
 		}
 		if result.Info.ExitStatus == "Error" || result.Info.ExitStatus == "ArtifactError" {
 			status = "completed_with_errors"
@@ -367,8 +403,11 @@ func Run(args []string) error {
 		ModelConfig: modelconfig.RedactSecrets(modelCfg), Environment: artifact.AbsPath(*environmentConfigPath),
 		CommandTimeout: commandTimeout.String(), CaseTimeout: caseTimeout.String(),
 		CodeSearch: *codeSearch, WorkspacePreload: *codeSearch && *workspacePreload,
-		Embedding:        embeddingUsage,
-		ExitStatusCounts: exitCounts, LLMCalls: llmCalls, ToolCalls: toolCalls, Usage: usage,
+		WorkspaceRepresentation:       string(workspaceRepresentation),
+		WorkspaceRepresentationSchema: tagagent.WorkspaceRepresentationSchema(workspaceRepresentation),
+		WorkspaceRepresentationSHA256: tagagent.WorkspaceRepresentationSHA256(workspaceRepresentation),
+		Embedding:                     embeddingUsage,
+		ExitStatusCounts:              exitCounts, LLMCalls: llmCalls, ToolCalls: toolCalls, Usage: usage,
 		Pricing: rateCard, CostEstimate: costEstimate,
 		Status: status,
 		Notes: []string{
@@ -378,6 +417,10 @@ func Run(args []string) error {
 	}
 	if embeddingCfg != nil {
 		doc.EmbeddingConfig = embeddingCfg.Redacted()
+	}
+	if embeddingCache != nil {
+		doc.EmbeddingCacheDB = artifact.AbsPath(embeddingCache.Path())
+		doc.EmbeddingCache = &embeddingCacheUsage
 	}
 	manifestPath := filepath.Join(*output, "tag-runner-manifest.json")
 	if err := artifact.WriteJSON(manifestPath, doc); err != nil {

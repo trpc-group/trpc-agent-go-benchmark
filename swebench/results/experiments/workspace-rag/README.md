@@ -66,7 +66,8 @@ Go workspace containing the benchmark and framework root, then run from
 ```bash
 cd /data/validation
 go work init ./trpc-agent-go-benchmark/swebench \
-  ./trpc-agent-go
+  ./trpc-agent-go \
+  ./trpc-agent-go/knowledge/document/reader/python
 export GOWORK=/data/validation/go.work
 cd /data/validation/trpc-agent-go-benchmark/swebench
 ```
@@ -821,3 +822,36 @@ shared by both arms.
 The complete provenance, per-run metrics, primary estimands, and all 54
 case-level outcomes are in
 [`v3-bge-m3-preload-ablation-54-result.json`](./v3-bge-m3-preload-ablation-54-result.json).
+
+## Planned AST representation gate
+
+AST value will be tested as a representation change, independently of initial
+preload. The offline replay matrix uses the same workspace bytes and problem
+statement for all four arms:
+
+| Arm | Boundary | Embedded text | Primary contrast |
+|---|---|---|---|
+| `current-fixed` | fixed 1024/128 | line-trimmed text | historical reference |
+| `fixed-raw` | fixed 1024/128 | indentation-preserving text | whitespace effect |
+| `ast-code` | Python AST node | node code | AST-boundary effect versus `fixed-raw` |
+| `ast-structured` | Python AST node | stable AST fields plus node code | structure-text effect versus `ast-code` |
+
+The first replay uses the existing 54-case RAG-sensitive panel as a diagnostic
+set. It records exact case-list and external-label hashes, full eligible/indexed
+file coverage, stable document-set hashes, AST fallbacks, duplicate rate,
+Recall@4/@6, reciprocal rank, hunk-anchor Recall@4/@6, and target-file character
+precision. Gold patches stay external; the report does not contain gold patch
+text or target paths.
+
+This panel is outcome-selected and cannot estimate population resolve rate.
+Problem-statement replay also cannot measure later model-written search queries.
+The gate therefore only chooses whether and which AST arm deserves an Agent
+experiment. A winning AST arm must show a material paired localization gain
+without a coverage regression or unexplained fallback concentration. It then
+runs against `fixed-raw` in a repeated, order-balanced Agent A/B using the
+official local harness. Expansion to 136 or 500 cases requires a resolve-rate
+signal from that smaller Agent experiment; lower indexing cost alone is not a
+quality result.
+
+The machine-readable design and fixed data fingerprints are in
+[`v4-bge-m3-ast-retrieval-plan.json`](./v4-bge-m3-ast-retrieval-plan.json).

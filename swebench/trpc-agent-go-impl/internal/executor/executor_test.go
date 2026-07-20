@@ -13,6 +13,7 @@ import (
 	"context"
 	"encoding/json"
 	"reflect"
+	"strings"
 	"sync"
 	"testing"
 
@@ -20,6 +21,8 @@ import (
 	"trpc.group/trpc-go/trpc-agent-go-benchmark/swebench/internal/minicompat"
 	"trpc.group/trpc-go/trpc-agent-go-benchmark/swebench/internal/modelconfig"
 	"trpc.group/trpc-go/trpc-agent-go-benchmark/swebench/internal/sweenv"
+	"trpc.group/trpc-go/trpc-agent-go-benchmark/swebench/trpc-agent-go-impl/internal/embeddingconfig"
+	"trpc.group/trpc-go/trpc-agent-go-benchmark/swebench/trpc-agent-go-impl/internal/tagagent"
 	"trpc.group/trpc-go/trpc-agent-go/model"
 )
 
@@ -237,5 +240,48 @@ func TestWorkspacePreloadOptOutKeepsPromptUnchanged(t *testing.T) {
 	}
 	if got := workspaceContextForPrompt(preloaded, true); got != "" {
 		t.Fatalf("disabled workspace context = %q, want empty", got)
+	}
+}
+
+func TestValidateRequiresStoreForEnabledEmbeddingCache(t *testing.T) {
+	cfg := &embeddingconfig.Config{}
+	cfg.Embedding.Provider = "openai"
+	cfg.Embedding.APIBase = "http://embedding.example/v1"
+	cfg.Embedding.APIKey = "secret"
+	cfg.Embedding.Model = "bge-m3"
+	cfg.Embedding.Dimensions = 3
+	cfg.Embedding.BatchSize = 64
+	cfg.Embedding.Concurrency = 1
+	cfg.Retrieval.Mode = "hybrid"
+	cfg.Retrieval.MaxResults = 4
+	cfg.Retrieval.MaxChars = 6000
+	cfg.Cache.Enabled = true
+	cfg.Cache.Directory = t.TempDir()
+	cfg.Cache.ModelFingerprint = "weights-v1"
+
+	exec := newTestExecutor(
+		&scriptedModel{},
+		&fakeEnvironment{},
+		minicompat.ObservationCodecXML,
+	)
+	exec.EnableCodeSearch = true
+	exec.EmbeddingConfig = cfg
+	if err := exec.Validate(); err == nil ||
+		!strings.Contains(err.Error(), "no cache store") {
+		t.Fatalf("Validate() error = %v, want missing cache store", err)
+	}
+}
+
+func TestValidateRequiresCodeSearchForNonDefaultRepresentation(t *testing.T) {
+	exec := newTestExecutor(
+		&scriptedModel{},
+		&fakeEnvironment{},
+		minicompat.ObservationCodecXML,
+	)
+	exec.WorkspaceRepresentation = tagagent.WorkspaceRepresentationASTCode
+
+	if err := exec.Validate(); err == nil ||
+		!strings.Contains(err.Error(), "requires code search") {
+		t.Fatalf("Validate() error = %v, want code-search requirement", err)
 	}
 }

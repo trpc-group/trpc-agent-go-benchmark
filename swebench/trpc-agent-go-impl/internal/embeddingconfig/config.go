@@ -19,6 +19,7 @@ import (
 
 	"github.com/openai/openai-go/option"
 	"gopkg.in/yaml.v3"
+	"trpc.group/trpc-go/trpc-agent-go-benchmark/swebench/trpc-agent-go-impl/internal/embeddingcache"
 	openaiembedder "trpc.group/trpc-go/trpc-agent-go/knowledge/embedder/openai"
 	"trpc.group/trpc-go/trpc-agent-go/knowledge/vectorstore"
 )
@@ -50,6 +51,11 @@ type Config struct {
 		MaxResults int    `yaml:"max_results"`
 		MaxChars   int    `yaml:"max_chars"`
 	} `yaml:"retrieval"`
+	Cache struct {
+		Enabled          bool   `yaml:"enabled"`
+		Directory        string `yaml:"directory"`
+		ModelFingerprint string `yaml:"model_fingerprint"`
+	} `yaml:"cache"`
 	Pricing struct {
 		Currency   string  `yaml:"currency"`
 		UnitTokens int64   `yaml:"unit_tokens"`
@@ -124,10 +130,31 @@ func (c *Config) Validate() error {
 	if c.Embedding.Concurrency <= 0 {
 		return fmt.Errorf("embedding.concurrency must be positive")
 	}
+	if c.Cache.Enabled {
+		if strings.TrimSpace(c.Cache.Directory) == "" {
+			return fmt.Errorf("cache.directory is required when cache is enabled")
+		}
+		if strings.TrimSpace(c.Cache.ModelFingerprint) == "" {
+			return fmt.Errorf("cache.model_fingerprint is required when cache is enabled")
+		}
+	}
 	if _, err := c.SearchMode(); err != nil {
 		return err
 	}
 	return nil
+}
+
+// CacheIdentity returns the model identity used to isolate persistent entries.
+func (c *Config) CacheIdentity() embeddingcache.Identity {
+	if c == nil {
+		return embeddingcache.Identity{}
+	}
+	return embeddingcache.Identity{
+		Provider:         c.Embedding.Provider,
+		Model:            c.Embedding.Model,
+		ModelFingerprint: c.Cache.ModelFingerprint,
+		Dimensions:       c.Embedding.Dimensions,
+	}
 }
 
 // NewEmbedder constructs a configured OpenAI-compatible embedder.
@@ -182,5 +209,11 @@ func (c *Config) Redacted() map[string]any {
 		"retrieval_mode": c.Retrieval.Mode,
 		"max_results":    c.Retrieval.MaxResults,
 		"max_chars":      c.Retrieval.MaxChars,
+		"cache": map[string]any{
+			"enabled":           c.Cache.Enabled,
+			"directory":         c.Cache.Directory,
+			"model_fingerprint": c.Cache.ModelFingerprint,
+			"access":            "readwrite",
+		},
 	}
 }

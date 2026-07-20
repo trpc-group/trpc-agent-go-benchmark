@@ -92,3 +92,27 @@ func TestWorkspacePreloadOptOutRequiresCodeSearch(t *testing.T) {
 		t.Fatalf("error = %v, want code-search requirement", err)
 	}
 }
+
+func TestASTWorkspaceRepresentationRequiresCodeSearch(t *testing.T) {
+	err := Run([]string{
+		"trpc-agent-go-impl",
+		"-run-id=test",
+		"-model-config=unused",
+		"-workspace-representation=ast-code",
+	})
+	if err == nil || !strings.Contains(err.Error(), "requires -code-search") {
+		t.Fatalf("error = %v, want code-search requirement", err)
+	}
+}
+
+func TestWorkspaceRepresentationRejectsUnknownValue(t *testing.T) {
+	err := Run([]string{
+		"trpc-agent-go-impl",
+		"-run-id=test",
+		"-model-config=unused",
+		"-workspace-representation=unknown",
+	})
+	if err == nil || !strings.Contains(err.Error(), "unsupported workspace representation") {
+		t.Fatalf("error = %v, want unsupported representation", err)
+	}
+}

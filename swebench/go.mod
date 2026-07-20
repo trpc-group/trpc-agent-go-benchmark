@@ -3,6 +3,7 @@ module trpc.group/trpc-go/trpc-agent-go-benchmark/swebench
 go 1.21
 
 require (
+	github.com/mattn/go-sqlite3 v1.14.32
 	github.com/openai/openai-go v1.12.0
 	gopkg.in/yaml.v3 v3.0.1
 	trpc.group/trpc-go/trpc-agent-go v1.10.1-0.20260616104537-c6c3bb29ab60

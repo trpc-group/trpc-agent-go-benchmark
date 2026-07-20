@@ -3,9 +3,8 @@ embedding:
   api_base: "https://<embedding-gateway>/v1"
   api_key: "sk-***"
   model: "<embedding-model>"
-  # Set the model's actual output dimension. Use 0 only when the endpoint
-  # requires dimensions to be omitted.
-  dimensions: 0
+  # Set the model's actual output dimension.
+  dimensions: 1024
   timeout: 120
   max_retries: 2
   batch_size: 64
@@ -19,6 +18,14 @@ retrieval:
   mode: hybrid
   max_results: 4
   max_chars: 6000
+
+# Optional persistent exact-input cache. When enabled, access is always
+# read-through/write-through. Change model_fingerprint whenever weights,
+# tokenizer, pooling, normalization, or serving preprocessing changes.
+cache:
+  enabled: false
+  directory: "/data/validation/cache/embeddings"
+  model_fingerprint: "<immutable-model-and-preprocessing-revision>"
 
 # Optional embedding cost estimate. The input rate is per unit_tokens.
 pricing:

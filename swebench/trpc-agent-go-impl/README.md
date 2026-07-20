@@ -41,6 +41,79 @@ Use `--workspace-preload=false` to keep the same index and `code_search` tool
 while withholding retrieved context from the initial prompt for a controlled
 ablation.
 
+`--workspace-representation` selects the Python indexing representation:
+
+- `current-fixed` (default): historical 1024-character text chunks with
+  128-character overlap and per-line whitespace trimming;
+- `fixed-raw`: the same chunk boundaries while preserving indentation;
+- `ast-code`: Python AST node boundaries, embedding node code;
+- `ast-structured`: Python AST node boundaries, embedding stable structural
+  fields plus node code.
+
+Both AST variants include test files, use repository-stable module/file paths,
+and emit a whole-file fallback document for parse failures or files with no AST
+nodes. Per-case `workspace_index` telemetry records eligible/indexed file
+coverage, fallback reasons, node types, duplicate rate, and stable file/document
+set hashes. The run manifest records the representation schema and its SHA-256.
+
+When `cache.enabled` is set in the embedding config, the runner shares one
+SQLite embedding cache across all case workers and later runs. Cache access is
+always read-through/write-through: exact input hits bypass the embedding
+endpoint, while misses are embedded and persisted. Entries are isolated by
+provider, model, output dimensions, and the required `model_fingerprint`;
+change that fingerprint whenever model weights, tokenizer, pooling,
+normalization, or serving preprocessing changes. The cache decorates the
+framework `Embedder`, so the same mechanism can also cover a future AST-based
+reader without making AST part of the cache key. This version does not
+automatically expire or delete cache databases.
+
+## AST retrieval gate
+
+Run retrieval replay before spending model tokens on an Agent A/B. It starts one
+official testbed per case, snapshots it once, and builds every requested
+representation sequentially from that exact snapshot. Gold patches must come
+from an external, uncommitted JSON or JSONL file with `instance_id` and `patch`
+fields; never add that file or derived gold content to benchmark data.
+
+```bash
+go run ./trpc-agent-go-impl/cmd/retrieval-replay \
+  --run-id ast-rag-replay-smoke \
+  --cases data/generated/cases.jsonl \
+  --case-list data/case-lists/tag-rag-preload-ablation-54.case_ids.txt \
+  --labels /data/private/swebench-verified-gold.jsonl \
+  --environment-config config/environments/swebench-testbed.yaml \
+  --embedding-config config/embeddings/workspace-rag.local.yaml \
+  --framework-revision "$(git -C /data/validation/trpc-agent-go rev-parse HEAD)" \
+  --representations current-fixed,fixed-raw,ast-code,ast-structured \
+  --max-results 6 \
+  --case-workers 1
+```
+
+The checkpointed report contains target-file Recall@4/@6, target-file reciprocal
+rank, base-hunk anchor Recall@4/@6, target-file character precision, and
+representation/cache/index telemetry. Search traces contain paths, scores,
+sizes, and hashes, but not retrieved source text, gold target paths, or gold
+patch content. The exact case-list, labels, configs, source revision, framework
+revision, and binary SHA-256 are recorded.
+
+The 54-case preload-ablation panel is a high-sensitivity diagnostic set, not an
+unbiased resolve-rate estimate. Replay also measures only retrieval from the
+problem statement; it does not reproduce later model-written `code_search`
+queries. Use it as a gate: require full file coverage and a material paired
+Recall@6 or hunk-anchor gain, then run the winning AST representation against
+`fixed-raw` in a repeated Agent A/B. Only expand to the 136-case or full-500
+panel after that Agent result preserves or improves official-harness resolve
+rate.
+
+The Python AST reader is a separate Go module. Until the benchmark pins a
+published reader revision, add it to the same Go workspace as the benchmark
+and framework root:
+
+```bash
+go work use \
+  /data/validation/trpc-agent-go/knowledge/document/reader/python
+```
+
 Each output directory contains:
 
 ```text

@@ -1,0 +1,97 @@
+{
+  "schema_version": 1,
+  "status": "implementation_ready",
+  "created_on": "2026-07-20",
+  "question": "Do Python AST boundaries or stable AST fields improve workspace-RAG localization over indentation-preserving fixed chunks?",
+  "run_id": "tag-rag-ast-replay54-20260720-r1",
+  "panel": {
+    "case_list": "data/case-lists/tag-rag-preload-ablation-54.case_ids.txt",
+    "case_count": 54,
+    "sha256": "b70ede78c4ff8bb13ebb087a12c8ed204dfe7256a72d98410239697a17325d0d",
+    "role": "RAG-sensitive diagnostic panel, not a population resolve-rate sample"
+  },
+  "safe_cases": {
+    "path": "data/generated/cases.jsonl",
+    "case_count": 500,
+    "server_sha256": "4b2a050a82d356963320cbfa8e2efdf6a133af8863f31b291a973ab4dd349d07"
+  },
+  "external_gold": {
+    "dataset": "princeton-nlp/SWE-bench_Verified",
+    "split": "test",
+    "rows": 500,
+    "cache_revision": "c104f840cc67f8b6eec6f759ebc8b2693d585d4a",
+    "labels_sha256": "2509dca38bd42165f2c193644f2a8957570ad61729549e1f015047c6a95ab833",
+    "policy": "External permission-0600 JSONL; patch text and gold target paths are never written to the report or repository."
+  },
+  "design": {
+    "query_mode": "problem_statement",
+    "snapshot_policy": "One official testbed snapshot per case; all arms index the exact same bytes sequentially.",
+    "representations": [
+      {
+        "name": "current-fixed",
+        "boundary": "fixed 1024 characters with 128 overlap",
+        "embedding_text": "line-trimmed chunk",
+        "role": "historical reference"
+      },
+      {
+        "name": "fixed-raw",
+        "boundary": "fixed 1024 characters with 128 overlap",
+        "embedding_text": "indentation-preserving chunk",
+        "role": "controls whitespace independently of AST"
+      },
+      {
+        "name": "ast-code",
+        "boundary": "Python AST node with whole-file fallback",
+        "embedding_text": "node code",
+        "role": "tests AST boundaries versus fixed-raw"
+      },
+      {
+        "name": "ast-structured",
+        "boundary": "Python AST node with whole-file fallback",
+        "embedding_text": "stable AST fields plus node code",
+        "role": "tests structural embedding text versus ast-code"
+      }
+    ],
+    "fixed_parameters": {
+      "embedding_model": "bge-m3",
+      "retrieval_mode": "hybrid",
+      "embedding_batch_size": 64,
+      "embedding_concurrency": 1,
+      "case_workers": 1,
+      "max_results": 6,
+      "embedding_cache_access": "readwrite"
+    }
+  },
+  "metrics": {
+    "quality": [
+      "paired target-file Recall@4 and Recall@6",
+      "paired target-file reciprocal rank",
+      "paired base-hunk anchor Recall@4 and Recall@6",
+      "target-file character precision@6"
+    ],
+    "coverage": [
+      "eligible and indexed file counts and hashes",
+      "missing files",
+      "AST fallback counts and reasons",
+      "AST node-type distribution",
+      "duplicate document rate",
+      "stable document-set hash"
+    ],
+    "operations": [
+      "index duration",
+      "embedding requests, inputs, errors, and duration",
+      "embedding-cache hits, misses, and writes"
+    ]
+  },
+  "decision_sequence": [
+    "Reject an AST arm on file-coverage regression, unstable representation hashes, or unexplained fallback concentration.",
+    "Use paired localization metrics to choose at most one AST arm; indexing speed alone is not a quality signal.",
+    "If an AST arm has a material localization gain, compare it with fixed-raw in a repeated, order-balanced Agent A/B.",
+    "Use the official local harness for Agent resolve rate and only expand to 136 or 500 cases after a small-panel quality signal."
+  ],
+  "limitations": [
+    "The 54-case panel was selected from prior RAG outcomes and cannot estimate population resolve rate.",
+    "Problem-statement replay does not reproduce later model-written code_search queries.",
+    "Gold patch localization is a proxy; only the official harness can determine whether an Agent patch resolves a case."
+  ]
+}
