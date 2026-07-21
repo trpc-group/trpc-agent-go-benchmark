@@ -1,0 +1,3926 @@
+{
+  "schema_version": 1,
+  "status": "completed",
+  "completed_on": "2026-07-21",
+  "question": "Do Python AST boundaries or stable AST fields improve workspace-RAG localization over indentation-preserving fixed chunks?",
+  "plan": {
+    "path": "results/experiments/workspace-rag/v4-bge-m3-ast-retrieval-plan.json",
+    "run_id": "tag-rag-ast-replay54-20260720-r1"
+  },
+  "provenance": {
+    "benchmark_revision": "c147ca3c2d3d3ff0142a875952bd2571a28465ed",
+    "framework_revision": "84e57c974f53052a0323e1fffcf51fe3a6bb95cc",
+    "source_modified": false,
+    "binary": "/data/validation/bin/trpc-agent-go-retrieval-replay-c147ca3",
+    "binary_sha256": "45a2290cb04a357d4b0df4b119159aa7408bf49db03876c72452519415752e9a",
+    "report": "/data/validation/results/ast-retrieval/tag-rag-ast-replay54-20260720-r1/report.json",
+    "report_sha256": "b33b07012e391bf06b72c69a7de0384709b094b536cb668e5985b8b28e740d3a",
+    "report_bytes": 949027,
+    "case_list": "data/case-lists/tag-rag-preload-ablation-54.case_ids.txt",
+    "case_list_sha256": "b70ede78c4ff8bb13ebb087a12c8ed204dfe7256a72d98410239697a17325d0d",
+    "safe_cases": "data/generated/cases.jsonl",
+    "safe_cases_sha256": "4b2a050a82d356963320cbfa8e2efdf6a133af8863f31b291a973ab4dd349d07",
+    "external_labels_sha256": "2509dca38bd42165f2c193644f2a8957570ad61729549e1f015047c6a95ab833",
+    "embedding_config": "config/embeddings/workspace-rag.cache.local.yaml",
+    "embedding_config_sha256": "2452624a6a38fbd6f414a70b0c66e48653204662fe1b96c9026350bcc6d79bd1",
+    "environment_config": "config/environments/swebench-testbed.yaml",
+    "environment_config_sha256": "3cfa72f92f4010d242e6adb9bb507ccdf9db261ba5726163b5adecd509c140f0",
+    "embedding_cache_db": "/data/validation/cache/embeddings/embeddings-v1-a7fdf52e2f17ce27e0df484e4c15ef17738caf3e3663103f3ce6f331b56472a0.sqlite"
+  },
+  "run": {
+    "started_at": "2026-07-20T10:22:05.474311588Z",
+    "finished_at": "2026-07-21T02:00:00.740204309Z",
+    "duration_ms": 56275265,
+    "duration_hours": 15.632018055555555,
+    "selected_cases": 54,
+    "completed_cases": 54,
+    "case_errors": 0,
+    "arm_order": [
+      "current-fixed",
+      "fixed-raw",
+      "ast-code",
+      "ast-structured"
+    ],
+    "same_snapshot_per_case": true,
+    "case_workers": 1,
+    "query_mode": "problem_statement",
+    "max_results": 6,
+    "embedding": {
+      "provider": "openai",
+      "model": "bge-m3",
+      "dimensions": 1024,
+      "retrieval_mode": "hybrid",
+      "batch_size": 64,
+      "concurrency": 1,
+      "max_chars": 6000,
+      "cache_access": "readwrite",
+      "model_fingerprint": "bge-m3-canary-f32-sha256-f8df8c1947f845f9f4ddcbd75564553d82d52127c6c0d1bd9a3ecfb634fa7f5b"
+    }
+  },
+  "quality": {
+    "arms": {
+      "current-fixed": {
+        "target_file_recall_at_4": 0.5308641975308642,
+        "target_file_recall_at_6": 0.5462962962962963,
+        "target_file_reciprocal_rank": 0.42407407407407405,
+        "hunk_anchor_recall_at_4": 0.19998351603207049,
+        "hunk_anchor_recall_at_6": 0.22134596452347274,
+        "target_file_char_precision_at_6": 0.23231607977295035
+      },
+      "fixed-raw": {
+        "target_file_recall_at_4": 0.4537037037037038,
+        "target_file_recall_at_6": 0.5185185185185185,
+        "target_file_reciprocal_rank": 0.40154320987654324,
+        "hunk_anchor_recall_at_4": 0.16009234975171716,
+        "hunk_anchor_recall_at_6": 0.19726166192102929,
+        "target_file_char_precision_at_6": 0.2332080241381838
+      },
+      "ast-code": {
+        "target_file_recall_at_4": 0.4382716049382716,
+        "target_file_recall_at_6": 0.558641975308642,
+        "target_file_reciprocal_rank": 0.3759259259259259,
+        "hunk_anchor_recall_at_4": 0.20224207451098,
+        "hunk_anchor_recall_at_6": 0.24279357491649503,
+        "target_file_char_precision_at_6": 0.21086266127440004
+      },
+      "ast-structured": {
+        "target_file_recall_at_4": 0.4761904761904762,
+        "target_file_recall_at_6": 0.5873015873015873,
+        "target_file_reciprocal_rank": 0.4172839506172839,
+        "hunk_anchor_recall_at_4": 0.24818968934545615,
+        "hunk_anchor_recall_at_6": 0.2705662325553327,
+        "target_file_char_precision_at_6": 0.2577243626848003
+      }
+    },
+    "paired_contrasts": {
+      "current_fixed_minus_fixed_raw": {
+        "target_file_recall_at_4": {
+          "mean_delta": 0.0771604938271605,
+          "wins": 6,
+          "ties": 46,
+          "losses": 2
+        },
+        "target_file_recall_at_6": {
+          "mean_delta": 0.027777777777777776,
+          "wins": 3,
+          "ties": 50,
+          "losses": 1
+        },
+        "target_file_reciprocal_rank": {
+          "mean_delta": 0.022530864197530868,
+          "wins": 12,
+          "ties": 32,
+          "losses": 10
+        },
+        "hunk_anchor_recall_at_4": {
+          "mean_delta": 0.03989116628035334,
+          "wins": 11,
+          "ties": 39,
+          "losses": 4
+        },
+        "hunk_anchor_recall_at_6": {
+          "mean_delta": 0.024084302602443434,
+          "wins": 11,
+          "ties": 41,
+          "losses": 2
+        },
+        "target_file_char_precision_at_6": {
+          "mean_delta": -0.0008919443652334679,
+          "wins": 14,
+          "ties": 29,
+          "losses": 11
+        }
+      },
+      "ast_code_minus_fixed_raw": {
+        "target_file_recall_at_4": {
+          "mean_delta": -0.015432098765432098,
+          "wins": 8,
+          "ties": 37,
+          "losses": 9
+        },
+        "target_file_recall_at_6": {
+          "mean_delta": 0.040123456790123455,
+          "wins": 8,
+          "ties": 39,
+          "losses": 7
+        },
+        "target_file_reciprocal_rank": {
+          "mean_delta": -0.025617283950617284,
+          "wins": 14,
+          "ties": 26,
+          "losses": 14
+        },
+        "hunk_anchor_recall_at_4": {
+          "mean_delta": 0.04214972475926287,
+          "wins": 15,
+          "ties": 31,
+          "losses": 8
+        },
+        "hunk_anchor_recall_at_6": {
+          "mean_delta": 0.045531912995465704,
+          "wins": 15,
+          "ties": 33,
+          "losses": 6
+        },
+        "target_file_char_precision_at_6": {
+          "mean_delta": -0.022345362863783778,
+          "wins": 17,
+          "ties": 16,
+          "losses": 21
+        }
+      },
+      "ast_structured_minus_ast_code": {
+        "target_file_recall_at_4": {
+          "mean_delta": 0.03791887125220458,
+          "wins": 8,
+          "ties": 42,
+          "losses": 4
+        },
+        "target_file_recall_at_6": {
+          "mean_delta": 0.028659611992945328,
+          "wins": 5,
+          "ties": 47,
+          "losses": 2
+        },
+        "target_file_reciprocal_rank": {
+          "mean_delta": 0.04135802469135803,
+          "wins": 12,
+          "ties": 33,
+          "losses": 9
+        },
+        "hunk_anchor_recall_at_4": {
+          "mean_delta": 0.045947614834476146,
+          "wins": 6,
+          "ties": 46,
+          "losses": 2
+        },
+        "hunk_anchor_recall_at_6": {
+          "mean_delta": 0.027772657638837687,
+          "wins": 5,
+          "ties": 48,
+          "losses": 1
+        },
+        "target_file_char_precision_at_6": {
+          "mean_delta": 0.04686170141040034,
+          "wins": 26,
+          "ties": 19,
+          "losses": 9
+        }
+      },
+      "ast_structured_minus_fixed_raw": {
+        "target_file_recall_at_4": {
+          "mean_delta": 0.02248677248677249,
+          "wins": 11,
+          "ties": 34,
+          "losses": 9
+        },
+        "target_file_recall_at_6": {
+          "mean_delta": 0.06878306878306878,
+          "wins": 10,
+          "ties": 38,
+          "losses": 6
+        },
+        "target_file_reciprocal_rank": {
+          "mean_delta": 0.01574074074074074,
+          "wins": 17,
+          "ties": 25,
+          "losses": 12
+        },
+        "hunk_anchor_recall_at_4": {
+          "mean_delta": 0.08809733959373901,
+          "wins": 17,
+          "ties": 28,
+          "losses": 9
+        },
+        "hunk_anchor_recall_at_6": {
+          "mean_delta": 0.07330457063430339,
+          "wins": 17,
+          "ties": 30,
+          "losses": 7
+        },
+        "target_file_char_precision_at_6": {
+          "mean_delta": 0.02451633854661656,
+          "wins": 22,
+          "ties": 13,
+          "losses": 19
+        }
+      }
+    },
+    "interpretation": {
+      "ast_boundary": "Mixed versus fixed-raw: Recall@6 and both hunk metrics rise, but Recall@4, reciprocal rank, and character precision fall.",
+      "structured_text": "Positive versus ast-code on all six metrics, including a 0.046862 absolute gain in target-file character precision@6.",
+      "selected_arm": "ast-structured shows the material overall localization signal versus fixed-raw: +0.068783 target-file Recall@6 and +0.073305 hunk-anchor Recall@6, with gains in all six aggregate metrics."
+    }
+  },
+  "coverage_and_representation": {
+    "arms": {
+      "current-fixed": {
+        "successful_cases": 54,
+        "errors": 0,
+        "eligible_files": 74293,
+        "indexed_files": 74293,
+        "file_coverage_min": 1,
+        "file_coverage_max": 1,
+        "documents": 609941,
+        "mean_documents_per_case": 11295.203703703704,
+        "representation_schema": "workspace-representation/v1;reader=text;chunk=fixed;size=1024;overlap=128;whitespace=trim-lines",
+        "representation_sha256": "4e76ab4ec67f611c6660585c6161fe167b33bc6e7de53950808aff32f989933a",
+        "unique_document_set_hashes": 54,
+        "fallback_documents": 0,
+        "fallback_document_rate": 0.0,
+        "fallback_reasons": {},
+        "node_types": {},
+        "duplicate_documents": 2295,
+        "duplicate_document_rate_weighted": 0.003762659011281419,
+        "duplicate_document_rate_case_mean": 0.0038213236842206647
+      },
+      "fixed-raw": {
+        "successful_cases": 54,
+        "errors": 0,
+        "eligible_files": 74293,
+        "indexed_files": 74293,
+        "file_coverage_min": 1,
+        "file_coverage_max": 1,
+        "documents": 728047,
+        "mean_documents_per_case": 13482.351851851852,
+        "representation_schema": "workspace-representation/v1;reader=text;chunk=fixed;size=1024;overlap=128;whitespace=preserve",
+        "representation_sha256": "2a0419991facdf15219d487f6c1ec59dc9796da5e49aff17f80bfb05e33fc163",
+        "unique_document_set_hashes": 54,
+        "fallback_documents": 0,
+        "fallback_document_rate": 0.0,
+        "fallback_reasons": {},
+        "node_types": {},
+        "duplicate_documents": 2452,
+        "duplicate_document_rate_weighted": 0.003367914434095601,
+        "duplicate_document_rate_case_mean": 0.0032852628410924927
+      },
+      "ast-code": {
+        "successful_cases": 54,
+        "errors": 0,
+        "eligible_files": 74293,
+        "indexed_files": 74293,
+        "file_coverage_min": 1,
+        "file_coverage_max": 1,
+        "documents": 1483836,
+        "mean_documents_per_case": 27478.444444444445,
+        "representation_schema": "workspace-representation/v1;reader=python-ast;tests=include;hidden=include;paths=stable;fallback=file;embedding=code",
+        "representation_sha256": "f40bbb5b009ead110b16f27e342e0fc463295be64bdefd727b2ab3df3614000a",
+        "unique_document_set_hashes": 54,
+        "fallback_documents": 1832,
+        "fallback_document_rate": 0.0012346377901600986,
+        "fallback_reasons": {
+          "no_nodes": 1799,
+          "parse_error": 33
+        },
+        "node_types": {
+          "Class": 266551,
+          "Function": 280019,
+          "Interface": 30,
+          "Method": 797851,
+          "Variable": 137553,
+          "file": 1832
+        },
+        "duplicate_documents": 83778,
+        "duplicate_document_rate_weighted": 0.056460417458533155,
+        "duplicate_document_rate_case_mean": 0.05746182760993095
+      },
+      "ast-structured": {
+        "successful_cases": 54,
+        "errors": 0,
+        "eligible_files": 74293,
+        "indexed_files": 74293,
+        "file_coverage_min": 1,
+        "file_coverage_max": 1,
+        "documents": 1483836,
+        "mean_documents_per_case": 27478.444444444445,
+        "representation_schema": "workspace-representation/v1;reader=python-ast;tests=include;hidden=include;paths=stable;fallback=file;embedding=structured-code",
+        "representation_sha256": "3178d3482124b20f29259fc59e8954975c44384e38779958118bf60b68748ec1",
+        "unique_document_set_hashes": 54,
+        "fallback_documents": 1832,
+        "fallback_document_rate": 0.0012346377901600986,
+        "fallback_reasons": {
+          "no_nodes": 1799,
+          "parse_error": 33
+        },
+        "node_types": {
+          "Class": 266551,
+          "Function": 280019,
+          "Interface": 30,
+          "Method": 797851,
+          "Variable": 137553,
+          "file": 1832
+        },
+        "duplicate_documents": 83778,
+        "duplicate_document_rate_weighted": 0.056460417458533155,
+        "duplicate_document_rate_case_mean": 0.05746182760993095
+      }
+    },
+    "checks": {
+      "all_arms_full_file_coverage": true,
+      "eligible_hash_mismatch_cases_across_arms": 0,
+      "indexed_hash_mismatch_cases_across_arms": 0,
+      "eligible_vs_indexed_hash_mismatches": {
+        "current-fixed": 0,
+        "fixed-raw": 0,
+        "ast-code": 0,
+        "ast-structured": 0
+      },
+      "ast_code_vs_structured_boundary_mismatch_cases": 0,
+      "ast_code_vs_structured_boundary_mismatches": [],
+      "ast_code_vs_structured_document_set_hash_equal_cases": 0,
+      "document_set_hash_note": "AST document boundaries and counts match, while document-set hashes differ by design because embedded text differs."
+    }
+  },
+  "operations": {
+    "arms": {
+      "current-fixed": {
+        "case_arm_duration_ms_total": 12000189,
+        "case_arm_duration_ms_mean": 222225.72222222222,
+        "case_arm_duration_ms_median": 163265.0,
+        "index_duration_ms_total": 11971463,
+        "index_duration_ms_mean": 221693.75925925927,
+        "embedding_requests": 6711,
+        "embedding_inputs": 294534,
+        "embedding_errors": 0,
+        "embedding_duration_ms": 11683165,
+        "cache_inputs": 609995,
+        "cache_hits": 315395,
+        "cache_misses": 294600,
+        "cache_writes": 294534,
+        "cache_hit_rate": 0.517045221682145,
+        "cache_corruptions": 0,
+        "cache_errors": 0,
+        "cache_bytes_read": 1289617408,
+        "cache_bytes_written": 1206411264
+      },
+      "fixed-raw": {
+        "case_arm_duration_ms_total": 12871415,
+        "case_arm_duration_ms_mean": 238359.53703703705,
+        "case_arm_duration_ms_median": 179732.0,
+        "index_duration_ms_total": 12860644,
+        "index_duration_ms_mean": 238160.07407407407,
+        "embedding_requests": 7808,
+        "embedding_inputs": 350705,
+        "embedding_errors": 0,
+        "embedding_duration_ms": 12512590,
+        "cache_inputs": 728101,
+        "cache_hits": 377341,
+        "cache_misses": 350760,
+        "cache_writes": 350705,
+        "cache_hit_rate": 0.5182536488756367,
+        "cache_corruptions": 0,
+        "cache_errors": 0,
+        "cache_bytes_read": 1543434240,
+        "cache_bytes_written": 1436487680
+      },
+      "ast-code": {
+        "case_arm_duration_ms_total": 18072301,
+        "case_arm_duration_ms_mean": 334672.24074074073,
+        "case_arm_duration_ms_median": 237892.5,
+        "index_duration_ms_total": 18043551,
+        "index_duration_ms_mean": 334139.8333333333,
+        "embedding_requests": 12123,
+        "embedding_inputs": 379864,
+        "embedding_errors": 0,
+        "embedding_duration_ms": 14623055,
+        "cache_inputs": 1483890,
+        "cache_hits": 1103871,
+        "cache_misses": 380019,
+        "cache_writes": 379864,
+        "cache_hit_rate": 0.7439035238461071,
+        "cache_corruptions": 0,
+        "cache_errors": 0,
+        "cache_bytes_read": 4496691200,
+        "cache_bytes_written": 1555922944
+      },
+      "ast-structured": {
+        "case_arm_duration_ms_total": 13150275,
+        "case_arm_duration_ms_mean": 243523.61111111112,
+        "case_arm_duration_ms_median": 141150.5,
+        "index_duration_ms_total": 13120711,
+        "index_duration_ms_mean": 242976.12962962964,
+        "embedding_requests": 11609,
+        "embedding_inputs": 244122,
+        "embedding_errors": 0,
+        "embedding_duration_ms": 9744733,
+        "cache_inputs": 1483890,
+        "cache_hits": 1238780,
+        "cache_misses": 245110,
+        "cache_writes": 244122,
+        "cache_hit_rate": 0.834819292535161,
+        "cache_corruptions": 0,
+        "cache_errors": 0,
+        "cache_bytes_read": 5014142976,
+        "cache_bytes_written": 999923712
+      }
+    },
+    "run_totals": {
+      "case_arm_duration_ms": 56094180,
+      "index_duration_ms": 55996369,
+      "embedding_requests": 38251,
+      "embedding_inputs": 1269225,
+      "embedding_errors": 0,
+      "embedding_duration_ms": 48563543,
+      "cache_hits": 3035387,
+      "cache_misses": 1270489,
+      "cache_writes": 1269225,
+      "recovered_embedding_502_retry_log_entries": 16,
+      "final_embedding_errors": 0,
+      "fatal_or_panic_log_entries": 0,
+      "final_cache_rows": 1333142,
+      "final_cache_bytes": 6251446272
+    },
+    "interpretation": "The arms ran in a fixed serial order against a persistent read-write cache. Runtime and cache differences are operational observations, not clean causal speed estimates."
+  },
+  "case_level": {
+    "ast_structured_vs_fixed_raw_transitions": {
+      "target_file_recall_at_6": {
+        "improved_count": 10,
+        "regressed_count": 6,
+        "tied_count": 38,
+        "improved": [
+          {
+            "instance_id": "django__django-10973",
+            "delta": 1
+          },
+          {
+            "instance_id": "django__django-14349",
+            "delta": 1
+          },
+          {
+            "instance_id": "django__django-16938",
+            "delta": 1
+          },
+          {
+            "instance_id": "matplotlib__matplotlib-20676",
+            "delta": 1
+          },
+          {
+            "instance_id": "matplotlib__matplotlib-23299",
+            "delta": 1
+          },
+          {
+            "instance_id": "matplotlib__matplotlib-25287",
+            "delta": 1
+          },
+          {
+            "instance_id": "psf__requests-6028",
+            "delta": 1
+          },
+          {
+            "instance_id": "pydata__xarray-4687",
+            "delta": 1
+          },
+          {
+            "instance_id": "pydata__xarray-7229",
+            "delta": 1
+          },
+          {
+            "instance_id": "sympy__sympy-13091",
+            "delta": 0.047619047619047616
+          }
+        ],
+        "regressed": [
+          {
+            "instance_id": "astropy__astropy-13236",
+            "delta": -1
+          },
+          {
+            "instance_id": "django__django-12050",
+            "delta": -1
+          },
+          {
+            "instance_id": "django__django-13344",
+            "delta": -0.3333333333333333
+          },
+          {
+            "instance_id": "django__django-14434",
+            "delta": -1
+          },
+          {
+            "instance_id": "django__django-14792",
+            "delta": -1
+          },
+          {
+            "instance_id": "sympy__sympy-15017",
+            "delta": -1
+          }
+        ],
+        "tied": [
+          "django__django-11239",
+          "django__django-11885",
+          "django__django-13023",
+          "django__django-13343",
+          "django__django-13346",
+          "django__django-13810",
+          "django__django-13820",
+          "django__django-13925",
+          "django__django-14311",
+          "django__django-14559",
+          "django__django-15268",
+          "django__django-15732",
+          "django__django-15930",
+          "django__django-15957",
+          "django__django-15987",
+          "django__django-16454",
+          "django__django-17084",
+          "django__django-17087",
+          "matplotlib__matplotlib-23412",
+          "psf__requests-1921",
+          "pydata__xarray-6599",
+          "pydata__xarray-7393",
+          "pylint-dev__pylint-4551",
+          "pytest-dev__pytest-7324",
+          "scikit-learn__scikit-learn-10297",
+          "scikit-learn__scikit-learn-12973",
+          "sphinx-doc__sphinx-10673",
+          "sphinx-doc__sphinx-11510",
+          "sphinx-doc__sphinx-8056",
+          "sphinx-doc__sphinx-8593",
+          "sphinx-doc__sphinx-9258",
+          "sympy__sympy-12489",
+          "sympy__sympy-13877",
+          "sympy__sympy-15809",
+          "sympy__sympy-17318",
+          "sympy__sympy-19346",
+          "sympy__sympy-21379",
+          "sympy__sympy-23262"
+        ]
+      },
+      "target_file_reciprocal_rank": {
+        "improved_count": 17,
+        "regressed_count": 12,
+        "tied_count": 25,
+        "improved": [
+          {
+            "instance_id": "django__django-10973",
+            "delta": 0.16666666666666666
+          },
+          {
+            "instance_id": "django__django-11239",
+            "delta": 0.04999999999999999
+          },
+          {
+            "instance_id": "django__django-13023",
+            "delta": 0.08333333333333334
+          },
+          {
+            "instance_id": "django__django-13346",
+            "delta": 0.5
+          },
+          {
+            "instance_id": "django__django-13925",
+            "delta": 0.3
+          },
+          {
+            "instance_id": "django__django-14349",
+            "delta": 1
+          },
+          {
+            "instance_id": "django__django-14559",
+            "delta": 0.16666666666666669
+          },
+          {
+            "instance_id": "django__django-16938",
+            "delta": 1
+          },
+          {
+            "instance_id": "matplotlib__matplotlib-20676",
+            "delta": 1
+          },
+          {
+            "instance_id": "matplotlib__matplotlib-23299",
+            "delta": 0.2
+          },
+          {
+            "instance_id": "matplotlib__matplotlib-25287",
+            "delta": 1
+          },
+          {
+            "instance_id": "psf__requests-1921",
+            "delta": 0.16666666666666669
+          },
+          {
+            "instance_id": "psf__requests-6028",
+            "delta": 0.16666666666666666
+          },
+          {
+            "instance_id": "pydata__xarray-4687",
+            "delta": 0.3333333333333333
+          },
+          {
+            "instance_id": "pydata__xarray-7229",
+            "delta": 0.3333333333333333
+          },
+          {
+            "instance_id": "sympy__sympy-13091",
+            "delta": 0.25
+          },
+          {
+            "instance_id": "sympy__sympy-13877",
+            "delta": 0.8
+          }
+        ],
+        "regressed": [
+          {
+            "instance_id": "astropy__astropy-13236",
+            "delta": -0.5
+          },
+          {
+            "instance_id": "django__django-12050",
+            "delta": -1
+          },
+          {
+            "instance_id": "django__django-13344",
+            "delta": -0.5
+          },
+          {
+            "instance_id": "django__django-14434",
+            "delta": -0.25
+          },
+          {
+            "instance_id": "django__django-14792",
+            "delta": -1
+          },
+          {
+            "instance_id": "django__django-15732",
+            "delta": -0.8333333333333334
+          },
+          {
+            "instance_id": "django__django-15987",
+            "delta": -0.8333333333333334
+          },
+          {
+            "instance_id": "sphinx-doc__sphinx-8056",
+            "delta": -0.08333333333333334
+          },
+          {
+            "instance_id": "sphinx-doc__sphinx-8593",
+            "delta": -0.5
+          },
+          {
+            "instance_id": "sympy__sympy-12489",
+            "delta": -0.5
+          },
+          {
+            "instance_id": "sympy__sympy-15017",
+            "delta": -0.5
+          },
+          {
+            "instance_id": "sympy__sympy-19346",
+            "delta": -0.16666666666666669
+          }
+        ],
+        "tied": [
+          "django__django-11885",
+          "django__django-13343",
+          "django__django-13810",
+          "django__django-13820",
+          "django__django-14311",
+          "django__django-15268",
+          "django__django-15930",
+          "django__django-15957",
+          "django__django-16454",
+          "django__django-17084",
+          "django__django-17087",
+          "matplotlib__matplotlib-23412",
+          "pydata__xarray-6599",
+          "pydata__xarray-7393",
+          "pylint-dev__pylint-4551",
+          "pytest-dev__pytest-7324",
+          "scikit-learn__scikit-learn-10297",
+          "scikit-learn__scikit-learn-12973",
+          "sphinx-doc__sphinx-10673",
+          "sphinx-doc__sphinx-11510",
+          "sphinx-doc__sphinx-9258",
+          "sympy__sympy-15809",
+          "sympy__sympy-17318",
+          "sympy__sympy-21379",
+          "sympy__sympy-23262"
+        ]
+      },
+      "hunk_anchor_recall_at_6": {
+        "improved_count": 17,
+        "regressed_count": 7,
+        "tied_count": 30,
+        "improved": [
+          {
+            "instance_id": "django__django-11885",
+            "delta": 0.36458333333333337
+          },
+          {
+            "instance_id": "django__django-13023",
+            "delta": 1
+          },
+          {
+            "instance_id": "django__django-13810",
+            "delta": 0.08333333333333337
+          },
+          {
+            "instance_id": "django__django-13820",
+            "delta": 1
+          },
+          {
+            "instance_id": "django__django-13925",
+            "delta": 1
+          },
+          {
+            "instance_id": "django__django-14349",
+            "delta": 0.5714285714285714
+          },
+          {
+            "instance_id": "django__django-14559",
+            "delta": 0.3636363636363637
+          },
+          {
+            "instance_id": "django__django-15732",
+            "delta": 0.125
+          },
+          {
+            "instance_id": "django__django-16938",
+            "delta": 1
+          },
+          {
+            "instance_id": "matplotlib__matplotlib-25287",
+            "delta": 1
+          },
+          {
+            "instance_id": "pydata__xarray-4687",
+            "delta": 0.9090909090909091
+          },
+          {
+            "instance_id": "pydata__xarray-7229",
+            "delta": 0.8571428571428571
+          },
+          {
+            "instance_id": "sphinx-doc__sphinx-10673",
+            "delta": 0.5666666666666667
+          },
+          {
+            "instance_id": "sympy__sympy-12489",
+            "delta": 0.1386861313868613
+          },
+          {
+            "instance_id": "sympy__sympy-13877",
+            "delta": 0.41935483870967744
+          },
+          {
+            "instance_id": "sympy__sympy-15809",
+            "delta": 0.6666666666666666
+          },
+          {
+            "instance_id": "sympy__sympy-23262",
+            "delta": 0.2857142857142857
+          }
+        ],
+        "regressed": [
+          {
+            "instance_id": "astropy__astropy-13236",
+            "delta": -1
+          },
+          {
+            "instance_id": "django__django-12050",
+            "delta": -1
+          },
+          {
+            "instance_id": "django__django-14311",
+            "delta": -1
+          },
+          {
+            "instance_id": "django__django-14792",
+            "delta": -1
+          },
+          {
+            "instance_id": "django__django-15987",
+            "delta": -1
+          },
+          {
+            "instance_id": "django__django-16454",
+            "delta": -1
+          },
+          {
+            "instance_id": "scikit-learn__scikit-learn-10297",
+            "delta": -0.39285714285714285
+          }
+        ],
+        "tied": [
+          "django__django-10973",
+          "django__django-11239",
+          "django__django-13343",
+          "django__django-13344",
+          "django__django-13346",
+          "django__django-14434",
+          "django__django-15268",
+          "django__django-15930",
+          "django__django-15957",
+          "django__django-17084",
+          "django__django-17087",
+          "matplotlib__matplotlib-20676",
+          "matplotlib__matplotlib-23299",
+          "matplotlib__matplotlib-23412",
+          "psf__requests-1921",
+          "psf__requests-6028",
+          "pydata__xarray-6599",
+          "pydata__xarray-7393",
+          "pylint-dev__pylint-4551",
+          "pytest-dev__pytest-7324",
+          "scikit-learn__scikit-learn-12973",
+          "sphinx-doc__sphinx-11510",
+          "sphinx-doc__sphinx-8056",
+          "sphinx-doc__sphinx-8593",
+          "sphinx-doc__sphinx-9258",
+          "sympy__sympy-13091",
+          "sympy__sympy-15017",
+          "sympy__sympy-17318",
+          "sympy__sympy-19346",
+          "sympy__sympy-21379"
+        ]
+      }
+    },
+    "rows": [
+      {
+        "instance_id": "astropy__astropy-13236",
+        "query_sha256": "1f01b57c4e17057a2427b8ed897618f91782d22e98804b706826ba936a3d5ec4",
+        "target_file_count": 1,
+        "hunk_anchor_count": 9,
+        "metrics": {
+          "current-fixed": {
+            "target_file_recall_at_4": 1,
+            "target_file_recall_at_6": 1,
+            "target_file_reciprocal_rank": 1,
+            "hunk_anchor_recall_at_4": 1,
+            "hunk_anchor_recall_at_6": 1,
+            "target_file_char_precision_at_6": 0.16666666666666666
+          },
+          "fixed-raw": {
+            "target_file_recall_at_4": 1,
+            "target_file_recall_at_6": 1,
+            "target_file_reciprocal_rank": 0.5,
+            "hunk_anchor_recall_at_4": 1,
+            "hunk_anchor_recall_at_6": 1,
+            "target_file_char_precision_at_6": 0.16666666666666666
+          },
+          "ast-code": {
+            "target_file_recall_at_4": 0,
+            "target_file_recall_at_6": 1,
+            "target_file_reciprocal_rank": 0.2,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 1,
+            "target_file_char_precision_at_6": 0.2256198057299155
+          },
+          "ast-structured": {
+            "target_file_recall_at_4": 0,
+            "target_file_recall_at_6": 0,
+            "target_file_reciprocal_rank": 0,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0,
+            "target_file_char_precision_at_6": 0
+          }
+        },
+        "ast_structured_minus_fixed_raw": {
+          "target_file_recall_at_4": -1,
+          "target_file_recall_at_6": -1,
+          "target_file_reciprocal_rank": -0.5,
+          "hunk_anchor_recall_at_4": -1,
+          "hunk_anchor_recall_at_6": -1,
+          "target_file_char_precision_at_6": -0.16666666666666666
+        },
+        "ast_structured_minus_ast_code": {
+          "target_file_recall_at_4": 0,
+          "target_file_recall_at_6": -1,
+          "target_file_reciprocal_rank": -0.2,
+          "hunk_anchor_recall_at_4": 0,
+          "hunk_anchor_recall_at_6": -1,
+          "target_file_char_precision_at_6": -0.2256198057299155
+        }
+      },
+      {
+        "instance_id": "django__django-10973",
+        "query_sha256": "bde1c4529fef5d030d1bd73a02e45bdbf9535a3c351aa9a43dba5c8249800271",
+        "target_file_count": 1,
+        "hunk_anchor_count": 43,
+        "metrics": {
+          "current-fixed": {
+            "target_file_recall_at_4": 0,
+            "target_file_recall_at_6": 0,
+            "target_file_reciprocal_rank": 0,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0,
+            "target_file_char_precision_at_6": 0
+          },
+          "fixed-raw": {
+            "target_file_recall_at_4": 0,
+            "target_file_recall_at_6": 0,
+            "target_file_reciprocal_rank": 0,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0,
+            "target_file_char_precision_at_6": 0
+          },
+          "ast-code": {
+            "target_file_recall_at_4": 0,
+            "target_file_recall_at_6": 0,
+            "target_file_reciprocal_rank": 0,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0,
+            "target_file_char_precision_at_6": 0
+          },
+          "ast-structured": {
+            "target_file_recall_at_4": 0,
+            "target_file_recall_at_6": 1,
+            "target_file_reciprocal_rank": 0.16666666666666666,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0,
+            "target_file_char_precision_at_6": 0.017001545595054096
+          }
+        },
+        "ast_structured_minus_fixed_raw": {
+          "target_file_recall_at_4": 0,
+          "target_file_recall_at_6": 1,
+          "target_file_reciprocal_rank": 0.16666666666666666,
+          "hunk_anchor_recall_at_4": 0,
+          "hunk_anchor_recall_at_6": 0,
+          "target_file_char_precision_at_6": 0.017001545595054096
+        },
+        "ast_structured_minus_ast_code": {
+          "target_file_recall_at_4": 0,
+          "target_file_recall_at_6": 1,
+          "target_file_reciprocal_rank": 0.16666666666666666,
+          "hunk_anchor_recall_at_4": 0,
+          "hunk_anchor_recall_at_6": 0,
+          "target_file_char_precision_at_6": 0.017001545595054096
+        }
+      },
+      {
+        "instance_id": "django__django-11239",
+        "query_sha256": "4f06ccec412dfd622e67248f35d24c93d00bfb755849a39f958b4e806969b86f",
+        "target_file_count": 1,
+        "hunk_anchor_count": 7,
+        "metrics": {
+          "current-fixed": {
+            "target_file_recall_at_4": 1,
+            "target_file_recall_at_6": 1,
+            "target_file_reciprocal_rank": 0.3333333333333333,
+            "hunk_anchor_recall_at_4": 1,
+            "hunk_anchor_recall_at_6": 1,
+            "target_file_char_precision_at_6": 0.1765821693395413
+          },
+          "fixed-raw": {
+            "target_file_recall_at_4": 0,
+            "target_file_recall_at_6": 1,
+            "target_file_reciprocal_rank": 0.2,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 1,
+            "target_file_char_precision_at_6": 0.1655350792111219
+          },
+          "ast-code": {
+            "target_file_recall_at_4": 0,
+            "target_file_recall_at_6": 1,
+            "target_file_reciprocal_rank": 0.2,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 1,
+            "target_file_char_precision_at_6": 0.11045867493906493
+          },
+          "ast-structured": {
+            "target_file_recall_at_4": 1,
+            "target_file_recall_at_6": 1,
+            "target_file_reciprocal_rank": 0.25,
+            "hunk_anchor_recall_at_4": 1,
+            "hunk_anchor_recall_at_6": 1,
+            "target_file_char_precision_at_6": 0.14137833238797504
+          }
+        },
+        "ast_structured_minus_fixed_raw": {
+          "target_file_recall_at_4": 1,
+          "target_file_recall_at_6": 0,
+          "target_file_reciprocal_rank": 0.04999999999999999,
+          "hunk_anchor_recall_at_4": 1,
+          "hunk_anchor_recall_at_6": 0,
+          "target_file_char_precision_at_6": -0.024156746823146863
+        },
+        "ast_structured_minus_ast_code": {
+          "target_file_recall_at_4": 1,
+          "target_file_recall_at_6": 0,
+          "target_file_reciprocal_rank": 0.04999999999999999,
+          "hunk_anchor_recall_at_4": 1,
+          "hunk_anchor_recall_at_6": 0,
+          "target_file_char_precision_at_6": 0.030919657448910107
+        }
+      },
+      {
+        "instance_id": "django__django-11885",
+        "query_sha256": "bd6ce8dcb4e3ccf23898a9f244352cc8d464c3f6e5fff1f656d5a30446a6ea10",
+        "target_file_count": 2,
+        "hunk_anchor_count": 96,
+        "metrics": {
+          "current-fixed": {
+            "target_file_recall_at_4": 0.5,
+            "target_file_recall_at_6": 0.5,
+            "target_file_reciprocal_rank": 1,
+            "hunk_anchor_recall_at_4": 0.3125,
+            "hunk_anchor_recall_at_6": 0.3125,
+            "target_file_char_precision_at_6": 0.5
+          },
+          "fixed-raw": {
+            "target_file_recall_at_4": 0.5,
+            "target_file_recall_at_6": 0.5,
+            "target_file_reciprocal_rank": 1,
+            "hunk_anchor_recall_at_4": 0.16666666666666666,
+            "hunk_anchor_recall_at_6": 0.16666666666666666,
+            "target_file_char_precision_at_6": 0.3333333333333333
+          },
+          "ast-code": {
+            "target_file_recall_at_4": 0.5,
+            "target_file_recall_at_6": 0.5,
+            "target_file_reciprocal_rank": 0.5,
+            "hunk_anchor_recall_at_4": 0.4479166666666667,
+            "hunk_anchor_recall_at_6": 0.4479166666666667,
+            "target_file_char_precision_at_6": 0.3695109780439122
+          },
+          "ast-structured": {
+            "target_file_recall_at_4": 0.5,
+            "target_file_recall_at_6": 0.5,
+            "target_file_reciprocal_rank": 1,
+            "hunk_anchor_recall_at_4": 0.53125,
+            "hunk_anchor_recall_at_6": 0.53125,
+            "target_file_char_precision_at_6": 0.6960008331597584
+          }
+        },
+        "ast_structured_minus_fixed_raw": {
+          "target_file_recall_at_4": 0.0,
+          "target_file_recall_at_6": 0.0,
+          "target_file_reciprocal_rank": 0,
+          "hunk_anchor_recall_at_4": 0.36458333333333337,
+          "hunk_anchor_recall_at_6": 0.36458333333333337,
+          "target_file_char_precision_at_6": 0.36266749982642504
+        },
+        "ast_structured_minus_ast_code": {
+          "target_file_recall_at_4": 0.0,
+          "target_file_recall_at_6": 0.0,
+          "target_file_reciprocal_rank": 0.5,
+          "hunk_anchor_recall_at_4": 0.08333333333333331,
+          "hunk_anchor_recall_at_6": 0.08333333333333331,
+          "target_file_char_precision_at_6": 0.32648985511584616
+        }
+      },
+      {
+        "instance_id": "django__django-12050",
+        "query_sha256": "161289bab4cda50aeb7a81ed68bb3a025e2a99db08588000a2f91ee206fbaa19",
+        "target_file_count": 1,
+        "hunk_anchor_count": 18,
+        "metrics": {
+          "current-fixed": {
+            "target_file_recall_at_4": 0,
+            "target_file_recall_at_6": 0,
+            "target_file_reciprocal_rank": 0,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0,
+            "target_file_char_precision_at_6": 0
+          },
+          "fixed-raw": {
+            "target_file_recall_at_4": 1,
+            "target_file_recall_at_6": 1,
+            "target_file_reciprocal_rank": 1,
+            "hunk_anchor_recall_at_4": 1,
+            "hunk_anchor_recall_at_6": 1,
+            "target_file_char_precision_at_6": 0.16666666666666666
+          },
+          "ast-code": {
+            "target_file_recall_at_4": 0,
+            "target_file_recall_at_6": 1,
+            "target_file_reciprocal_rank": 0.16666666666666666,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0,
+            "target_file_char_precision_at_6": 0.14687406521088842
+          },
+          "ast-structured": {
+            "target_file_recall_at_4": 0,
+            "target_file_recall_at_6": 0,
+            "target_file_reciprocal_rank": 0,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0,
+            "target_file_char_precision_at_6": 0
+          }
+        },
+        "ast_structured_minus_fixed_raw": {
+          "target_file_recall_at_4": -1,
+          "target_file_recall_at_6": -1,
+          "target_file_reciprocal_rank": -1,
+          "hunk_anchor_recall_at_4": -1,
+          "hunk_anchor_recall_at_6": -1,
+          "target_file_char_precision_at_6": -0.16666666666666666
+        },
+        "ast_structured_minus_ast_code": {
+          "target_file_recall_at_4": 0,
+          "target_file_recall_at_6": -1,
+          "target_file_reciprocal_rank": -0.16666666666666666,
+          "hunk_anchor_recall_at_4": 0,
+          "hunk_anchor_recall_at_6": 0,
+          "target_file_char_precision_at_6": -0.14687406521088842
+        }
+      },
+      {
+        "instance_id": "django__django-13023",
+        "query_sha256": "c05085a58a67bb3f452db083e2f011b6b0a4706ec1f8ef24df17fc6e6756cb70",
+        "target_file_count": 1,
+        "hunk_anchor_count": 5,
+        "metrics": {
+          "current-fixed": {
+            "target_file_recall_at_4": 1,
+            "target_file_recall_at_6": 1,
+            "target_file_reciprocal_rank": 1,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0,
+            "target_file_char_precision_at_6": 0.16666666666666666
+          },
+          "fixed-raw": {
+            "target_file_recall_at_4": 0,
+            "target_file_recall_at_6": 1,
+            "target_file_reciprocal_rank": 0.16666666666666666,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0,
+            "target_file_char_precision_at_6": 0.16666666666666666
+          },
+          "ast-code": {
+            "target_file_recall_at_4": 0,
+            "target_file_recall_at_6": 0,
+            "target_file_reciprocal_rank": 0,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0,
+            "target_file_char_precision_at_6": 0
+          },
+          "ast-structured": {
+            "target_file_recall_at_4": 1,
+            "target_file_recall_at_6": 1,
+            "target_file_reciprocal_rank": 0.25,
+            "hunk_anchor_recall_at_4": 1,
+            "hunk_anchor_recall_at_6": 1,
+            "target_file_char_precision_at_6": 0.14017717561229806
+          }
+        },
+        "ast_structured_minus_fixed_raw": {
+          "target_file_recall_at_4": 1,
+          "target_file_recall_at_6": 0,
+          "target_file_reciprocal_rank": 0.08333333333333334,
+          "hunk_anchor_recall_at_4": 1,
+          "hunk_anchor_recall_at_6": 1,
+          "target_file_char_precision_at_6": -0.026489491054368597
+        },
+        "ast_structured_minus_ast_code": {
+          "target_file_recall_at_4": 1,
+          "target_file_recall_at_6": 1,
+          "target_file_reciprocal_rank": 0.25,
+          "hunk_anchor_recall_at_4": 1,
+          "hunk_anchor_recall_at_6": 1,
+          "target_file_char_precision_at_6": 0.14017717561229806
+        }
+      },
+      {
+        "instance_id": "django__django-13343",
+        "query_sha256": "e105d6198bfcc19f652eb3f7d9a0fc8243ada3b8492de1688b31b3e4b43a1153",
+        "target_file_count": 1,
+        "hunk_anchor_count": 7,
+        "metrics": {
+          "current-fixed": {
+            "target_file_recall_at_4": 1,
+            "target_file_recall_at_6": 1,
+            "target_file_reciprocal_rank": 0.5,
+            "hunk_anchor_recall_at_4": 0.7142857142857143,
+            "hunk_anchor_recall_at_6": 0.7142857142857143,
+            "target_file_char_precision_at_6": 0.5098039215686274
+          },
+          "fixed-raw": {
+            "target_file_recall_at_4": 1,
+            "target_file_recall_at_6": 1,
+            "target_file_reciprocal_rank": 0.25,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0,
+            "target_file_char_precision_at_6": 0.3305483821965669
+          },
+          "ast-code": {
+            "target_file_recall_at_4": 1,
+            "target_file_recall_at_6": 1,
+            "target_file_reciprocal_rank": 0.3333333333333333,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0,
+            "target_file_char_precision_at_6": 0.1858698034631402
+          },
+          "ast-structured": {
+            "target_file_recall_at_4": 1,
+            "target_file_recall_at_6": 1,
+            "target_file_reciprocal_rank": 0.25,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0,
+            "target_file_char_precision_at_6": 0.3195672624647225
+          }
+        },
+        "ast_structured_minus_fixed_raw": {
+          "target_file_recall_at_4": 0,
+          "target_file_recall_at_6": 0,
+          "target_file_reciprocal_rank": 0.0,
+          "hunk_anchor_recall_at_4": 0,
+          "hunk_anchor_recall_at_6": 0,
+          "target_file_char_precision_at_6": -0.010981119731844402
+        },
+        "ast_structured_minus_ast_code": {
+          "target_file_recall_at_4": 0,
+          "target_file_recall_at_6": 0,
+          "target_file_reciprocal_rank": -0.08333333333333331,
+          "hunk_anchor_recall_at_4": 0,
+          "hunk_anchor_recall_at_6": 0,
+          "target_file_char_precision_at_6": 0.1336974590015823
+        }
+      },
+      {
+        "instance_id": "django__django-13344",
+        "query_sha256": "fa0d64caaae3c17b9e52c447593c2c8ac3354046b1df2ceb293645b293b06090",
+        "target_file_count": 3,
+        "hunk_anchor_count": 51,
+        "metrics": {
+          "current-fixed": {
+            "target_file_recall_at_4": 0,
+            "target_file_recall_at_6": 0.3333333333333333,
+            "target_file_reciprocal_rank": 0.2,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0,
+            "target_file_char_precision_at_6": 0.1509433962264151
+          },
+          "fixed-raw": {
+            "target_file_recall_at_4": 0.3333333333333333,
+            "target_file_recall_at_6": 0.3333333333333333,
+            "target_file_reciprocal_rank": 0.5,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0,
+            "target_file_char_precision_at_6": 0.1568627450980392
+          },
+          "ast-code": {
+            "target_file_recall_at_4": 0,
+            "target_file_recall_at_6": 0,
+            "target_file_reciprocal_rank": 0,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0,
+            "target_file_char_precision_at_6": 0
+          },
+          "ast-structured": {
+            "target_file_recall_at_4": 0,
+            "target_file_recall_at_6": 0,
+            "target_file_reciprocal_rank": 0,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0,
+            "target_file_char_precision_at_6": 0
+          }
+        },
+        "ast_structured_minus_fixed_raw": {
+          "target_file_recall_at_4": -0.3333333333333333,
+          "target_file_recall_at_6": -0.3333333333333333,
+          "target_file_reciprocal_rank": -0.5,
+          "hunk_anchor_recall_at_4": 0,
+          "hunk_anchor_recall_at_6": 0,
+          "target_file_char_precision_at_6": -0.1568627450980392
+        },
+        "ast_structured_minus_ast_code": {
+          "target_file_recall_at_4": 0,
+          "target_file_recall_at_6": 0,
+          "target_file_reciprocal_rank": 0,
+          "hunk_anchor_recall_at_4": 0,
+          "hunk_anchor_recall_at_6": 0,
+          "target_file_char_precision_at_6": 0
+        }
+      },
+      {
+        "instance_id": "django__django-13346",
+        "query_sha256": "3cb764082e21011777c787f5ecf6688762b6f899a8b1f4ef1fab404245dc227c",
+        "target_file_count": 1,
+        "hunk_anchor_count": 4,
+        "metrics": {
+          "current-fixed": {
+            "target_file_recall_at_4": 1,
+            "target_file_recall_at_6": 1,
+            "target_file_reciprocal_rank": 0.3333333333333333,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0,
+            "target_file_char_precision_at_6": 0.3333333333333333
+          },
+          "fixed-raw": {
+            "target_file_recall_at_4": 1,
+            "target_file_recall_at_6": 1,
+            "target_file_reciprocal_rank": 0.5,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0,
+            "target_file_char_precision_at_6": 0.3333333333333333
+          },
+          "ast-code": {
+            "target_file_recall_at_4": 1,
+            "target_file_recall_at_6": 1,
+            "target_file_reciprocal_rank": 0.5,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0,
+            "target_file_char_precision_at_6": 0.08387096774193549
+          },
+          "ast-structured": {
+            "target_file_recall_at_4": 1,
+            "target_file_recall_at_6": 1,
+            "target_file_reciprocal_rank": 1,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0,
+            "target_file_char_precision_at_6": 0.053696636194195436
+          }
+        },
+        "ast_structured_minus_fixed_raw": {
+          "target_file_recall_at_4": 0,
+          "target_file_recall_at_6": 0,
+          "target_file_reciprocal_rank": 0.5,
+          "hunk_anchor_recall_at_4": 0,
+          "hunk_anchor_recall_at_6": 0,
+          "target_file_char_precision_at_6": -0.27963669713913786
+        },
+        "ast_structured_minus_ast_code": {
+          "target_file_recall_at_4": 0,
+          "target_file_recall_at_6": 0,
+          "target_file_reciprocal_rank": 0.5,
+          "hunk_anchor_recall_at_4": 0,
+          "hunk_anchor_recall_at_6": 0,
+          "target_file_char_precision_at_6": -0.030174331547740053
+        }
+      },
+      {
+        "instance_id": "django__django-13810",
+        "query_sha256": "56e9927b1d405bb6be5bd7a327cea4ed7a83858f705590310391df2fd2066379",
+        "target_file_count": 1,
+        "hunk_anchor_count": 12,
+        "metrics": {
+          "current-fixed": {
+            "target_file_recall_at_4": 1,
+            "target_file_recall_at_6": 1,
+            "target_file_reciprocal_rank": 1,
+            "hunk_anchor_recall_at_4": 1,
+            "hunk_anchor_recall_at_6": 1,
+            "target_file_char_precision_at_6": 0.34321465812602414
+          },
+          "fixed-raw": {
+            "target_file_recall_at_4": 1,
+            "target_file_recall_at_6": 1,
+            "target_file_reciprocal_rank": 1,
+            "hunk_anchor_recall_at_4": 0.9166666666666666,
+            "hunk_anchor_recall_at_6": 0.9166666666666666,
+            "target_file_char_precision_at_6": 0.33962264150943394
+          },
+          "ast-code": {
+            "target_file_recall_at_4": 1,
+            "target_file_recall_at_6": 1,
+            "target_file_reciprocal_rank": 1,
+            "hunk_anchor_recall_at_4": 1,
+            "hunk_anchor_recall_at_6": 1,
+            "target_file_char_precision_at_6": 0.3126679170679779
+          },
+          "ast-structured": {
+            "target_file_recall_at_4": 1,
+            "target_file_recall_at_6": 1,
+            "target_file_reciprocal_rank": 1,
+            "hunk_anchor_recall_at_4": 1,
+            "hunk_anchor_recall_at_6": 1,
+            "target_file_char_precision_at_6": 0.5392551145305123
+          }
+        },
+        "ast_structured_minus_fixed_raw": {
+          "target_file_recall_at_4": 0,
+          "target_file_recall_at_6": 0,
+          "target_file_reciprocal_rank": 0,
+          "hunk_anchor_recall_at_4": 0.08333333333333337,
+          "hunk_anchor_recall_at_6": 0.08333333333333337,
+          "target_file_char_precision_at_6": 0.1996324730210784
+        },
+        "ast_structured_minus_ast_code": {
+          "target_file_recall_at_4": 0,
+          "target_file_recall_at_6": 0,
+          "target_file_reciprocal_rank": 0,
+          "hunk_anchor_recall_at_4": 0,
+          "hunk_anchor_recall_at_6": 0,
+          "target_file_char_precision_at_6": 0.22658719746253442
+        }
+      },
+      {
+        "instance_id": "django__django-13820",
+        "query_sha256": "8448b0b82597255474fabc23fafe8fb9aee04c6f7bbc5a59dbec7918a19063e4",
+        "target_file_count": 1,
+        "hunk_anchor_count": 13,
+        "metrics": {
+          "current-fixed": {
+            "target_file_recall_at_4": 1,
+            "target_file_recall_at_6": 1,
+            "target_file_reciprocal_rank": 0.5,
+            "hunk_anchor_recall_at_4": 0.6923076923076923,
+            "hunk_anchor_recall_at_6": 0.6923076923076923,
+            "target_file_char_precision_at_6": 0.5
+          },
+          "fixed-raw": {
+            "target_file_recall_at_4": 1,
+            "target_file_recall_at_6": 1,
+            "target_file_reciprocal_rank": 1,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0,
+            "target_file_char_precision_at_6": 0.3269230769230769
+          },
+          "ast-code": {
+            "target_file_recall_at_4": 1,
+            "target_file_recall_at_6": 1,
+            "target_file_reciprocal_rank": 1,
+            "hunk_anchor_recall_at_4": 1,
+            "hunk_anchor_recall_at_6": 1,
+            "target_file_char_precision_at_6": 0.210479809136697
+          },
+          "ast-structured": {
+            "target_file_recall_at_4": 1,
+            "target_file_recall_at_6": 1,
+            "target_file_reciprocal_rank": 1,
+            "hunk_anchor_recall_at_4": 1,
+            "hunk_anchor_recall_at_6": 1,
+            "target_file_char_precision_at_6": 0.4379481522338665
+          }
+        },
+        "ast_structured_minus_fixed_raw": {
+          "target_file_recall_at_4": 0,
+          "target_file_recall_at_6": 0,
+          "target_file_reciprocal_rank": 0,
+          "hunk_anchor_recall_at_4": 1,
+          "hunk_anchor_recall_at_6": 1,
+          "target_file_char_precision_at_6": 0.11102507531078959
+        },
+        "ast_structured_minus_ast_code": {
+          "target_file_recall_at_4": 0,
+          "target_file_recall_at_6": 0,
+          "target_file_reciprocal_rank": 0,
+          "hunk_anchor_recall_at_4": 0,
+          "hunk_anchor_recall_at_6": 0,
+          "target_file_char_precision_at_6": 0.2274683430971695
+        }
+      },
+      {
+        "instance_id": "django__django-13925",
+        "query_sha256": "53aa9d5d9f674abca126966c4a1292cebbfcdb29346652e41d2151dd88f09b69",
+        "target_file_count": 1,
+        "hunk_anchor_count": 4,
+        "metrics": {
+          "current-fixed": {
+            "target_file_recall_at_4": 1,
+            "target_file_recall_at_6": 1,
+            "target_file_reciprocal_rank": 1,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0,
+            "target_file_char_precision_at_6": 0.16698072184374546
+          },
+          "fixed-raw": {
+            "target_file_recall_at_4": 0,
+            "target_file_recall_at_6": 1,
+            "target_file_reciprocal_rank": 0.2,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0,
+            "target_file_char_precision_at_6": 0.16666666666666666
+          },
+          "ast-code": {
+            "target_file_recall_at_4": 1,
+            "target_file_recall_at_6": 1,
+            "target_file_reciprocal_rank": 0.5,
+            "hunk_anchor_recall_at_4": 1,
+            "hunk_anchor_recall_at_6": 1,
+            "target_file_char_precision_at_6": 0.04076282295234471
+          },
+          "ast-structured": {
+            "target_file_recall_at_4": 1,
+            "target_file_recall_at_6": 1,
+            "target_file_reciprocal_rank": 0.5,
+            "hunk_anchor_recall_at_4": 1,
+            "hunk_anchor_recall_at_6": 1,
+            "target_file_char_precision_at_6": 0.0684756357437136
+          }
+        },
+        "ast_structured_minus_fixed_raw": {
+          "target_file_recall_at_4": 1,
+          "target_file_recall_at_6": 0,
+          "target_file_reciprocal_rank": 0.3,
+          "hunk_anchor_recall_at_4": 1,
+          "hunk_anchor_recall_at_6": 1,
+          "target_file_char_precision_at_6": -0.09819103092295306
+        },
+        "ast_structured_minus_ast_code": {
+          "target_file_recall_at_4": 0,
+          "target_file_recall_at_6": 0,
+          "target_file_reciprocal_rank": 0.0,
+          "hunk_anchor_recall_at_4": 0,
+          "hunk_anchor_recall_at_6": 0,
+          "target_file_char_precision_at_6": 0.02771281279136889
+        }
+      },
+      {
+        "instance_id": "django__django-14311",
+        "query_sha256": "461ce927881a7aee7d62b6cea89d7bc71d0f6ce70e107dbf073a0abe37394d4b",
+        "target_file_count": 1,
+        "hunk_anchor_count": 6,
+        "metrics": {
+          "current-fixed": {
+            "target_file_recall_at_4": 1,
+            "target_file_recall_at_6": 1,
+            "target_file_reciprocal_rank": 1,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0,
+            "target_file_char_precision_at_6": 0.1996187835730376
+          },
+          "fixed-raw": {
+            "target_file_recall_at_4": 1,
+            "target_file_recall_at_6": 1,
+            "target_file_reciprocal_rank": 1,
+            "hunk_anchor_recall_at_4": 1,
+            "hunk_anchor_recall_at_6": 1,
+            "target_file_char_precision_at_6": 0.3858650142354714
+          },
+          "ast-code": {
+            "target_file_recall_at_4": 0,
+            "target_file_recall_at_6": 1,
+            "target_file_reciprocal_rank": 0.2,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0,
+            "target_file_char_precision_at_6": 0.33559782608695654
+          },
+          "ast-structured": {
+            "target_file_recall_at_4": 1,
+            "target_file_recall_at_6": 1,
+            "target_file_reciprocal_rank": 1,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0,
+            "target_file_char_precision_at_6": 0.6317135549872123
+          }
+        },
+        "ast_structured_minus_fixed_raw": {
+          "target_file_recall_at_4": 0,
+          "target_file_recall_at_6": 0,
+          "target_file_reciprocal_rank": 0,
+          "hunk_anchor_recall_at_4": -1,
+          "hunk_anchor_recall_at_6": -1,
+          "target_file_char_precision_at_6": 0.24584854075174084
+        },
+        "ast_structured_minus_ast_code": {
+          "target_file_recall_at_4": 1,
+          "target_file_recall_at_6": 0,
+          "target_file_reciprocal_rank": 0.8,
+          "hunk_anchor_recall_at_4": 0,
+          "hunk_anchor_recall_at_6": 0,
+          "target_file_char_precision_at_6": 0.2961157289002557
+        }
+      },
+      {
+        "instance_id": "django__django-14349",
+        "query_sha256": "a68339a313302a5206f13b93193a304536f6bd11f99f1a0555a7077431b99152",
+        "target_file_count": 1,
+        "hunk_anchor_count": 7,
+        "metrics": {
+          "current-fixed": {
+            "target_file_recall_at_4": 0,
+            "target_file_recall_at_6": 0,
+            "target_file_reciprocal_rank": 0,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0,
+            "target_file_char_precision_at_6": 0
+          },
+          "fixed-raw": {
+            "target_file_recall_at_4": 0,
+            "target_file_recall_at_6": 0,
+            "target_file_reciprocal_rank": 0,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0,
+            "target_file_char_precision_at_6": 0
+          },
+          "ast-code": {
+            "target_file_recall_at_4": 1,
+            "target_file_recall_at_6": 1,
+            "target_file_reciprocal_rank": 0.3333333333333333,
+            "hunk_anchor_recall_at_4": 0.5714285714285714,
+            "hunk_anchor_recall_at_6": 0.5714285714285714,
+            "target_file_char_precision_at_6": 0.17528710819445645
+          },
+          "ast-structured": {
+            "target_file_recall_at_4": 1,
+            "target_file_recall_at_6": 1,
+            "target_file_reciprocal_rank": 1,
+            "hunk_anchor_recall_at_4": 0.5714285714285714,
+            "hunk_anchor_recall_at_6": 0.5714285714285714,
+            "target_file_char_precision_at_6": 0.3358702845797485
+          }
+        },
+        "ast_structured_minus_fixed_raw": {
+          "target_file_recall_at_4": 1,
+          "target_file_recall_at_6": 1,
+          "target_file_reciprocal_rank": 1,
+          "hunk_anchor_recall_at_4": 0.5714285714285714,
+          "hunk_anchor_recall_at_6": 0.5714285714285714,
+          "target_file_char_precision_at_6": 0.3358702845797485
+        },
+        "ast_structured_minus_ast_code": {
+          "target_file_recall_at_4": 0,
+          "target_file_recall_at_6": 0,
+          "target_file_reciprocal_rank": 0.6666666666666667,
+          "hunk_anchor_recall_at_4": 0.0,
+          "hunk_anchor_recall_at_6": 0.0,
+          "target_file_char_precision_at_6": 0.16058317638529204
+        }
+      },
+      {
+        "instance_id": "django__django-14434",
+        "query_sha256": "069b0d7ba8ebff2f277a626aec1231cfee3546478a755fd268df7ecf2e4ee766",
+        "target_file_count": 1,
+        "hunk_anchor_count": 14,
+        "metrics": {
+          "current-fixed": {
+            "target_file_recall_at_4": 1,
+            "target_file_recall_at_6": 1,
+            "target_file_reciprocal_rank": 0.5,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0,
+            "target_file_char_precision_at_6": 0.2192197906755471
+          },
+          "fixed-raw": {
+            "target_file_recall_at_4": 1,
+            "target_file_recall_at_6": 1,
+            "target_file_reciprocal_rank": 0.25,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0,
+            "target_file_char_precision_at_6": 0.16981132075471697
+          },
+          "ast-code": {
+            "target_file_recall_at_4": 0,
+            "target_file_recall_at_6": 0,
+            "target_file_reciprocal_rank": 0,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0,
+            "target_file_char_precision_at_6": 0
+          },
+          "ast-structured": {
+            "target_file_recall_at_4": 0,
+            "target_file_recall_at_6": 0,
+            "target_file_reciprocal_rank": 0,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0,
+            "target_file_char_precision_at_6": 0
+          }
+        },
+        "ast_structured_minus_fixed_raw": {
+          "target_file_recall_at_4": -1,
+          "target_file_recall_at_6": -1,
+          "target_file_reciprocal_rank": -0.25,
+          "hunk_anchor_recall_at_4": 0,
+          "hunk_anchor_recall_at_6": 0,
+          "target_file_char_precision_at_6": -0.16981132075471697
+        },
+        "ast_structured_minus_ast_code": {
+          "target_file_recall_at_4": 0,
+          "target_file_recall_at_6": 0,
+          "target_file_reciprocal_rank": 0,
+          "hunk_anchor_recall_at_4": 0,
+          "hunk_anchor_recall_at_6": 0,
+          "target_file_char_precision_at_6": 0
+        }
+      },
+      {
+        "instance_id": "django__django-14559",
+        "query_sha256": "6cc9af44c911bf02e1f72e4b16fbc31d33889d6468f7ef4ffde9ef408f92e90f",
+        "target_file_count": 1,
+        "hunk_anchor_count": 11,
+        "metrics": {
+          "current-fixed": {
+            "target_file_recall_at_4": 1,
+            "target_file_recall_at_6": 1,
+            "target_file_reciprocal_rank": 1,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0.45454545454545453,
+            "target_file_char_precision_at_6": 0.5
+          },
+          "fixed-raw": {
+            "target_file_recall_at_4": 1,
+            "target_file_recall_at_6": 1,
+            "target_file_reciprocal_rank": 0.3333333333333333,
+            "hunk_anchor_recall_at_4": 0.45454545454545453,
+            "hunk_anchor_recall_at_6": 0.45454545454545453,
+            "target_file_char_precision_at_6": 0.5
+          },
+          "ast-code": {
+            "target_file_recall_at_4": 1,
+            "target_file_recall_at_6": 1,
+            "target_file_reciprocal_rank": 0.5,
+            "hunk_anchor_recall_at_4": 0.8181818181818182,
+            "hunk_anchor_recall_at_6": 0.8181818181818182,
+            "target_file_char_precision_at_6": 0.41798941798941797
+          },
+          "ast-structured": {
+            "target_file_recall_at_4": 1,
+            "target_file_recall_at_6": 1,
+            "target_file_reciprocal_rank": 0.5,
+            "hunk_anchor_recall_at_4": 0.8181818181818182,
+            "hunk_anchor_recall_at_6": 0.8181818181818182,
+            "target_file_char_precision_at_6": 0.5587031275585393
+          }
+        },
+        "ast_structured_minus_fixed_raw": {
+          "target_file_recall_at_4": 0,
+          "target_file_recall_at_6": 0,
+          "target_file_reciprocal_rank": 0.16666666666666669,
+          "hunk_anchor_recall_at_4": 0.3636363636363637,
+          "hunk_anchor_recall_at_6": 0.3636363636363637,
+          "target_file_char_precision_at_6": 0.05870312755853935
+        },
+        "ast_structured_minus_ast_code": {
+          "target_file_recall_at_4": 0,
+          "target_file_recall_at_6": 0,
+          "target_file_reciprocal_rank": 0.0,
+          "hunk_anchor_recall_at_4": 0.0,
+          "hunk_anchor_recall_at_6": 0.0,
+          "target_file_char_precision_at_6": 0.14071370956912138
+        }
+      },
+      {
+        "instance_id": "django__django-14792",
+        "query_sha256": "b5f5a0d21a40deb0fea2a4a0dfa0b0c5f45c891648de9e0d622db437f3b84e3e",
+        "target_file_count": 1,
+        "hunk_anchor_count": 2,
+        "metrics": {
+          "current-fixed": {
+            "target_file_recall_at_4": 1,
+            "target_file_recall_at_6": 1,
+            "target_file_reciprocal_rank": 0.5,
+            "hunk_anchor_recall_at_4": 1,
+            "hunk_anchor_recall_at_6": 1,
+            "target_file_char_precision_at_6": 0.3269230769230769
+          },
+          "fixed-raw": {
+            "target_file_recall_at_4": 1,
+            "target_file_recall_at_6": 1,
+            "target_file_reciprocal_rank": 1,
+            "hunk_anchor_recall_at_4": 1,
+            "hunk_anchor_recall_at_6": 1,
+            "target_file_char_precision_at_6": 0.3269230769230769
+          },
+          "ast-code": {
+            "target_file_recall_at_4": 0,
+            "target_file_recall_at_6": 0,
+            "target_file_reciprocal_rank": 0,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0,
+            "target_file_char_precision_at_6": 0
+          },
+          "ast-structured": {
+            "target_file_recall_at_4": 0,
+            "target_file_recall_at_6": 0,
+            "target_file_reciprocal_rank": 0,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0,
+            "target_file_char_precision_at_6": 0
+          }
+        },
+        "ast_structured_minus_fixed_raw": {
+          "target_file_recall_at_4": -1,
+          "target_file_recall_at_6": -1,
+          "target_file_reciprocal_rank": -1,
+          "hunk_anchor_recall_at_4": -1,
+          "hunk_anchor_recall_at_6": -1,
+          "target_file_char_precision_at_6": -0.3269230769230769
+        },
+        "ast_structured_minus_ast_code": {
+          "target_file_recall_at_4": 0,
+          "target_file_recall_at_6": 0,
+          "target_file_reciprocal_rank": 0,
+          "hunk_anchor_recall_at_4": 0,
+          "hunk_anchor_recall_at_6": 0,
+          "target_file_char_precision_at_6": 0
+        }
+      },
+      {
+        "instance_id": "django__django-15268",
+        "query_sha256": "d924c4fce88325ef036717d83eec6886a45e706bcdb2990f20049ed3d6377f07",
+        "target_file_count": 1,
+        "hunk_anchor_count": 7,
+        "metrics": {
+          "current-fixed": {
+            "target_file_recall_at_4": 0,
+            "target_file_recall_at_6": 0,
+            "target_file_reciprocal_rank": 0,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0,
+            "target_file_char_precision_at_6": 0
+          },
+          "fixed-raw": {
+            "target_file_recall_at_4": 0,
+            "target_file_recall_at_6": 0,
+            "target_file_reciprocal_rank": 0,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0,
+            "target_file_char_precision_at_6": 0
+          },
+          "ast-code": {
+            "target_file_recall_at_4": 0,
+            "target_file_recall_at_6": 0,
+            "target_file_reciprocal_rank": 0,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0,
+            "target_file_char_precision_at_6": 0
+          },
+          "ast-structured": {
+            "target_file_recall_at_4": 0,
+            "target_file_recall_at_6": 0,
+            "target_file_reciprocal_rank": 0,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0,
+            "target_file_char_precision_at_6": 0
+          }
+        },
+        "ast_structured_minus_fixed_raw": {
+          "target_file_recall_at_4": 0,
+          "target_file_recall_at_6": 0,
+          "target_file_reciprocal_rank": 0,
+          "hunk_anchor_recall_at_4": 0,
+          "hunk_anchor_recall_at_6": 0,
+          "target_file_char_precision_at_6": 0
+        },
+        "ast_structured_minus_ast_code": {
+          "target_file_recall_at_4": 0,
+          "target_file_recall_at_6": 0,
+          "target_file_reciprocal_rank": 0,
+          "hunk_anchor_recall_at_4": 0,
+          "hunk_anchor_recall_at_6": 0,
+          "target_file_char_precision_at_6": 0
+        }
+      },
+      {
+        "instance_id": "django__django-15732",
+        "query_sha256": "9fec2159f491fae94855a4e7f43923ee35d5c1b124f9f26769a0e6015ff0f312",
+        "target_file_count": 1,
+        "hunk_anchor_count": 24,
+        "metrics": {
+          "current-fixed": {
+            "target_file_recall_at_4": 1,
+            "target_file_recall_at_6": 1,
+            "target_file_reciprocal_rank": 1,
+            "hunk_anchor_recall_at_4": 0.20833333333333334,
+            "hunk_anchor_recall_at_6": 0.20833333333333334,
+            "target_file_char_precision_at_6": 0.5155131264916468
+          },
+          "fixed-raw": {
+            "target_file_recall_at_4": 1,
+            "target_file_recall_at_6": 1,
+            "target_file_reciprocal_rank": 1,
+            "hunk_anchor_recall_at_4": 0.08333333333333333,
+            "hunk_anchor_recall_at_6": 0.08333333333333333,
+            "target_file_char_precision_at_6": 0.5
+          },
+          "ast-code": {
+            "target_file_recall_at_4": 1,
+            "target_file_recall_at_6": 1,
+            "target_file_reciprocal_rank": 0.5,
+            "hunk_anchor_recall_at_4": 0.20833333333333334,
+            "hunk_anchor_recall_at_6": 0.20833333333333334,
+            "target_file_char_precision_at_6": 0.08555370524562864
+          },
+          "ast-structured": {
+            "target_file_recall_at_4": 0,
+            "target_file_recall_at_6": 1,
+            "target_file_reciprocal_rank": 0.16666666666666666,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0.20833333333333334,
+            "target_file_char_precision_at_6": 0.06279123061645406
+          }
+        },
+        "ast_structured_minus_fixed_raw": {
+          "target_file_recall_at_4": -1,
+          "target_file_recall_at_6": 0,
+          "target_file_reciprocal_rank": -0.8333333333333334,
+          "hunk_anchor_recall_at_4": -0.08333333333333333,
+          "hunk_anchor_recall_at_6": 0.125,
+          "target_file_char_precision_at_6": -0.4372087693835459
+        },
+        "ast_structured_minus_ast_code": {
+          "target_file_recall_at_4": -1,
+          "target_file_recall_at_6": 0,
+          "target_file_reciprocal_rank": -0.33333333333333337,
+          "hunk_anchor_recall_at_4": -0.20833333333333334,
+          "hunk_anchor_recall_at_6": 0.0,
+          "target_file_char_precision_at_6": -0.02276247462917458
+        }
+      },
+      {
+        "instance_id": "django__django-15930",
+        "query_sha256": "e2c63560dec85eba8d54e55e16e39c352b0db782bc1b1f06aef31819757e9732",
+        "target_file_count": 1,
+        "hunk_anchor_count": 4,
+        "metrics": {
+          "current-fixed": {
+            "target_file_recall_at_4": 0,
+            "target_file_recall_at_6": 0,
+            "target_file_reciprocal_rank": 0,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0,
+            "target_file_char_precision_at_6": 0
+          },
+          "fixed-raw": {
+            "target_file_recall_at_4": 0,
+            "target_file_recall_at_6": 0,
+            "target_file_reciprocal_rank": 0,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0,
+            "target_file_char_precision_at_6": 0
+          },
+          "ast-code": {
+            "target_file_recall_at_4": 0,
+            "target_file_recall_at_6": 0,
+            "target_file_reciprocal_rank": 0,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0,
+            "target_file_char_precision_at_6": 0
+          },
+          "ast-structured": {
+            "target_file_recall_at_4": 0,
+            "target_file_recall_at_6": 0,
+            "target_file_reciprocal_rank": 0,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0,
+            "target_file_char_precision_at_6": 0
+          }
+        },
+        "ast_structured_minus_fixed_raw": {
+          "target_file_recall_at_4": 0,
+          "target_file_recall_at_6": 0,
+          "target_file_reciprocal_rank": 0,
+          "hunk_anchor_recall_at_4": 0,
+          "hunk_anchor_recall_at_6": 0,
+          "target_file_char_precision_at_6": 0
+        },
+        "ast_structured_minus_ast_code": {
+          "target_file_recall_at_4": 0,
+          "target_file_recall_at_6": 0,
+          "target_file_reciprocal_rank": 0,
+          "hunk_anchor_recall_at_4": 0,
+          "hunk_anchor_recall_at_6": 0,
+          "target_file_char_precision_at_6": 0
+        }
+      },
+      {
+        "instance_id": "django__django-15957",
+        "query_sha256": "676a7fa58acee1293e62f431bfea0ddd001785e0efd2051bb50d7314027e9213",
+        "target_file_count": 1,
+        "hunk_anchor_count": 16,
+        "metrics": {
+          "current-fixed": {
+            "target_file_recall_at_4": 0,
+            "target_file_recall_at_6": 0,
+            "target_file_reciprocal_rank": 0,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0,
+            "target_file_char_precision_at_6": 0
+          },
+          "fixed-raw": {
+            "target_file_recall_at_4": 0,
+            "target_file_recall_at_6": 0,
+            "target_file_reciprocal_rank": 0,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0,
+            "target_file_char_precision_at_6": 0
+          },
+          "ast-code": {
+            "target_file_recall_at_4": 0,
+            "target_file_recall_at_6": 0,
+            "target_file_reciprocal_rank": 0,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0,
+            "target_file_char_precision_at_6": 0
+          },
+          "ast-structured": {
+            "target_file_recall_at_4": 0,
+            "target_file_recall_at_6": 0,
+            "target_file_reciprocal_rank": 0,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0,
+            "target_file_char_precision_at_6": 0
+          }
+        },
+        "ast_structured_minus_fixed_raw": {
+          "target_file_recall_at_4": 0,
+          "target_file_recall_at_6": 0,
+          "target_file_reciprocal_rank": 0,
+          "hunk_anchor_recall_at_4": 0,
+          "hunk_anchor_recall_at_6": 0,
+          "target_file_char_precision_at_6": 0
+        },
+        "ast_structured_minus_ast_code": {
+          "target_file_recall_at_4": 0,
+          "target_file_recall_at_6": 0,
+          "target_file_reciprocal_rank": 0,
+          "hunk_anchor_recall_at_4": 0,
+          "hunk_anchor_recall_at_6": 0,
+          "target_file_char_precision_at_6": 0
+        }
+      },
+      {
+        "instance_id": "django__django-15987",
+        "query_sha256": "74fc422f95f0cc73e0782cafc65260bc6805ce03753bea993d58c0641edc8a5d",
+        "target_file_count": 1,
+        "hunk_anchor_count": 5,
+        "metrics": {
+          "current-fixed": {
+            "target_file_recall_at_4": 1,
+            "target_file_recall_at_6": 1,
+            "target_file_reciprocal_rank": 0.5,
+            "hunk_anchor_recall_at_4": 1,
+            "hunk_anchor_recall_at_6": 1,
+            "target_file_char_precision_at_6": 0.391304347826087
+          },
+          "fixed-raw": {
+            "target_file_recall_at_4": 1,
+            "target_file_recall_at_6": 1,
+            "target_file_reciprocal_rank": 1,
+            "hunk_anchor_recall_at_4": 1,
+            "hunk_anchor_recall_at_6": 1,
+            "target_file_char_precision_at_6": 0.6666666666666666
+          },
+          "ast-code": {
+            "target_file_recall_at_4": 1,
+            "target_file_recall_at_6": 1,
+            "target_file_reciprocal_rank": 0.5,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0,
+            "target_file_char_precision_at_6": 0.2057142857142857
+          },
+          "ast-structured": {
+            "target_file_recall_at_4": 0,
+            "target_file_recall_at_6": 1,
+            "target_file_reciprocal_rank": 0.16666666666666666,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0,
+            "target_file_char_precision_at_6": 0.22845055526176627
+          }
+        },
+        "ast_structured_minus_fixed_raw": {
+          "target_file_recall_at_4": -1,
+          "target_file_recall_at_6": 0,
+          "target_file_reciprocal_rank": -0.8333333333333334,
+          "hunk_anchor_recall_at_4": -1,
+          "hunk_anchor_recall_at_6": -1,
+          "target_file_char_precision_at_6": -0.43821611140490035
+        },
+        "ast_structured_minus_ast_code": {
+          "target_file_recall_at_4": -1,
+          "target_file_recall_at_6": 0,
+          "target_file_reciprocal_rank": -0.33333333333333337,
+          "hunk_anchor_recall_at_4": 0,
+          "hunk_anchor_recall_at_6": 0,
+          "target_file_char_precision_at_6": 0.022736269547480564
+        }
+      },
+      {
+        "instance_id": "django__django-16454",
+        "query_sha256": "1b38e35ca2721cfc6bfdf1b9fdc133975c7e5c72b4ef5e91e132fd578e89d0e0",
+        "target_file_count": 1,
+        "hunk_anchor_count": 5,
+        "metrics": {
+          "current-fixed": {
+            "target_file_recall_at_4": 1,
+            "target_file_recall_at_6": 1,
+            "target_file_reciprocal_rank": 1,
+            "hunk_anchor_recall_at_4": 1,
+            "hunk_anchor_recall_at_6": 1,
+            "target_file_char_precision_at_6": 0.660377358490566
+          },
+          "fixed-raw": {
+            "target_file_recall_at_4": 1,
+            "target_file_recall_at_6": 1,
+            "target_file_reciprocal_rank": 1,
+            "hunk_anchor_recall_at_4": 0.6,
+            "hunk_anchor_recall_at_6": 1,
+            "target_file_char_precision_at_6": 0.8301886792452831
+          },
+          "ast-code": {
+            "target_file_recall_at_4": 1,
+            "target_file_recall_at_6": 1,
+            "target_file_reciprocal_rank": 1,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0,
+            "target_file_char_precision_at_6": 0.47576152660898424
+          },
+          "ast-structured": {
+            "target_file_recall_at_4": 1,
+            "target_file_recall_at_6": 1,
+            "target_file_reciprocal_rank": 1,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0,
+            "target_file_char_precision_at_6": 0.5963774220724516
+          }
+        },
+        "ast_structured_minus_fixed_raw": {
+          "target_file_recall_at_4": 0,
+          "target_file_recall_at_6": 0,
+          "target_file_reciprocal_rank": 0,
+          "hunk_anchor_recall_at_4": -0.6,
+          "hunk_anchor_recall_at_6": -1,
+          "target_file_char_precision_at_6": -0.23381125717283147
+        },
+        "ast_structured_minus_ast_code": {
+          "target_file_recall_at_4": 0,
+          "target_file_recall_at_6": 0,
+          "target_file_reciprocal_rank": 0,
+          "hunk_anchor_recall_at_4": 0,
+          "hunk_anchor_recall_at_6": 0,
+          "target_file_char_precision_at_6": 0.12061589546346735
+        }
+      },
+      {
+        "instance_id": "django__django-16938",
+        "query_sha256": "df77a03b1d4dc247eb9cb80cd7a2d98d9b6f63f3036e1a3d65431ff0edc39d39",
+        "target_file_count": 2,
+        "hunk_anchor_count": 6,
+        "metrics": {
+          "current-fixed": {
+            "target_file_recall_at_4": 0,
+            "target_file_recall_at_6": 0.5,
+            "target_file_reciprocal_rank": 0.2,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0.5,
+            "target_file_char_precision_at_6": 0.17307692307692307
+          },
+          "fixed-raw": {
+            "target_file_recall_at_4": 0,
+            "target_file_recall_at_6": 0,
+            "target_file_reciprocal_rank": 0,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0,
+            "target_file_char_precision_at_6": 0
+          },
+          "ast-code": {
+            "target_file_recall_at_4": 0.5,
+            "target_file_recall_at_6": 1,
+            "target_file_reciprocal_rank": 1,
+            "hunk_anchor_recall_at_4": 0.5,
+            "hunk_anchor_recall_at_6": 0.5,
+            "target_file_char_precision_at_6": 0.19216706668760233
+          },
+          "ast-structured": {
+            "target_file_recall_at_4": 1,
+            "target_file_recall_at_6": 1,
+            "target_file_reciprocal_rank": 1,
+            "hunk_anchor_recall_at_4": 1,
+            "hunk_anchor_recall_at_6": 1,
+            "target_file_char_precision_at_6": 0.21533929987538236
+          }
+        },
+        "ast_structured_minus_fixed_raw": {
+          "target_file_recall_at_4": 1,
+          "target_file_recall_at_6": 1,
+          "target_file_reciprocal_rank": 1,
+          "hunk_anchor_recall_at_4": 1,
+          "hunk_anchor_recall_at_6": 1,
+          "target_file_char_precision_at_6": 0.21533929987538236
+        },
+        "ast_structured_minus_ast_code": {
+          "target_file_recall_at_4": 0.5,
+          "target_file_recall_at_6": 0,
+          "target_file_reciprocal_rank": 0,
+          "hunk_anchor_recall_at_4": 0.5,
+          "hunk_anchor_recall_at_6": 0.5,
+          "target_file_char_precision_at_6": 0.023172233187780028
+        }
+      },
+      {
+        "instance_id": "django__django-17084",
+        "query_sha256": "04cc3977bbc184d950a14a6b4e9caf06f854fa2575218694b65982247ca6388c",
+        "target_file_count": 1,
+        "hunk_anchor_count": 12,
+        "metrics": {
+          "current-fixed": {
+            "target_file_recall_at_4": 0,
+            "target_file_recall_at_6": 0,
+            "target_file_reciprocal_rank": 0,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0,
+            "target_file_char_precision_at_6": 0
+          },
+          "fixed-raw": {
+            "target_file_recall_at_4": 0,
+            "target_file_recall_at_6": 0,
+            "target_file_reciprocal_rank": 0,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0,
+            "target_file_char_precision_at_6": 0
+          },
+          "ast-code": {
+            "target_file_recall_at_4": 0,
+            "target_file_recall_at_6": 0,
+            "target_file_reciprocal_rank": 0,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0,
+            "target_file_char_precision_at_6": 0
+          },
+          "ast-structured": {
+            "target_file_recall_at_4": 0,
+            "target_file_recall_at_6": 0,
+            "target_file_reciprocal_rank": 0,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0,
+            "target_file_char_precision_at_6": 0
+          }
+        },
+        "ast_structured_minus_fixed_raw": {
+          "target_file_recall_at_4": 0,
+          "target_file_recall_at_6": 0,
+          "target_file_reciprocal_rank": 0,
+          "hunk_anchor_recall_at_4": 0,
+          "hunk_anchor_recall_at_6": 0,
+          "target_file_char_precision_at_6": 0
+        },
+        "ast_structured_minus_ast_code": {
+          "target_file_recall_at_4": 0,
+          "target_file_recall_at_6": 0,
+          "target_file_reciprocal_rank": 0,
+          "hunk_anchor_recall_at_4": 0,
+          "hunk_anchor_recall_at_6": 0,
+          "target_file_char_precision_at_6": 0
+        }
+      },
+      {
+        "instance_id": "django__django-17087",
+        "query_sha256": "70cad331a2b095ca612c98e2d2d81a549fb32f91f6ac261196d30d4a77bdb2fb",
+        "target_file_count": 1,
+        "hunk_anchor_count": 5,
+        "metrics": {
+          "current-fixed": {
+            "target_file_recall_at_4": 0,
+            "target_file_recall_at_6": 0,
+            "target_file_reciprocal_rank": 0,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0,
+            "target_file_char_precision_at_6": 0
+          },
+          "fixed-raw": {
+            "target_file_recall_at_4": 0,
+            "target_file_recall_at_6": 0,
+            "target_file_reciprocal_rank": 0,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0,
+            "target_file_char_precision_at_6": 0
+          },
+          "ast-code": {
+            "target_file_recall_at_4": 0,
+            "target_file_recall_at_6": 0,
+            "target_file_reciprocal_rank": 0,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0,
+            "target_file_char_precision_at_6": 0
+          },
+          "ast-structured": {
+            "target_file_recall_at_4": 0,
+            "target_file_recall_at_6": 0,
+            "target_file_reciprocal_rank": 0,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0,
+            "target_file_char_precision_at_6": 0
+          }
+        },
+        "ast_structured_minus_fixed_raw": {
+          "target_file_recall_at_4": 0,
+          "target_file_recall_at_6": 0,
+          "target_file_reciprocal_rank": 0,
+          "hunk_anchor_recall_at_4": 0,
+          "hunk_anchor_recall_at_6": 0,
+          "target_file_char_precision_at_6": 0
+        },
+        "ast_structured_minus_ast_code": {
+          "target_file_recall_at_4": 0,
+          "target_file_recall_at_6": 0,
+          "target_file_reciprocal_rank": 0,
+          "hunk_anchor_recall_at_4": 0,
+          "hunk_anchor_recall_at_6": 0,
+          "target_file_char_precision_at_6": 0
+        }
+      },
+      {
+        "instance_id": "matplotlib__matplotlib-20676",
+        "query_sha256": "c201ac5236b0a5eb57faa1768a12c67f0132074a5538d82feb717a62af9ad01d",
+        "target_file_count": 1,
+        "hunk_anchor_count": 4,
+        "metrics": {
+          "current-fixed": {
+            "target_file_recall_at_4": 1,
+            "target_file_recall_at_6": 1,
+            "target_file_reciprocal_rank": 1,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0,
+            "target_file_char_precision_at_6": 0.1825962910128388
+          },
+          "fixed-raw": {
+            "target_file_recall_at_4": 0,
+            "target_file_recall_at_6": 0,
+            "target_file_reciprocal_rank": 0,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0,
+            "target_file_char_precision_at_6": 0
+          },
+          "ast-code": {
+            "target_file_recall_at_4": 1,
+            "target_file_recall_at_6": 1,
+            "target_file_reciprocal_rank": 1,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0,
+            "target_file_char_precision_at_6": 0.22056121596793052
+          },
+          "ast-structured": {
+            "target_file_recall_at_4": 1,
+            "target_file_recall_at_6": 1,
+            "target_file_reciprocal_rank": 1,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0,
+            "target_file_char_precision_at_6": 0.7416476958100043
+          }
+        },
+        "ast_structured_minus_fixed_raw": {
+          "target_file_recall_at_4": 1,
+          "target_file_recall_at_6": 1,
+          "target_file_reciprocal_rank": 1,
+          "hunk_anchor_recall_at_4": 0,
+          "hunk_anchor_recall_at_6": 0,
+          "target_file_char_precision_at_6": 0.7416476958100043
+        },
+        "ast_structured_minus_ast_code": {
+          "target_file_recall_at_4": 0,
+          "target_file_recall_at_6": 0,
+          "target_file_reciprocal_rank": 0,
+          "hunk_anchor_recall_at_4": 0,
+          "hunk_anchor_recall_at_6": 0,
+          "target_file_char_precision_at_6": 0.5210864798420738
+        }
+      },
+      {
+        "instance_id": "matplotlib__matplotlib-23299",
+        "query_sha256": "e09f2f06fba2878eb83a9b899e7f51c5053caf050a9e1ccaa56a015edf027cc6",
+        "target_file_count": 1,
+        "hunk_anchor_count": 7,
+        "metrics": {
+          "current-fixed": {
+            "target_file_recall_at_4": 0,
+            "target_file_recall_at_6": 0,
+            "target_file_reciprocal_rank": 0,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0,
+            "target_file_char_precision_at_6": 0
+          },
+          "fixed-raw": {
+            "target_file_recall_at_4": 0,
+            "target_file_recall_at_6": 0,
+            "target_file_reciprocal_rank": 0,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0,
+            "target_file_char_precision_at_6": 0
+          },
+          "ast-code": {
+            "target_file_recall_at_4": 1,
+            "target_file_recall_at_6": 1,
+            "target_file_reciprocal_rank": 0.25,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0,
+            "target_file_char_precision_at_6": 0.12242903903463774
+          },
+          "ast-structured": {
+            "target_file_recall_at_4": 0,
+            "target_file_recall_at_6": 1,
+            "target_file_reciprocal_rank": 0.2,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0,
+            "target_file_char_precision_at_6": 0.36734095573145703
+          }
+        },
+        "ast_structured_minus_fixed_raw": {
+          "target_file_recall_at_4": 0,
+          "target_file_recall_at_6": 1,
+          "target_file_reciprocal_rank": 0.2,
+          "hunk_anchor_recall_at_4": 0,
+          "hunk_anchor_recall_at_6": 0,
+          "target_file_char_precision_at_6": 0.36734095573145703
+        },
+        "ast_structured_minus_ast_code": {
+          "target_file_recall_at_4": -1,
+          "target_file_recall_at_6": 0,
+          "target_file_reciprocal_rank": -0.04999999999999999,
+          "hunk_anchor_recall_at_4": 0,
+          "hunk_anchor_recall_at_6": 0,
+          "target_file_char_precision_at_6": 0.24491191669681928
+        }
+      },
+      {
+        "instance_id": "matplotlib__matplotlib-23412",
+        "query_sha256": "f6a488ca9ccd9717eed2b1b06381bfb2f0df1fcb770c10d2798a394581354770",
+        "target_file_count": 1,
+        "hunk_anchor_count": 7,
+        "metrics": {
+          "current-fixed": {
+            "target_file_recall_at_4": 0,
+            "target_file_recall_at_6": 0,
+            "target_file_reciprocal_rank": 0,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0,
+            "target_file_char_precision_at_6": 0
+          },
+          "fixed-raw": {
+            "target_file_recall_at_4": 0,
+            "target_file_recall_at_6": 0,
+            "target_file_reciprocal_rank": 0,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0,
+            "target_file_char_precision_at_6": 0
+          },
+          "ast-code": {
+            "target_file_recall_at_4": 0,
+            "target_file_recall_at_6": 0,
+            "target_file_reciprocal_rank": 0,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0,
+            "target_file_char_precision_at_6": 0
+          },
+          "ast-structured": {
+            "target_file_recall_at_4": 0,
+            "target_file_recall_at_6": 0,
+            "target_file_reciprocal_rank": 0,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0,
+            "target_file_char_precision_at_6": 0
+          }
+        },
+        "ast_structured_minus_fixed_raw": {
+          "target_file_recall_at_4": 0,
+          "target_file_recall_at_6": 0,
+          "target_file_reciprocal_rank": 0,
+          "hunk_anchor_recall_at_4": 0,
+          "hunk_anchor_recall_at_6": 0,
+          "target_file_char_precision_at_6": 0
+        },
+        "ast_structured_minus_ast_code": {
+          "target_file_recall_at_4": 0,
+          "target_file_recall_at_6": 0,
+          "target_file_reciprocal_rank": 0,
+          "hunk_anchor_recall_at_4": 0,
+          "hunk_anchor_recall_at_6": 0,
+          "target_file_char_precision_at_6": 0
+        }
+      },
+      {
+        "instance_id": "matplotlib__matplotlib-25287",
+        "query_sha256": "f9bbb7794506f072129a5e7941e265280853fd873550828d7a66e91baa611c7e",
+        "target_file_count": 1,
+        "hunk_anchor_count": 17,
+        "metrics": {
+          "current-fixed": {
+            "target_file_recall_at_4": 1,
+            "target_file_recall_at_6": 1,
+            "target_file_reciprocal_rank": 0.5,
+            "hunk_anchor_recall_at_4": 0.47058823529411764,
+            "hunk_anchor_recall_at_6": 0.47058823529411764,
+            "target_file_char_precision_at_6": 0.3333333333333333
+          },
+          "fixed-raw": {
+            "target_file_recall_at_4": 0,
+            "target_file_recall_at_6": 0,
+            "target_file_reciprocal_rank": 0,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0,
+            "target_file_char_precision_at_6": 0
+          },
+          "ast-code": {
+            "target_file_recall_at_4": 1,
+            "target_file_recall_at_6": 1,
+            "target_file_reciprocal_rank": 1,
+            "hunk_anchor_recall_at_4": 1,
+            "hunk_anchor_recall_at_6": 1,
+            "target_file_char_precision_at_6": 0.1197925380625732
+          },
+          "ast-structured": {
+            "target_file_recall_at_4": 1,
+            "target_file_recall_at_6": 1,
+            "target_file_reciprocal_rank": 1,
+            "hunk_anchor_recall_at_4": 1,
+            "hunk_anchor_recall_at_6": 1,
+            "target_file_char_precision_at_6": 0.07099310390778558
+          }
+        },
+        "ast_structured_minus_fixed_raw": {
+          "target_file_recall_at_4": 1,
+          "target_file_recall_at_6": 1,
+          "target_file_reciprocal_rank": 1,
+          "hunk_anchor_recall_at_4": 1,
+          "hunk_anchor_recall_at_6": 1,
+          "target_file_char_precision_at_6": 0.07099310390778558
+        },
+        "ast_structured_minus_ast_code": {
+          "target_file_recall_at_4": 0,
+          "target_file_recall_at_6": 0,
+          "target_file_reciprocal_rank": 0,
+          "hunk_anchor_recall_at_4": 0,
+          "hunk_anchor_recall_at_6": 0,
+          "target_file_char_precision_at_6": -0.048799434154787616
+        }
+      },
+      {
+        "instance_id": "psf__requests-1921",
+        "query_sha256": "3f7bdcd805645db3f6bbfa3476d3207f878afdfa4a91f8c8d56705d9aaf48e8d",
+        "target_file_count": 1,
+        "hunk_anchor_count": 1,
+        "metrics": {
+          "current-fixed": {
+            "target_file_recall_at_4": 1,
+            "target_file_recall_at_6": 1,
+            "target_file_reciprocal_rank": 0.25,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0,
+            "target_file_char_precision_at_6": 0.3333333333333333
+          },
+          "fixed-raw": {
+            "target_file_recall_at_4": 1,
+            "target_file_recall_at_6": 1,
+            "target_file_reciprocal_rank": 0.3333333333333333,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0,
+            "target_file_char_precision_at_6": 0.5
+          },
+          "ast-code": {
+            "target_file_recall_at_4": 1,
+            "target_file_recall_at_6": 1,
+            "target_file_reciprocal_rank": 1,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0,
+            "target_file_char_precision_at_6": 0.6968814650218375
+          },
+          "ast-structured": {
+            "target_file_recall_at_4": 1,
+            "target_file_recall_at_6": 1,
+            "target_file_reciprocal_rank": 0.5,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0,
+            "target_file_char_precision_at_6": 0.7252943947244466
+          }
+        },
+        "ast_structured_minus_fixed_raw": {
+          "target_file_recall_at_4": 0,
+          "target_file_recall_at_6": 0,
+          "target_file_reciprocal_rank": 0.16666666666666669,
+          "hunk_anchor_recall_at_4": 0,
+          "hunk_anchor_recall_at_6": 0,
+          "target_file_char_precision_at_6": 0.22529439472444657
+        },
+        "ast_structured_minus_ast_code": {
+          "target_file_recall_at_4": 0,
+          "target_file_recall_at_6": 0,
+          "target_file_reciprocal_rank": -0.5,
+          "hunk_anchor_recall_at_4": 0,
+          "hunk_anchor_recall_at_6": 0,
+          "target_file_char_precision_at_6": 0.028412929702609113
+        }
+      },
+      {
+        "instance_id": "psf__requests-6028",
+        "query_sha256": "1d82b6998adb429d6d13a59c0c321de5ea24889a19843d4de7ea4dff06739cc0",
+        "target_file_count": 1,
+        "hunk_anchor_count": 3,
+        "metrics": {
+          "current-fixed": {
+            "target_file_recall_at_4": 0,
+            "target_file_recall_at_6": 0,
+            "target_file_reciprocal_rank": 0,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0,
+            "target_file_char_precision_at_6": 0
+          },
+          "fixed-raw": {
+            "target_file_recall_at_4": 0,
+            "target_file_recall_at_6": 0,
+            "target_file_reciprocal_rank": 0,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0,
+            "target_file_char_precision_at_6": 0
+          },
+          "ast-code": {
+            "target_file_recall_at_4": 0,
+            "target_file_recall_at_6": 1,
+            "target_file_reciprocal_rank": 0.2,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0,
+            "target_file_char_precision_at_6": 0.1473734091524506
+          },
+          "ast-structured": {
+            "target_file_recall_at_4": 0,
+            "target_file_recall_at_6": 1,
+            "target_file_reciprocal_rank": 0.16666666666666666,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0,
+            "target_file_char_precision_at_6": 0.27863816715730194
+          }
+        },
+        "ast_structured_minus_fixed_raw": {
+          "target_file_recall_at_4": 0,
+          "target_file_recall_at_6": 1,
+          "target_file_reciprocal_rank": 0.16666666666666666,
+          "hunk_anchor_recall_at_4": 0,
+          "hunk_anchor_recall_at_6": 0,
+          "target_file_char_precision_at_6": 0.27863816715730194
+        },
+        "ast_structured_minus_ast_code": {
+          "target_file_recall_at_4": 0,
+          "target_file_recall_at_6": 0,
+          "target_file_reciprocal_rank": -0.033333333333333354,
+          "hunk_anchor_recall_at_4": 0,
+          "hunk_anchor_recall_at_6": 0,
+          "target_file_char_precision_at_6": 0.13126475800485135
+        }
+      },
+      {
+        "instance_id": "pydata__xarray-4687",
+        "query_sha256": "c88bf8b1b5d25b8a288a2b44d5dfbdfb965ec927fa9658368ebeb65809441dbd",
+        "target_file_count": 1,
+        "hunk_anchor_count": 11,
+        "metrics": {
+          "current-fixed": {
+            "target_file_recall_at_4": 0,
+            "target_file_recall_at_6": 0,
+            "target_file_reciprocal_rank": 0,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0,
+            "target_file_char_precision_at_6": 0
+          },
+          "fixed-raw": {
+            "target_file_recall_at_4": 0,
+            "target_file_recall_at_6": 0,
+            "target_file_reciprocal_rank": 0,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0,
+            "target_file_char_precision_at_6": 0
+          },
+          "ast-code": {
+            "target_file_recall_at_4": 0,
+            "target_file_recall_at_6": 1,
+            "target_file_reciprocal_rank": 0.16666666666666666,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0,
+            "target_file_char_precision_at_6": 0.31771592934694537
+          },
+          "ast-structured": {
+            "target_file_recall_at_4": 1,
+            "target_file_recall_at_6": 1,
+            "target_file_reciprocal_rank": 0.3333333333333333,
+            "hunk_anchor_recall_at_4": 0.9090909090909091,
+            "hunk_anchor_recall_at_6": 0.9090909090909091,
+            "target_file_char_precision_at_6": 0.13404391178348643
+          }
+        },
+        "ast_structured_minus_fixed_raw": {
+          "target_file_recall_at_4": 1,
+          "target_file_recall_at_6": 1,
+          "target_file_reciprocal_rank": 0.3333333333333333,
+          "hunk_anchor_recall_at_4": 0.9090909090909091,
+          "hunk_anchor_recall_at_6": 0.9090909090909091,
+          "target_file_char_precision_at_6": 0.13404391178348643
+        },
+        "ast_structured_minus_ast_code": {
+          "target_file_recall_at_4": 1,
+          "target_file_recall_at_6": 0,
+          "target_file_reciprocal_rank": 0.16666666666666666,
+          "hunk_anchor_recall_at_4": 0.9090909090909091,
+          "hunk_anchor_recall_at_6": 0.9090909090909091,
+          "target_file_char_precision_at_6": -0.18367201756345894
+        }
+      },
+      {
+        "instance_id": "pydata__xarray-6599",
+        "query_sha256": "96fa37e0c21ff705c55cdf125c413b37779b3ef6566658861e3d00d6cf2fa8c4",
+        "target_file_count": 1,
+        "hunk_anchor_count": 7,
+        "metrics": {
+          "current-fixed": {
+            "target_file_recall_at_4": 0,
+            "target_file_recall_at_6": 0,
+            "target_file_reciprocal_rank": 0,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0,
+            "target_file_char_precision_at_6": 0
+          },
+          "fixed-raw": {
+            "target_file_recall_at_4": 0,
+            "target_file_recall_at_6": 0,
+            "target_file_reciprocal_rank": 0,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0,
+            "target_file_char_precision_at_6": 0
+          },
+          "ast-code": {
+            "target_file_recall_at_4": 0,
+            "target_file_recall_at_6": 0,
+            "target_file_reciprocal_rank": 0,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0,
+            "target_file_char_precision_at_6": 0
+          },
+          "ast-structured": {
+            "target_file_recall_at_4": 0,
+            "target_file_recall_at_6": 0,
+            "target_file_reciprocal_rank": 0,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0,
+            "target_file_char_precision_at_6": 0
+          }
+        },
+        "ast_structured_minus_fixed_raw": {
+          "target_file_recall_at_4": 0,
+          "target_file_recall_at_6": 0,
+          "target_file_reciprocal_rank": 0,
+          "hunk_anchor_recall_at_4": 0,
+          "hunk_anchor_recall_at_6": 0,
+          "target_file_char_precision_at_6": 0
+        },
+        "ast_structured_minus_ast_code": {
+          "target_file_recall_at_4": 0,
+          "target_file_recall_at_6": 0,
+          "target_file_reciprocal_rank": 0,
+          "hunk_anchor_recall_at_4": 0,
+          "hunk_anchor_recall_at_6": 0,
+          "target_file_char_precision_at_6": 0
+        }
+      },
+      {
+        "instance_id": "pydata__xarray-7229",
+        "query_sha256": "1755ba7fe03d6f5917886ea3d5f0e5116a78593b08596ad9d394c5ccbb7f26aa",
+        "target_file_count": 1,
+        "hunk_anchor_count": 14,
+        "metrics": {
+          "current-fixed": {
+            "target_file_recall_at_4": 0,
+            "target_file_recall_at_6": 0,
+            "target_file_reciprocal_rank": 0,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0,
+            "target_file_char_precision_at_6": 0
+          },
+          "fixed-raw": {
+            "target_file_recall_at_4": 0,
+            "target_file_recall_at_6": 0,
+            "target_file_reciprocal_rank": 0,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0,
+            "target_file_char_precision_at_6": 0
+          },
+          "ast-code": {
+            "target_file_recall_at_4": 1,
+            "target_file_recall_at_6": 1,
+            "target_file_reciprocal_rank": 0.25,
+            "hunk_anchor_recall_at_4": 0.8571428571428571,
+            "hunk_anchor_recall_at_6": 0.8571428571428571,
+            "target_file_char_precision_at_6": 0.10051320565777945
+          },
+          "ast-structured": {
+            "target_file_recall_at_4": 1,
+            "target_file_recall_at_6": 1,
+            "target_file_reciprocal_rank": 0.3333333333333333,
+            "hunk_anchor_recall_at_4": 0.8571428571428571,
+            "hunk_anchor_recall_at_6": 0.8571428571428571,
+            "target_file_char_precision_at_6": 0.15667528413248133
+          }
+        },
+        "ast_structured_minus_fixed_raw": {
+          "target_file_recall_at_4": 1,
+          "target_file_recall_at_6": 1,
+          "target_file_reciprocal_rank": 0.3333333333333333,
+          "hunk_anchor_recall_at_4": 0.8571428571428571,
+          "hunk_anchor_recall_at_6": 0.8571428571428571,
+          "target_file_char_precision_at_6": 0.15667528413248133
+        },
+        "ast_structured_minus_ast_code": {
+          "target_file_recall_at_4": 0,
+          "target_file_recall_at_6": 0,
+          "target_file_reciprocal_rank": 0.08333333333333331,
+          "hunk_anchor_recall_at_4": 0.0,
+          "hunk_anchor_recall_at_6": 0.0,
+          "target_file_char_precision_at_6": 0.05616207847470188
+        }
+      },
+      {
+        "instance_id": "pydata__xarray-7393",
+        "query_sha256": "7a754d9fc6c6c54623c0bbff6a45db2b812026258275ff61e8fa85d1c4f81f40",
+        "target_file_count": 1,
+        "hunk_anchor_count": 4,
+        "metrics": {
+          "current-fixed": {
+            "target_file_recall_at_4": 0,
+            "target_file_recall_at_6": 0,
+            "target_file_reciprocal_rank": 0,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0,
+            "target_file_char_precision_at_6": 0
+          },
+          "fixed-raw": {
+            "target_file_recall_at_4": 0,
+            "target_file_recall_at_6": 0,
+            "target_file_reciprocal_rank": 0,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0,
+            "target_file_char_precision_at_6": 0
+          },
+          "ast-code": {
+            "target_file_recall_at_4": 0,
+            "target_file_recall_at_6": 0,
+            "target_file_reciprocal_rank": 0,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0,
+            "target_file_char_precision_at_6": 0
+          },
+          "ast-structured": {
+            "target_file_recall_at_4": 0,
+            "target_file_recall_at_6": 0,
+            "target_file_reciprocal_rank": 0,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0,
+            "target_file_char_precision_at_6": 0
+          }
+        },
+        "ast_structured_minus_fixed_raw": {
+          "target_file_recall_at_4": 0,
+          "target_file_recall_at_6": 0,
+          "target_file_reciprocal_rank": 0,
+          "hunk_anchor_recall_at_4": 0,
+          "hunk_anchor_recall_at_6": 0,
+          "target_file_char_precision_at_6": 0
+        },
+        "ast_structured_minus_ast_code": {
+          "target_file_recall_at_4": 0,
+          "target_file_recall_at_6": 0,
+          "target_file_reciprocal_rank": 0,
+          "hunk_anchor_recall_at_4": 0,
+          "hunk_anchor_recall_at_6": 0,
+          "target_file_char_precision_at_6": 0
+        }
+      },
+      {
+        "instance_id": "pylint-dev__pylint-4551",
+        "query_sha256": "28e19b9ac4f2a25215824cc162bb26d6ef73d661478746cd0cfc2e0432fadb18",
+        "target_file_count": 4,
+        "hunk_anchor_count": 46,
+        "metrics": {
+          "current-fixed": {
+            "target_file_recall_at_4": 0,
+            "target_file_recall_at_6": 0,
+            "target_file_reciprocal_rank": 0,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0,
+            "target_file_char_precision_at_6": 0
+          },
+          "fixed-raw": {
+            "target_file_recall_at_4": 0,
+            "target_file_recall_at_6": 0,
+            "target_file_reciprocal_rank": 0,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0,
+            "target_file_char_precision_at_6": 0
+          },
+          "ast-code": {
+            "target_file_recall_at_4": 0,
+            "target_file_recall_at_6": 0,
+            "target_file_reciprocal_rank": 0,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0,
+            "target_file_char_precision_at_6": 0
+          },
+          "ast-structured": {
+            "target_file_recall_at_4": 0,
+            "target_file_recall_at_6": 0,
+            "target_file_reciprocal_rank": 0,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0,
+            "target_file_char_precision_at_6": 0
+          }
+        },
+        "ast_structured_minus_fixed_raw": {
+          "target_file_recall_at_4": 0,
+          "target_file_recall_at_6": 0,
+          "target_file_reciprocal_rank": 0,
+          "hunk_anchor_recall_at_4": 0,
+          "hunk_anchor_recall_at_6": 0,
+          "target_file_char_precision_at_6": 0
+        },
+        "ast_structured_minus_ast_code": {
+          "target_file_recall_at_4": 0,
+          "target_file_recall_at_6": 0,
+          "target_file_reciprocal_rank": 0,
+          "hunk_anchor_recall_at_4": 0,
+          "hunk_anchor_recall_at_6": 0,
+          "target_file_char_precision_at_6": 0
+        }
+      },
+      {
+        "instance_id": "pytest-dev__pytest-7324",
+        "query_sha256": "c86104555dc540eca4e1fc4625c95084e5ebe6bb5484acc6a9d4b2fca7378634",
+        "target_file_count": 1,
+        "hunk_anchor_count": 8,
+        "metrics": {
+          "current-fixed": {
+            "target_file_recall_at_4": 0,
+            "target_file_recall_at_6": 0,
+            "target_file_reciprocal_rank": 0,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0,
+            "target_file_char_precision_at_6": 0
+          },
+          "fixed-raw": {
+            "target_file_recall_at_4": 0,
+            "target_file_recall_at_6": 0,
+            "target_file_reciprocal_rank": 0,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0,
+            "target_file_char_precision_at_6": 0
+          },
+          "ast-code": {
+            "target_file_recall_at_4": 0,
+            "target_file_recall_at_6": 0,
+            "target_file_reciprocal_rank": 0,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0,
+            "target_file_char_precision_at_6": 0
+          },
+          "ast-structured": {
+            "target_file_recall_at_4": 0,
+            "target_file_recall_at_6": 0,
+            "target_file_reciprocal_rank": 0,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0,
+            "target_file_char_precision_at_6": 0
+          }
+        },
+        "ast_structured_minus_fixed_raw": {
+          "target_file_recall_at_4": 0,
+          "target_file_recall_at_6": 0,
+          "target_file_reciprocal_rank": 0,
+          "hunk_anchor_recall_at_4": 0,
+          "hunk_anchor_recall_at_6": 0,
+          "target_file_char_precision_at_6": 0
+        },
+        "ast_structured_minus_ast_code": {
+          "target_file_recall_at_4": 0,
+          "target_file_recall_at_6": 0,
+          "target_file_reciprocal_rank": 0,
+          "hunk_anchor_recall_at_4": 0,
+          "hunk_anchor_recall_at_6": 0,
+          "target_file_char_precision_at_6": 0
+        }
+      },
+      {
+        "instance_id": "scikit-learn__scikit-learn-10297",
+        "query_sha256": "80b289fedf3bc996489e3ce2ce6f575ea7c8153524ea8736ccd7e0dad0c29a41",
+        "target_file_count": 1,
+        "hunk_anchor_count": 28,
+        "metrics": {
+          "current-fixed": {
+            "target_file_recall_at_4": 1,
+            "target_file_recall_at_6": 1,
+            "target_file_reciprocal_rank": 1,
+            "hunk_anchor_recall_at_4": 0.8928571428571429,
+            "hunk_anchor_recall_at_6": 0.8928571428571429,
+            "target_file_char_precision_at_6": 0.6666666666666666
+          },
+          "fixed-raw": {
+            "target_file_recall_at_4": 1,
+            "target_file_recall_at_6": 1,
+            "target_file_reciprocal_rank": 1,
+            "hunk_anchor_recall_at_4": 0.5,
+            "hunk_anchor_recall_at_6": 0.75,
+            "target_file_char_precision_at_6": 0.8333333333333334
+          },
+          "ast-code": {
+            "target_file_recall_at_4": 1,
+            "target_file_recall_at_6": 1,
+            "target_file_reciprocal_rank": 1,
+            "hunk_anchor_recall_at_4": 0.35714285714285715,
+            "hunk_anchor_recall_at_6": 0.35714285714285715,
+            "target_file_char_precision_at_6": 0.5960922341049592
+          },
+          "ast-structured": {
+            "target_file_recall_at_4": 1,
+            "target_file_recall_at_6": 1,
+            "target_file_reciprocal_rank": 1,
+            "hunk_anchor_recall_at_4": 0.35714285714285715,
+            "hunk_anchor_recall_at_6": 0.35714285714285715,
+            "target_file_char_precision_at_6": 0.5960922341049592
+          }
+        },
+        "ast_structured_minus_fixed_raw": {
+          "target_file_recall_at_4": 0,
+          "target_file_recall_at_6": 0,
+          "target_file_reciprocal_rank": 0,
+          "hunk_anchor_recall_at_4": -0.14285714285714285,
+          "hunk_anchor_recall_at_6": -0.39285714285714285,
+          "target_file_char_precision_at_6": -0.23724109922837422
+        },
+        "ast_structured_minus_ast_code": {
+          "target_file_recall_at_4": 0,
+          "target_file_recall_at_6": 0,
+          "target_file_reciprocal_rank": 0,
+          "hunk_anchor_recall_at_4": 0.0,
+          "hunk_anchor_recall_at_6": 0.0,
+          "target_file_char_precision_at_6": 0.0
+        }
+      },
+      {
+        "instance_id": "scikit-learn__scikit-learn-12973",
+        "query_sha256": "9f4c3ac86062600df1bbf16897c088a862213cb9418d09da8d0d6e32163ba223",
+        "target_file_count": 1,
+        "hunk_anchor_count": 12,
+        "metrics": {
+          "current-fixed": {
+            "target_file_recall_at_4": 1,
+            "target_file_recall_at_6": 1,
+            "target_file_reciprocal_rank": 1,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0,
+            "target_file_char_precision_at_6": 0.3333333333333333
+          },
+          "fixed-raw": {
+            "target_file_recall_at_4": 1,
+            "target_file_recall_at_6": 1,
+            "target_file_reciprocal_rank": 1,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0,
+            "target_file_char_precision_at_6": 0.5094339622641509
+          },
+          "ast-code": {
+            "target_file_recall_at_4": 1,
+            "target_file_recall_at_6": 1,
+            "target_file_reciprocal_rank": 1,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0,
+            "target_file_char_precision_at_6": 0.6430618892508143
+          },
+          "ast-structured": {
+            "target_file_recall_at_4": 1,
+            "target_file_recall_at_6": 1,
+            "target_file_reciprocal_rank": 1,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0,
+            "target_file_char_precision_at_6": 0.6430618892508143
+          }
+        },
+        "ast_structured_minus_fixed_raw": {
+          "target_file_recall_at_4": 0,
+          "target_file_recall_at_6": 0,
+          "target_file_reciprocal_rank": 0,
+          "hunk_anchor_recall_at_4": 0,
+          "hunk_anchor_recall_at_6": 0,
+          "target_file_char_precision_at_6": 0.13362792698666337
+        },
+        "ast_structured_minus_ast_code": {
+          "target_file_recall_at_4": 0,
+          "target_file_recall_at_6": 0,
+          "target_file_reciprocal_rank": 0,
+          "hunk_anchor_recall_at_4": 0,
+          "hunk_anchor_recall_at_6": 0,
+          "target_file_char_precision_at_6": 0.0
+        }
+      },
+      {
+        "instance_id": "sphinx-doc__sphinx-10673",
+        "query_sha256": "f455450f1dbed1a4b75c2bcd97f9147d124b866223283f6287bd09ce6eab7d8e",
+        "target_file_count": 3,
+        "hunk_anchor_count": 30,
+        "metrics": {
+          "current-fixed": {
+            "target_file_recall_at_4": 0.6666666666666666,
+            "target_file_recall_at_6": 0.6666666666666666,
+            "target_file_reciprocal_rank": 1,
+            "hunk_anchor_recall_at_4": 0.1,
+            "hunk_anchor_recall_at_6": 0.23333333333333334,
+            "target_file_char_precision_at_6": 0.8333333333333334
+          },
+          "fixed-raw": {
+            "target_file_recall_at_4": 0.6666666666666666,
+            "target_file_recall_at_6": 0.6666666666666666,
+            "target_file_reciprocal_rank": 1,
+            "hunk_anchor_recall_at_4": 0.1,
+            "hunk_anchor_recall_at_6": 0.1,
+            "target_file_char_precision_at_6": 0.8333333333333334
+          },
+          "ast-code": {
+            "target_file_recall_at_4": 0.6666666666666666,
+            "target_file_recall_at_6": 0.6666666666666666,
+            "target_file_reciprocal_rank": 1,
+            "hunk_anchor_recall_at_4": 0.6666666666666666,
+            "hunk_anchor_recall_at_6": 0.6666666666666666,
+            "target_file_char_precision_at_6": 0.8349263855700301
+          },
+          "ast-structured": {
+            "target_file_recall_at_4": 0.6666666666666666,
+            "target_file_recall_at_6": 0.6666666666666666,
+            "target_file_reciprocal_rank": 1,
+            "hunk_anchor_recall_at_4": 0.6666666666666666,
+            "hunk_anchor_recall_at_6": 0.6666666666666666,
+            "target_file_char_precision_at_6": 0.9154411764705882
+          }
+        },
+        "ast_structured_minus_fixed_raw": {
+          "target_file_recall_at_4": 0.0,
+          "target_file_recall_at_6": 0.0,
+          "target_file_reciprocal_rank": 0,
+          "hunk_anchor_recall_at_4": 0.5666666666666667,
+          "hunk_anchor_recall_at_6": 0.5666666666666667,
+          "target_file_char_precision_at_6": 0.08210784313725483
+        },
+        "ast_structured_minus_ast_code": {
+          "target_file_recall_at_4": 0.0,
+          "target_file_recall_at_6": 0.0,
+          "target_file_reciprocal_rank": 0,
+          "hunk_anchor_recall_at_4": 0.0,
+          "hunk_anchor_recall_at_6": 0.0,
+          "target_file_char_precision_at_6": 0.08051479090055813
+        }
+      },
+      {
+        "instance_id": "sphinx-doc__sphinx-11510",
+        "query_sha256": "e7ae2e2a1619fdc7fa58451dae12c5dd8b268002fdb30b4b3f457a6a9ef26762",
+        "target_file_count": 1,
+        "hunk_anchor_count": 9,
+        "metrics": {
+          "current-fixed": {
+            "target_file_recall_at_4": 0,
+            "target_file_recall_at_6": 0,
+            "target_file_reciprocal_rank": 0,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0,
+            "target_file_char_precision_at_6": 0
+          },
+          "fixed-raw": {
+            "target_file_recall_at_4": 0,
+            "target_file_recall_at_6": 0,
+            "target_file_reciprocal_rank": 0,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0,
+            "target_file_char_precision_at_6": 0
+          },
+          "ast-code": {
+            "target_file_recall_at_4": 0,
+            "target_file_recall_at_6": 0,
+            "target_file_reciprocal_rank": 0,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0,
+            "target_file_char_precision_at_6": 0
+          },
+          "ast-structured": {
+            "target_file_recall_at_4": 0,
+            "target_file_recall_at_6": 0,
+            "target_file_reciprocal_rank": 0,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0,
+            "target_file_char_precision_at_6": 0
+          }
+        },
+        "ast_structured_minus_fixed_raw": {
+          "target_file_recall_at_4": 0,
+          "target_file_recall_at_6": 0,
+          "target_file_reciprocal_rank": 0,
+          "hunk_anchor_recall_at_4": 0,
+          "hunk_anchor_recall_at_6": 0,
+          "target_file_char_precision_at_6": 0
+        },
+        "ast_structured_minus_ast_code": {
+          "target_file_recall_at_4": 0,
+          "target_file_recall_at_6": 0,
+          "target_file_reciprocal_rank": 0,
+          "hunk_anchor_recall_at_4": 0,
+          "hunk_anchor_recall_at_6": 0,
+          "target_file_char_precision_at_6": 0
+        }
+      },
+      {
+        "instance_id": "sphinx-doc__sphinx-8056",
+        "query_sha256": "4ad73beedadd0040b395a860a9ece993226dfb83750d36cef213cb166e04589b",
+        "target_file_count": 1,
+        "hunk_anchor_count": 15,
+        "metrics": {
+          "current-fixed": {
+            "target_file_recall_at_4": 1,
+            "target_file_recall_at_6": 1,
+            "target_file_reciprocal_rank": 0.3333333333333333,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0,
+            "target_file_char_precision_at_6": 0.35294117647058826
+          },
+          "fixed-raw": {
+            "target_file_recall_at_4": 1,
+            "target_file_recall_at_6": 1,
+            "target_file_reciprocal_rank": 0.25,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0,
+            "target_file_char_precision_at_6": 0.34615384615384615
+          },
+          "ast-code": {
+            "target_file_recall_at_4": 1,
+            "target_file_recall_at_6": 1,
+            "target_file_reciprocal_rank": 0.5,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0,
+            "target_file_char_precision_at_6": 0.5911827303131652
+          },
+          "ast-structured": {
+            "target_file_recall_at_4": 0,
+            "target_file_recall_at_6": 1,
+            "target_file_reciprocal_rank": 0.16666666666666666,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0,
+            "target_file_char_precision_at_6": 0.39919354838709675
+          }
+        },
+        "ast_structured_minus_fixed_raw": {
+          "target_file_recall_at_4": -1,
+          "target_file_recall_at_6": 0,
+          "target_file_reciprocal_rank": -0.08333333333333334,
+          "hunk_anchor_recall_at_4": 0,
+          "hunk_anchor_recall_at_6": 0,
+          "target_file_char_precision_at_6": 0.05303970223325061
+        },
+        "ast_structured_minus_ast_code": {
+          "target_file_recall_at_4": -1,
+          "target_file_recall_at_6": 0,
+          "target_file_reciprocal_rank": -0.33333333333333337,
+          "hunk_anchor_recall_at_4": 0,
+          "hunk_anchor_recall_at_6": 0,
+          "target_file_char_precision_at_6": -0.1919891819260684
+        }
+      },
+      {
+        "instance_id": "sphinx-doc__sphinx-8593",
+        "query_sha256": "d7a0b222ecda2268846b70d86cee54c8162748aacb047519b2e657c3c18dc962",
+        "target_file_count": 2,
+        "hunk_anchor_count": 39,
+        "metrics": {
+          "current-fixed": {
+            "target_file_recall_at_4": 0.5,
+            "target_file_recall_at_6": 0.5,
+            "target_file_reciprocal_rank": 1,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0,
+            "target_file_char_precision_at_6": 0.17307692307692307
+          },
+          "fixed-raw": {
+            "target_file_recall_at_4": 0.5,
+            "target_file_recall_at_6": 0.5,
+            "target_file_reciprocal_rank": 1,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0,
+            "target_file_char_precision_at_6": 0.19241690329046268
+          },
+          "ast-code": {
+            "target_file_recall_at_4": 0,
+            "target_file_recall_at_6": 0,
+            "target_file_reciprocal_rank": 0,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0,
+            "target_file_char_precision_at_6": 0
+          },
+          "ast-structured": {
+            "target_file_recall_at_4": 0.5,
+            "target_file_recall_at_6": 0.5,
+            "target_file_reciprocal_rank": 0.5,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0,
+            "target_file_char_precision_at_6": 0.08173076923076923
+          }
+        },
+        "ast_structured_minus_fixed_raw": {
+          "target_file_recall_at_4": 0.0,
+          "target_file_recall_at_6": 0.0,
+          "target_file_reciprocal_rank": -0.5,
+          "hunk_anchor_recall_at_4": 0,
+          "hunk_anchor_recall_at_6": 0,
+          "target_file_char_precision_at_6": -0.11068613405969345
+        },
+        "ast_structured_minus_ast_code": {
+          "target_file_recall_at_4": 0.5,
+          "target_file_recall_at_6": 0.5,
+          "target_file_reciprocal_rank": 0.5,
+          "hunk_anchor_recall_at_4": 0,
+          "hunk_anchor_recall_at_6": 0,
+          "target_file_char_precision_at_6": 0.08173076923076923
+        }
+      },
+      {
+        "instance_id": "sphinx-doc__sphinx-9258",
+        "query_sha256": "4163acebdf504c769400387fdf4abdce2b57c5d5634a7845a8a347af1de7464f",
+        "target_file_count": 1,
+        "hunk_anchor_count": 4,
+        "metrics": {
+          "current-fixed": {
+            "target_file_recall_at_4": 0,
+            "target_file_recall_at_6": 0,
+            "target_file_reciprocal_rank": 0,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0,
+            "target_file_char_precision_at_6": 0
+          },
+          "fixed-raw": {
+            "target_file_recall_at_4": 0,
+            "target_file_recall_at_6": 0,
+            "target_file_reciprocal_rank": 0,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0,
+            "target_file_char_precision_at_6": 0
+          },
+          "ast-code": {
+            "target_file_recall_at_4": 0,
+            "target_file_recall_at_6": 0,
+            "target_file_reciprocal_rank": 0,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0,
+            "target_file_char_precision_at_6": 0
+          },
+          "ast-structured": {
+            "target_file_recall_at_4": 0,
+            "target_file_recall_at_6": 0,
+            "target_file_reciprocal_rank": 0,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0,
+            "target_file_char_precision_at_6": 0
+          }
+        },
+        "ast_structured_minus_fixed_raw": {
+          "target_file_recall_at_4": 0,
+          "target_file_recall_at_6": 0,
+          "target_file_reciprocal_rank": 0,
+          "hunk_anchor_recall_at_4": 0,
+          "hunk_anchor_recall_at_6": 0,
+          "target_file_char_precision_at_6": 0
+        },
+        "ast_structured_minus_ast_code": {
+          "target_file_recall_at_4": 0,
+          "target_file_recall_at_6": 0,
+          "target_file_reciprocal_rank": 0,
+          "hunk_anchor_recall_at_4": 0,
+          "hunk_anchor_recall_at_6": 0,
+          "target_file_char_precision_at_6": 0
+        }
+      },
+      {
+        "instance_id": "sympy__sympy-12489",
+        "query_sha256": "33f4a1134633597866883bbd4ac04b3642fda8ae680822b1c44d5a5e82b8ce28",
+        "target_file_count": 1,
+        "hunk_anchor_count": 137,
+        "metrics": {
+          "current-fixed": {
+            "target_file_recall_at_4": 1,
+            "target_file_recall_at_6": 1,
+            "target_file_reciprocal_rank": 0.5,
+            "hunk_anchor_recall_at_4": 0.051094890510948905,
+            "hunk_anchor_recall_at_6": 0.11678832116788321,
+            "target_file_char_precision_at_6": 0.5
+          },
+          "fixed-raw": {
+            "target_file_recall_at_4": 1,
+            "target_file_recall_at_6": 1,
+            "target_file_reciprocal_rank": 1,
+            "hunk_anchor_recall_at_4": 0.10948905109489052,
+            "hunk_anchor_recall_at_6": 0.10948905109489052,
+            "target_file_char_precision_at_6": 0.3333333333333333
+          },
+          "ast-code": {
+            "target_file_recall_at_4": 1,
+            "target_file_recall_at_6": 1,
+            "target_file_reciprocal_rank": 0.5,
+            "hunk_anchor_recall_at_4": 0.051094890510948905,
+            "hunk_anchor_recall_at_6": 0.24087591240875914,
+            "target_file_char_precision_at_6": 0.35548417319146086
+          },
+          "ast-structured": {
+            "target_file_recall_at_4": 1,
+            "target_file_recall_at_6": 1,
+            "target_file_reciprocal_rank": 0.5,
+            "hunk_anchor_recall_at_4": 0.24817518248175183,
+            "hunk_anchor_recall_at_6": 0.24817518248175183,
+            "target_file_char_precision_at_6": 0.7622156697556866
+          }
+        },
+        "ast_structured_minus_fixed_raw": {
+          "target_file_recall_at_4": 0,
+          "target_file_recall_at_6": 0,
+          "target_file_reciprocal_rank": -0.5,
+          "hunk_anchor_recall_at_4": 0.1386861313868613,
+          "hunk_anchor_recall_at_6": 0.1386861313868613,
+          "target_file_char_precision_at_6": 0.42888233642235324
+        },
+        "ast_structured_minus_ast_code": {
+          "target_file_recall_at_4": 0,
+          "target_file_recall_at_6": 0,
+          "target_file_reciprocal_rank": 0.0,
+          "hunk_anchor_recall_at_4": 0.19708029197080293,
+          "hunk_anchor_recall_at_6": 0.007299270072992692,
+          "target_file_char_precision_at_6": 0.4067314965642257
+        }
+      },
+      {
+        "instance_id": "sympy__sympy-13091",
+        "query_sha256": "56dd1975c2cdb9924609fb6ce9a46f4a1269dce8da33bf80032d1c9d8a73e7db",
+        "target_file_count": 21,
+        "hunk_anchor_count": 167,
+        "metrics": {
+          "current-fixed": {
+            "target_file_recall_at_4": 0,
+            "target_file_recall_at_6": 0,
+            "target_file_reciprocal_rank": 0,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0,
+            "target_file_char_precision_at_6": 0
+          },
+          "fixed-raw": {
+            "target_file_recall_at_4": 0,
+            "target_file_recall_at_6": 0,
+            "target_file_reciprocal_rank": 0,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0,
+            "target_file_char_precision_at_6": 0
+          },
+          "ast-code": {
+            "target_file_recall_at_4": 0,
+            "target_file_recall_at_6": 0,
+            "target_file_reciprocal_rank": 0,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0,
+            "target_file_char_precision_at_6": 0
+          },
+          "ast-structured": {
+            "target_file_recall_at_4": 0.047619047619047616,
+            "target_file_recall_at_6": 0.047619047619047616,
+            "target_file_reciprocal_rank": 0.25,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0,
+            "target_file_char_precision_at_6": 0.11270327243525396
+          }
+        },
+        "ast_structured_minus_fixed_raw": {
+          "target_file_recall_at_4": 0.047619047619047616,
+          "target_file_recall_at_6": 0.047619047619047616,
+          "target_file_reciprocal_rank": 0.25,
+          "hunk_anchor_recall_at_4": 0,
+          "hunk_anchor_recall_at_6": 0,
+          "target_file_char_precision_at_6": 0.11270327243525396
+        },
+        "ast_structured_minus_ast_code": {
+          "target_file_recall_at_4": 0.047619047619047616,
+          "target_file_recall_at_6": 0.047619047619047616,
+          "target_file_reciprocal_rank": 0.25,
+          "hunk_anchor_recall_at_4": 0,
+          "hunk_anchor_recall_at_6": 0,
+          "target_file_char_precision_at_6": 0.11270327243525396
+        }
+      },
+      {
+        "instance_id": "sympy__sympy-13877",
+        "query_sha256": "e8eb7f7fe32ffe357b6a54186c56ae0f9326084bf90504838895599d08e0dbc8",
+        "target_file_count": 2,
+        "hunk_anchor_count": 31,
+        "metrics": {
+          "current-fixed": {
+            "target_file_recall_at_4": 0.5,
+            "target_file_recall_at_6": 0.5,
+            "target_file_reciprocal_rank": 0.25,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0,
+            "target_file_char_precision_at_6": 0.33962264150943394
+          },
+          "fixed-raw": {
+            "target_file_recall_at_4": 0,
+            "target_file_recall_at_6": 0.5,
+            "target_file_reciprocal_rank": 0.2,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0,
+            "target_file_char_precision_at_6": 0.35294117647058826
+          },
+          "ast-code": {
+            "target_file_recall_at_4": 0.5,
+            "target_file_recall_at_6": 0.5,
+            "target_file_reciprocal_rank": 1,
+            "hunk_anchor_recall_at_4": 0.41935483870967744,
+            "hunk_anchor_recall_at_6": 0.41935483870967744,
+            "target_file_char_precision_at_6": 0.6544764429449331
+          },
+          "ast-structured": {
+            "target_file_recall_at_4": 0.5,
+            "target_file_recall_at_6": 0.5,
+            "target_file_reciprocal_rank": 1,
+            "hunk_anchor_recall_at_4": 0.41935483870967744,
+            "hunk_anchor_recall_at_6": 0.41935483870967744,
+            "target_file_char_precision_at_6": 0.7329254410927718
+          }
+        },
+        "ast_structured_minus_fixed_raw": {
+          "target_file_recall_at_4": 0.5,
+          "target_file_recall_at_6": 0.0,
+          "target_file_reciprocal_rank": 0.8,
+          "hunk_anchor_recall_at_4": 0.41935483870967744,
+          "hunk_anchor_recall_at_6": 0.41935483870967744,
+          "target_file_char_precision_at_6": 0.37998426462218354
+        },
+        "ast_structured_minus_ast_code": {
+          "target_file_recall_at_4": 0.0,
+          "target_file_recall_at_6": 0.0,
+          "target_file_reciprocal_rank": 0,
+          "hunk_anchor_recall_at_4": 0.0,
+          "hunk_anchor_recall_at_6": 0.0,
+          "target_file_char_precision_at_6": 0.07844899814783868
+        }
+      },
+      {
+        "instance_id": "sympy__sympy-15017",
+        "query_sha256": "b106dd1aed96c16195e44e41b0d863086366cf9c597e31787a38816ae04efb2a",
+        "target_file_count": 1,
+        "hunk_anchor_count": 4,
+        "metrics": {
+          "current-fixed": {
+            "target_file_recall_at_4": 1,
+            "target_file_recall_at_6": 1,
+            "target_file_reciprocal_rank": 0.25,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0,
+            "target_file_char_precision_at_6": 0.17307692307692307
+          },
+          "fixed-raw": {
+            "target_file_recall_at_4": 1,
+            "target_file_recall_at_6": 1,
+            "target_file_reciprocal_rank": 0.5,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0,
+            "target_file_char_precision_at_6": 0.16981132075471697
+          },
+          "ast-code": {
+            "target_file_recall_at_4": 0,
+            "target_file_recall_at_6": 0,
+            "target_file_reciprocal_rank": 0,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0,
+            "target_file_char_precision_at_6": 0
+          },
+          "ast-structured": {
+            "target_file_recall_at_4": 0,
+            "target_file_recall_at_6": 0,
+            "target_file_reciprocal_rank": 0,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0,
+            "target_file_char_precision_at_6": 0
+          }
+        },
+        "ast_structured_minus_fixed_raw": {
+          "target_file_recall_at_4": -1,
+          "target_file_recall_at_6": -1,
+          "target_file_reciprocal_rank": -0.5,
+          "hunk_anchor_recall_at_4": 0,
+          "hunk_anchor_recall_at_6": 0,
+          "target_file_char_precision_at_6": -0.16981132075471697
+        },
+        "ast_structured_minus_ast_code": {
+          "target_file_recall_at_4": 0,
+          "target_file_recall_at_6": 0,
+          "target_file_reciprocal_rank": 0,
+          "hunk_anchor_recall_at_4": 0,
+          "hunk_anchor_recall_at_6": 0,
+          "target_file_char_precision_at_6": 0
+        }
+      },
+      {
+        "instance_id": "sympy__sympy-15809",
+        "query_sha256": "4d0982bb7d0bc25fd0f0c24f136fddb1e2e9e1571502aadcae1c84644c40bd5a",
+        "target_file_count": 1,
+        "hunk_anchor_count": 3,
+        "metrics": {
+          "current-fixed": {
+            "target_file_recall_at_4": 1,
+            "target_file_recall_at_6": 1,
+            "target_file_reciprocal_rank": 1,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0,
+            "target_file_char_precision_at_6": 0.3333333333333333
+          },
+          "fixed-raw": {
+            "target_file_recall_at_4": 1,
+            "target_file_recall_at_6": 1,
+            "target_file_reciprocal_rank": 1,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0,
+            "target_file_char_precision_at_6": 0.5
+          },
+          "ast-code": {
+            "target_file_recall_at_4": 1,
+            "target_file_recall_at_6": 1,
+            "target_file_reciprocal_rank": 1,
+            "hunk_anchor_recall_at_4": 0.6666666666666666,
+            "hunk_anchor_recall_at_6": 0.6666666666666666,
+            "target_file_char_precision_at_6": 0.7643758765778401
+          },
+          "ast-structured": {
+            "target_file_recall_at_4": 1,
+            "target_file_recall_at_6": 1,
+            "target_file_reciprocal_rank": 1,
+            "hunk_anchor_recall_at_4": 0.6666666666666666,
+            "hunk_anchor_recall_at_6": 0.6666666666666666,
+            "target_file_char_precision_at_6": 0.3009778031546642
+          }
+        },
+        "ast_structured_minus_fixed_raw": {
+          "target_file_recall_at_4": 0,
+          "target_file_recall_at_6": 0,
+          "target_file_reciprocal_rank": 0,
+          "hunk_anchor_recall_at_4": 0.6666666666666666,
+          "hunk_anchor_recall_at_6": 0.6666666666666666,
+          "target_file_char_precision_at_6": -0.19902219684533579
+        },
+        "ast_structured_minus_ast_code": {
+          "target_file_recall_at_4": 0,
+          "target_file_recall_at_6": 0,
+          "target_file_reciprocal_rank": 0,
+          "hunk_anchor_recall_at_4": 0.0,
+          "hunk_anchor_recall_at_6": 0.0,
+          "target_file_char_precision_at_6": -0.4633980734231759
+        }
+      },
+      {
+        "instance_id": "sympy__sympy-17318",
+        "query_sha256": "8a310f20c7a096a6254d15f08997beaed275576879e726690cc2a8de13e47e3c",
+        "target_file_count": 2,
+        "hunk_anchor_count": 14,
+        "metrics": {
+          "current-fixed": {
+            "target_file_recall_at_4": 0.5,
+            "target_file_recall_at_6": 0.5,
+            "target_file_reciprocal_rank": 1,
+            "hunk_anchor_recall_at_4": 0.35714285714285715,
+            "hunk_anchor_recall_at_6": 0.35714285714285715,
+            "target_file_char_precision_at_6": 1
+          },
+          "fixed-raw": {
+            "target_file_recall_at_4": 0.5,
+            "target_file_recall_at_6": 0.5,
+            "target_file_reciprocal_rank": 1,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0.35714285714285715,
+            "target_file_char_precision_at_6": 1
+          },
+          "ast-code": {
+            "target_file_recall_at_4": 0.5,
+            "target_file_recall_at_6": 0.5,
+            "target_file_reciprocal_rank": 1,
+            "hunk_anchor_recall_at_4": 0.35714285714285715,
+            "hunk_anchor_recall_at_6": 0.35714285714285715,
+            "target_file_char_precision_at_6": 1
+          },
+          "ast-structured": {
+            "target_file_recall_at_4": 0.5,
+            "target_file_recall_at_6": 0.5,
+            "target_file_reciprocal_rank": 1,
+            "hunk_anchor_recall_at_4": 0.35714285714285715,
+            "hunk_anchor_recall_at_6": 0.35714285714285715,
+            "target_file_char_precision_at_6": 0.9124293785310734
+          }
+        },
+        "ast_structured_minus_fixed_raw": {
+          "target_file_recall_at_4": 0.0,
+          "target_file_recall_at_6": 0.0,
+          "target_file_reciprocal_rank": 0,
+          "hunk_anchor_recall_at_4": 0.35714285714285715,
+          "hunk_anchor_recall_at_6": 0.0,
+          "target_file_char_precision_at_6": -0.08757062146892658
+        },
+        "ast_structured_minus_ast_code": {
+          "target_file_recall_at_4": 0.0,
+          "target_file_recall_at_6": 0.0,
+          "target_file_reciprocal_rank": 0,
+          "hunk_anchor_recall_at_4": 0.0,
+          "hunk_anchor_recall_at_6": 0.0,
+          "target_file_char_precision_at_6": -0.08757062146892658
+        }
+      },
+      {
+        "instance_id": "sympy__sympy-19346",
+        "query_sha256": "beaf218a0d5d4cb22acc35caa8e471d049542cd914604cced5485993327db334",
+        "target_file_count": 1,
+        "hunk_anchor_count": 3,
+        "metrics": {
+          "current-fixed": {
+            "target_file_recall_at_4": 1,
+            "target_file_recall_at_6": 1,
+            "target_file_reciprocal_rank": 0.25,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0,
+            "target_file_char_precision_at_6": 0.1568627450980392
+          },
+          "fixed-raw": {
+            "target_file_recall_at_4": 1,
+            "target_file_recall_at_6": 1,
+            "target_file_reciprocal_rank": 0.5,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0,
+            "target_file_char_precision_at_6": 0.1568627450980392
+          },
+          "ast-code": {
+            "target_file_recall_at_4": 0,
+            "target_file_recall_at_6": 0,
+            "target_file_reciprocal_rank": 0,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0,
+            "target_file_char_precision_at_6": 0
+          },
+          "ast-structured": {
+            "target_file_recall_at_4": 1,
+            "target_file_recall_at_6": 1,
+            "target_file_reciprocal_rank": 0.3333333333333333,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0,
+            "target_file_char_precision_at_6": 0.00712158487634339
+          }
+        },
+        "ast_structured_minus_fixed_raw": {
+          "target_file_recall_at_4": 0,
+          "target_file_recall_at_6": 0,
+          "target_file_reciprocal_rank": -0.16666666666666669,
+          "hunk_anchor_recall_at_4": 0,
+          "hunk_anchor_recall_at_6": 0,
+          "target_file_char_precision_at_6": -0.1497411602216958
+        },
+        "ast_structured_minus_ast_code": {
+          "target_file_recall_at_4": 1,
+          "target_file_recall_at_6": 1,
+          "target_file_reciprocal_rank": 0.3333333333333333,
+          "hunk_anchor_recall_at_4": 0,
+          "hunk_anchor_recall_at_6": 0,
+          "target_file_char_precision_at_6": 0.00712158487634339
+        }
+      },
+      {
+        "instance_id": "sympy__sympy-21379",
+        "query_sha256": "e199bb269f9d7eedd813b73859ebc266bbf9180ba44e93fee83257f13a7b3c38",
+        "target_file_count": 1,
+        "hunk_anchor_count": 9,
+        "metrics": {
+          "current-fixed": {
+            "target_file_recall_at_4": 0,
+            "target_file_recall_at_6": 0,
+            "target_file_reciprocal_rank": 0,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0,
+            "target_file_char_precision_at_6": 0
+          },
+          "fixed-raw": {
+            "target_file_recall_at_4": 0,
+            "target_file_recall_at_6": 0,
+            "target_file_reciprocal_rank": 0,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0,
+            "target_file_char_precision_at_6": 0
+          },
+          "ast-code": {
+            "target_file_recall_at_4": 0,
+            "target_file_recall_at_6": 0,
+            "target_file_reciprocal_rank": 0,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0,
+            "target_file_char_precision_at_6": 0
+          },
+          "ast-structured": {
+            "target_file_recall_at_4": 0,
+            "target_file_recall_at_6": 0,
+            "target_file_reciprocal_rank": 0,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 0,
+            "target_file_char_precision_at_6": 0
+          }
+        },
+        "ast_structured_minus_fixed_raw": {
+          "target_file_recall_at_4": 0,
+          "target_file_recall_at_6": 0,
+          "target_file_reciprocal_rank": 0,
+          "hunk_anchor_recall_at_4": 0,
+          "hunk_anchor_recall_at_6": 0,
+          "target_file_char_precision_at_6": 0
+        },
+        "ast_structured_minus_ast_code": {
+          "target_file_recall_at_4": 0,
+          "target_file_recall_at_6": 0,
+          "target_file_reciprocal_rank": 0,
+          "hunk_anchor_recall_at_4": 0,
+          "hunk_anchor_recall_at_6": 0,
+          "target_file_char_precision_at_6": 0
+        }
+      },
+      {
+        "instance_id": "sympy__sympy-23262",
+        "query_sha256": "c0c0ac5aecba195d382f82e1b5d1519cc8053e29b967bdc2805137079c9fd3b7",
+        "target_file_count": 1,
+        "hunk_anchor_count": 7,
+        "metrics": {
+          "current-fixed": {
+            "target_file_recall_at_4": 1,
+            "target_file_recall_at_6": 1,
+            "target_file_reciprocal_rank": 1,
+            "hunk_anchor_recall_at_4": 1,
+            "hunk_anchor_recall_at_6": 1,
+            "target_file_char_precision_at_6": 0.8333333333333334
+          },
+          "fixed-raw": {
+            "target_file_recall_at_4": 1,
+            "target_file_recall_at_6": 1,
+            "target_file_reciprocal_rank": 1,
+            "hunk_anchor_recall_at_4": 0.7142857142857143,
+            "hunk_anchor_recall_at_6": 0.7142857142857143,
+            "target_file_char_precision_at_6": 0.8333333333333334
+          },
+          "ast-code": {
+            "target_file_recall_at_4": 1,
+            "target_file_recall_at_6": 1,
+            "target_file_reciprocal_rank": 1,
+            "hunk_anchor_recall_at_4": 1,
+            "hunk_anchor_recall_at_6": 1,
+            "target_file_char_precision_at_6": 0.6475313938070353
+          },
+          "ast-structured": {
+            "target_file_recall_at_4": 1,
+            "target_file_recall_at_6": 1,
+            "target_file_reciprocal_rank": 1,
+            "hunk_anchor_recall_at_4": 0,
+            "hunk_anchor_recall_at_6": 1,
+            "target_file_char_precision_at_6": 0.9358431415685843
+          }
+        },
+        "ast_structured_minus_fixed_raw": {
+          "target_file_recall_at_4": 0,
+          "target_file_recall_at_6": 0,
+          "target_file_reciprocal_rank": 0,
+          "hunk_anchor_recall_at_4": -0.7142857142857143,
+          "hunk_anchor_recall_at_6": 0.2857142857142857,
+          "target_file_char_precision_at_6": 0.10250980823525091
+        },
+        "ast_structured_minus_ast_code": {
+          "target_file_recall_at_4": 0,
+          "target_file_recall_at_6": 0,
+          "target_file_reciprocal_rank": 0,
+          "hunk_anchor_recall_at_4": -1,
+          "hunk_anchor_recall_at_6": 0,
+          "target_file_char_precision_at_6": 0.288311747761549
+        }
+      }
+    ]
+  },
+  "decision": {
+    "ast_boundary_alone_is_a_clean_win": false,
+    "structured_ast_text_adds_material_localization_value": true,
+    "selected_ast_arm": "ast-structured",
+    "advance_to_repeated_order_balanced_agent_ab": true,
+    "agent_ab_control": "fixed-raw",
+    "agent_ab_candidate": "ast-structured",
+    "use_official_local_harness": true,
+    "expand_to_136_or_500_now": false,
+    "expansion_gate": "Require a resolve-rate signal from the repeated, order-balanced small-panel Agent A/B before expanding.",
+    "summary": "AST boundaries alone are mixed, while stable AST fields improve all six localization metrics over the same AST document boundaries. ast-structured also beats fixed-raw on all six aggregate metrics, with the clearest gains at Recall@6 and hunk-anchor Recall@4/@6."
+  },
+  "limitations": [
+    "The 54-case panel was selected from prior workspace-RAG outcomes and cannot estimate population resolve rate.",
+    "Problem-statement replay does not reproduce later model-written code_search queries.",
+    "Gold patch localization is a proxy; only the official local harness can determine whether an Agent patch resolves a case.",
+    "The four arms used a fixed serial order and a persistent read-write cache, so runtime and cache statistics are not an order-balanced performance comparison.",
+    "The AST representations increase the document count and weighted duplicate-document rate; Agent context quality and end-to-end cost must be checked before adoption."
+  ]
+}

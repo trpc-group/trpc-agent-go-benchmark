@@ -823,35 +823,103 @@ The complete provenance, per-run metrics, primary estimands, and all 54
 case-level outcomes are in
 [`v3-bge-m3-preload-ablation-54-result.json`](./v3-bge-m3-preload-ablation-54-result.json).
 
-## Planned AST representation gate
+## AST representation retrieval gate
 
-AST value will be tested as a representation change, independently of initial
-preload. The offline replay matrix uses the same workspace bytes and problem
-statement for all four arms:
+The four-arm offline replay completed all 54 selected cases without a case,
+embedding, cache, fatal, or panic error. Each case used one official testbed
+snapshot and indexed the four representations serially in the declared order.
+The query was always the original problem statement, BGE-M3 hybrid retrieval
+returned at most six chunks, and the persistent embedding cache remained in
+read-write mode.
 
-| Arm | Boundary | Embedded text | Primary contrast |
-|---|---|---|---|
-| `current-fixed` | fixed 1024/128 | line-trimmed text | historical reference |
-| `fixed-raw` | fixed 1024/128 | indentation-preserving text | whitespace effect |
-| `ast-code` | Python AST node | node code | AST-boundary effect versus `fixed-raw` |
-| `ast-structured` | Python AST node | stable AST fields plus node code | structure-text effect versus `ast-code` |
+### Localization quality
 
-The first replay uses the existing 54-case RAG-sensitive panel as a diagnostic
-set. It records exact case-list and external-label hashes, full eligible/indexed
-file coverage, stable document-set hashes, AST fallbacks, duplicate rate,
-Recall@4/@6, reciprocal rank, hunk-anchor Recall@4/@6, and target-file character
-precision. Gold patches stay external; the report does not contain gold patch
-text or target paths.
+`fixed-raw` is the primary control because it preserves indentation while
+changing neither chunk size nor overlap. `current-fixed` remains a historical
+line-trimmed reference rather than the causal AST control.
 
-This panel is outcome-selected and cannot estimate population resolve rate.
-Problem-statement replay also cannot measure later model-written search queries.
-The gate therefore only chooses whether and which AST arm deserves an Agent
-experiment. A winning AST arm must show a material paired localization gain
-without a coverage regression or unexplained fallback concentration. It then
-runs against `fixed-raw` in a repeated, order-balanced Agent A/B using the
-official local harness. Expansion to 136 or 500 cases requires a resolve-rate
-signal from that smaller Agent experiment; lower indexing cost alone is not a
-quality result.
+| Arm | Target-file R@4 | Target-file R@6 | MRR | Hunk R@4 | Hunk R@6 | Target char P@6 |
+|---|---:|---:|---:|---:|---:|---:|
+| `current-fixed` | 0.5309 | 0.5463 | 0.4241 | 0.2000 | 0.2213 | 0.2323 |
+| `fixed-raw` | 0.4537 | 0.5185 | 0.4015 | 0.1601 | 0.1973 | 0.2332 |
+| `ast-code` | 0.4383 | 0.5586 | 0.3759 | 0.2022 | 0.2428 | 0.2109 |
+| `ast-structured` | 0.4762 | **0.5873** | 0.4173 | **0.2482** | **0.2706** | **0.2577** |
 
-The machine-readable design and fixed data fingerprints are in
+The paired deltas below are absolute mean changes across the same 54 cases;
+`W/T/L` counts cases where the left arm improved, tied, or regressed.
+
+| Metric | AST boundary: `ast-code - fixed-raw` | Structured text: `ast-structured - ast-code` | Overall: `ast-structured - fixed-raw` |
+|---|---:|---:|---:|
+| Target-file R@4 | -0.0154 (8/37/9) | +0.0379 (8/42/4) | +0.0225 (11/34/9) |
+| Target-file R@6 | +0.0401 (8/39/7) | +0.0287 (5/47/2) | **+0.0688 (10/38/6)** |
+| MRR | -0.0256 (14/26/14) | +0.0414 (12/33/9) | +0.0157 (17/25/12) |
+| Hunk R@4 | +0.0421 (15/31/8) | +0.0459 (6/46/2) | **+0.0881 (17/28/9)** |
+| Hunk R@6 | +0.0455 (15/33/6) | +0.0278 (5/48/1) | **+0.0733 (17/30/7)** |
+| Target char P@6 | -0.0223 (17/16/21) | +0.0469 (26/19/9) | +0.0245 (22/13/19) |
+
+AST boundaries alone are mixed: they improve R@6 and both hunk metrics but
+reduce R@4, MRR, and character precision. Adding stable AST fields over the
+same boundaries improves all six aggregate metrics. The complete
+`ast-structured` arm also beats `fixed-raw` on all six aggregates, with the
+clearest gains in target-file R@6 and hunk localization. The effect is not
+universal—six cases regress on target-file R@6 and seven regress on hunk R@6—
+but it is material enough to pass this retrieval-only gate.
+
+### Coverage, representation, and operations
+
+Every arm indexed all 74,293 eligible file instances across the panel. There
+were zero eligible/indexed hash mismatches within an arm and zero eligible or
+indexed file-set hash mismatches across arms. Each arm used exactly one stable
+representation schema and representation hash across all 54 cases. The two AST
+arms have identical boundaries, counts, fallbacks, node distributions, and
+duplicate statistics; their document-set hashes differ by design because their
+embedded text differs.
+
+| Arm | Documents | Indexed / eligible files | Fallback documents | Weighted duplicates | Mean index time |
+|---|---:|---:|---:|---:|---:|
+| `current-fixed` | 609,941 | 74,293 / 74,293 | 0 | 2,295 (0.3763%) | 221.694 s |
+| `fixed-raw` | 728,047 | 74,293 / 74,293 | 0 | 2,452 (0.3368%) | 238.160 s |
+| `ast-code` | 1,483,836 | 74,293 / 74,293 | 1,832 (0.1235%) | 83,778 (5.6460%) | 334.140 s |
+| `ast-structured` | 1,483,836 | 74,293 / 74,293 | 1,832 (0.1235%) | 83,778 (5.6460%) | 242.976 s |
+
+AST node totals are 797,851 methods, 280,019 functions, 266,551 classes,
+137,553 variables, 30 interfaces, and 1,832 whole-file fallbacks. The fallback
+reasons are 1,799 files with no supported nodes and 33 parse errors. Full file
+coverage means these fallbacks did not drop source files. The AST document
+count is 2.04x `fixed-raw`, and its weighted duplicate rate is materially
+higher; both remain adoption risks for Agent context and cost.
+
+| Arm | Embed requests / inputs | Embed errors | Embed duration | Cache hits / misses / writes | Cache hit rate |
+|---|---:|---:|---:|---:|---:|
+| `current-fixed` | 6,711 / 294,534 | 0 | 11,683,165 ms | 315,395 / 294,600 / 294,534 | 51.70% |
+| `fixed-raw` | 7,808 / 350,705 | 0 | 12,512,590 ms | 377,341 / 350,760 / 350,705 | 51.83% |
+| `ast-code` | 12,123 / 379,864 | 0 | 14,623,055 ms | 1,103,871 / 380,019 / 379,864 | 74.39% |
+| `ast-structured` | 11,609 / 244,122 | 0 | 9,744,733 ms | 1,238,780 / 245,110 / 244,122 | 83.48% |
+
+The run took 56,275,265 ms (15.632 hours). All 16 logged first-attempt 502
+embedding retries recovered; the final cache contained 1,333,142 rows and
+6,251,446,272 bytes. Because the arms ran in a fixed order against a warming
+read-write cache, these timing and cache differences are operational
+observations, not a clean causal speed comparison.
+
+### Decision and next gate
+
+`ast-structured` is the only AST candidate advanced. The next experiment is a
+repeated, order-balanced Agent A/B with `fixed-raw` as control,
+`ast-structured` as candidate, all non-representation settings fixed, and
+patches scored by the official local harness. Resolve rate and paired case
+outcomes are primary; tokens, model cost, retrieval/tool paths, latency, and
+errors remain separate secondary evidence. The panel is not expanded to 136 or
+500 cases unless that smaller Agent experiment shows a resolve-rate signal.
+
+This remains a 54-case outcome-selected diagnostic panel, not a population
+sample. Problem-statement replay cannot reproduce later model-written
+`code_search` queries, and patch localization is only a proxy for an executable
+fix. The result therefore selects an Agent candidate; it does not establish an
+end-to-end resolve-rate gain.
+
+The predeclared design is in
 [`v4-bge-m3-ast-retrieval-plan.json`](./v4-bge-m3-ast-retrieval-plan.json).
+Complete provenance, hashes, paired estimands, operations, transitions, and all
+54 case-level metric rows are in
+[`v4-bge-m3-ast-retrieval-54-result.json`](./v4-bge-m3-ast-retrieval-54-result.json).
