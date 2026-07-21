@@ -1,0 +1,179 @@
+{
+  "schema_version": 1,
+  "status": "pre_registered_amendment",
+  "created_at": "2026-07-21",
+  "amendment_id": "v5r1-resource-recovery-20260721",
+  "question": "Can the V5 Agent quality comparison be completed on a larger host while retaining the completed A1 generation and separately preserving the original B1 operational failure?",
+  "parent": {
+    "plan": "results/experiments/workspace-rag/v5-bge-m3-ast-agent-ab-54-plan.json",
+    "attempt_result": "results/experiments/workspace-rag/v5-bge-m3-ast-agent-ab-54-result.json",
+    "attempt_status": "aborted",
+    "reason": "The original B1 was OOM-killed before producing any case prediction or official-harness outcome."
+  },
+  "outcome_blinding": {
+    "completed_b_generation_cases_seen": 0,
+    "completed_b_official_harness_outcomes_seen": 0,
+    "formal_harness_started": false,
+    "note": "This amendment was frozen before any ast-structured Agent quality outcome existed."
+  },
+  "preserved_evidence": {
+    "A1": {
+      "run_id": "tag-rag-ast-agent54-a1-20260721",
+      "representation": "fixed-raw",
+      "generation_status": "completed",
+      "prediction_count": 54,
+      "case_errors": 0,
+      "quality_role": "retained A repetition pending official-harness scoring"
+    },
+    "original_B1_attempt": {
+      "run_id": "tag-rag-ast-agent54-b1-20260721",
+      "representation": "ast-structured",
+      "generation_status": "oom_killed",
+      "prediction_count": 0,
+      "quality_role": "excluded because no prediction exists",
+      "operational_role": "retained as a treatment-dependent feasibility incident",
+      "artifact_policy": "Do not overwrite, delete, rename, or append a recovery run to the failed attempt directory."
+    }
+  },
+  "frozen_quality_contract": {
+    "source_revision": "1532343d90ed0e86d9bab7365166ee060ab2a34d",
+    "framework_revision": "9c4a839314a2f0f0b782196e52a45c733a94f213",
+    "case_list": "data/case-lists/tag-rag-preload-ablation-54.case_ids.txt",
+    "case_list_sha256": "b70ede78c4ff8bb13ebb087a12c8ed204dfe7256a72d98410239697a17325d0d",
+    "safe_cases_sha256": "4b2a050a82d356963320cbfa8e2efdf6a133af8863f31b291a973ab4dd349d07",
+    "agent_workers": 15,
+    "embedding_batch_size": 64,
+    "embedding_concurrency": 1,
+    "embedding_cache_access": "readwrite",
+    "retrieval_mode": "hybrid",
+    "max_results": 4,
+    "max_chars": 6000,
+    "observation_codec": "xml",
+    "code_search": true,
+    "workspace_preload": true,
+    "command_timeout": "1m",
+    "case_timeout": "2h",
+    "only_changed_quality_variable": "workspace representation"
+  },
+  "host_discontinuity": {
+    "present": true,
+    "quality_parameters_changed": false,
+    "interpretation": "Host capacity changed between the failed attempt and recovery. This is recorded as a nuisance-condition discontinuity; cross-environment timing and memory are not causal comparisons, while the completed A1 predictions remain valid quality evidence."
+  },
+  "resource_preflight": {
+    "status": "planned",
+    "run_id": "tag-rag-ast-resource-soak15-20260721-r1",
+    "formal_estimand_role": "excluded",
+    "model_generation": false,
+    "official_harness": false,
+    "selection": {
+      "case_list": "data/case-lists/tag-rag-ast-resource-soak-nonpanel-15.case_ids.txt",
+      "case_list_sha256": "d626351156a6dc0b007a51d19ec1f3f62362720b93d37ccd22e896287fb19014",
+      "case_count": 15,
+      "disjoint_from_formal_panel": true,
+      "composition": {
+        "astropy": 1,
+        "django": 14
+      },
+      "selection_rule": "Lexicographically first non-panel Verified cases matching the repository composition of the original B1 first 15 scheduled cases."
+    },
+    "execution": {
+      "mode": "retrieval-replay",
+      "representations": [
+        "ast-structured"
+      ],
+      "case_workers": 15,
+      "max_results": 6,
+      "query_mode": "problem_statement"
+    },
+    "required_pre_start_conditions": [
+      "Required runtime dependencies are healthy.",
+      "No formal Agent run is active.",
+      "Resource headroom and disk headroom pass the private operations threshold.",
+      "Frozen revisions and public data fingerprints match.",
+      "Embedding cache integrity passes."
+    ],
+    "pass_conditions": {
+      "report_status": "completed",
+      "selected_cases": 15,
+      "completed_cases": 15,
+      "case_errors": 0,
+      "arm_errors": 0,
+      "index_coverage_min": 1,
+      "fallback_concentration": 0,
+      "embedding_final_errors": 0,
+      "embedding_cache_errors": 0,
+      "embedding_cache_corruptions": 0,
+      "oom_events_during_window": 0,
+      "fatal_or_panic_log_lines": 0,
+      "resource_headroom": "must_pass",
+      "runtime_dependency_failures": 0
+    },
+    "failure_action": "Stop without starting B1 recovery. Do not lower workers inside this amendment; propose a separately pre-registered balanced V6."
+  },
+  "recovery_sequence": {
+    "start_condition": "Start only after every public integrity condition and private resource-headroom check passes and its evidence is preserved.",
+    "effective_order": [
+      "A1",
+      "B1R1",
+      "B2",
+      "A2"
+    ],
+    "runs": {
+      "A1": "tag-rag-ast-agent54-a1-20260721",
+      "B1R1": "tag-rag-ast-agent54-b1r1-20260721",
+      "B2": "tag-rag-ast-agent54-b2-20260721",
+      "A2": "tag-rag-ast-agent54-a2-20260721"
+    },
+    "representations": {
+      "A1": "fixed-raw",
+      "B1R1": "ast-structured",
+      "B2": "ast-structured",
+      "A2": "fixed-raw"
+    },
+    "directory_policy": "Every recovery run uses a new, absent directory. The original B1 directory remains immutable.",
+    "serial_policy": "Do not start the next run until the previous manifest is completed with 54 predictions, no case errors, and exact frozen fingerprints.",
+    "resume_policy": "Within a recovery run, preds.json remains the resume boundary and only identical-parameter resume is allowed. Never use redo-existing."
+  },
+  "analysis_sets": {
+    "amended_primary_quality": "Pooled B-minus-A official-harness resolved probability across B1R1+B2 versus A1+A2, 108 outcomes per arm, explicitly labeled V5-R and conditional on successful resource recovery.",
+    "paired_case_direction": "Per-case successes across the two retained/completed repetitions per arm, with favor-B, favor-A, and tie counts.",
+    "within_arm_sensitivity": "Always report A1-versus-A2 agreement and resolved-set Jaccard; do not use observed agreement to decide post hoc whether A1 is included.",
+    "new_boot_sensitivity": "Report A2 versus each B recovery repetition descriptively because A1 preceded the host reboot.",
+    "operational_feasibility": "Report the original B1 OOM together with recovery memory, index, embedding, cache, errors, and latency. Do not erase the failed attempt or pool performance timings across host conditions.",
+    "cache_timing": "Treat warmed read-write cache and fixed run order as operational observations, not a causal speed comparison."
+  },
+  "official_harness": {
+    "timing": "Run only after B1R1, B2, and A2 generations all pass their manifest gates.",
+    "order": [
+      "A1",
+      "B1R1",
+      "B2",
+      "A2"
+    ],
+    "target": "tag",
+    "workers": 4,
+    "verifier_mode": "calibrated",
+    "cache_level": "instance",
+    "clean": false,
+    "apply_harness_compat": true
+  },
+  "decision_rules": {
+    "stop": "Stop if B has a lower pooled resolved rate than A, stable regressions outnumber stable improvements, evidence integrity fails, or recovery introduces a material error regression.",
+    "inconclusive": "Do not expand when B improves by only zero to two of 108 pooled outcomes, case-level direction is non-positive, or repetitions disagree materially.",
+    "advance_to_136": "Advance provisionally only when B improves by at least three of 108 pooled outcomes, more cases favor B than A, evidence integrity passes, and no material error regression appears.",
+    "advance_to_500": "Do not start automatically; require a successful 136-case official-harness result first.",
+    "adoption": "Do not recommend ast-structured as a default unless amended quality evidence is positive and operational feasibility is acceptable."
+  },
+  "publication_profile": {
+    "public_sanitized": true,
+    "billing_and_token_metrics_included": true,
+    "omitted": [
+      "credentials and endpoints",
+      "absolute filesystem paths",
+      "host and process identifiers",
+      "binary and private-config fingerprints",
+      "raw artifact hashes"
+    ]
+  }
+}

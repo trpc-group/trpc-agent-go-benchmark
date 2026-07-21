@@ -1,0 +1,190 @@
+{
+  "schema_version": 1,
+  "status": "pre_registered",
+  "created_at": "2026-07-21",
+  "plan_id": "v6-ast-b500-postgate-exploratory-20260721",
+  "question": "What absolute official-harness quality, cost, and operational profile does ast-structured produce on the canonical 500-case SWE-bench Verified panel under the frozen V5-R Agent configuration?",
+  "authorization": {
+    "explicit_user_authorization": true,
+    "interpretation": "Run one ast-structured B generation over the canonical 500 cases, followed by the official local harness.",
+    "relation_to_prior_gate": "Explicit post-gate expansion requested after V5-R concluded no B-minus-A quality gain."
+  },
+  "inference_boundary": {
+    "design": "single-arm exploratory full-panel run",
+    "arm": "B_ast_structured",
+    "causal_comparison_available": false,
+    "prohibited_claims": [
+      "Do not interpret the absolute 500-case score as evidence that B is better than A.",
+      "Do not pool this run into the pre-registered V5-R estimand.",
+      "Do not use historical runs with different revisions/configurations as a controlled counterfactual."
+    ],
+    "permitted_claims": [
+      "Absolute official-harness resolved count/rate for this run.",
+      "Descriptive comparison with named historical full-500 runs, with configuration drift stated.",
+      "Operational feasibility, cost, errors, retrieval usage, index, embedding, cache, and memory observations."
+    ]
+  },
+  "prior_evidence": {
+    "v5r_result": "results/experiments/workspace-rag/v5r-bge-m3-ast-agent-ab-54-result.json",
+    "v5r_primary": {
+      "A_fixed_raw_resolved": 81,
+      "B_ast_structured_resolved": 81,
+      "outcomes_per_arm": 108,
+      "B_minus_A": 0,
+      "favor_B": 8,
+      "favor_A": 8,
+      "tie": 38,
+      "gate": "stop_no_expansion"
+    },
+    "override_note": "This plan records a user-authorized exploratory run; it does not retroactively change or pass the V5-R gate."
+  },
+  "panel": {
+    "case_list": "data/case-lists/verified-test-500.case_ids.txt",
+    "case_count": 500,
+    "case_list_sha256": "a6b0fd7c8c2969a0eef892e032250adcfa6d32362d395c246930e61b575ac9b9",
+    "safe_cases": "data/generated/cases.jsonl",
+    "safe_cases_sha256": "4b2a050a82d356963320cbfa8e2efdf6a133af8863f31b291a973ab4dd349d07",
+    "role": "Canonical full SWE-bench Verified test panel."
+  },
+  "run": {
+    "run_id": "tag-rag-ast-b500-exploratory-20260721-r1",
+    "workspace_representation": "ast-structured",
+    "workspace_representation_schema": "workspace-representation/v1;reader=python-ast;tests=include;hidden=include;paths=stable;fallback=file;embedding=structured-code",
+    "workspace_representation_sha256": "3178d3482124b20f29259fc59e8954975c44384e38779958118bf60b68748ec1"
+  },
+  "provenance": {
+    "source_revision": "1532343d90ed0e86d9bab7365166ee060ab2a34d",
+    "source_modified_required": false,
+    "framework_revision": "9c4a839314a2f0f0b782196e52a45c733a94f213"
+  },
+  "fixed_parameters": {
+    "model": "GLM-5.2",
+    "model_reasoning_effort": "high",
+    "embedding_model": "bge-m3",
+    "retrieval_mode": "hybrid",
+    "embedding_dimensions": 1024,
+    "embedding_batch_size": 64,
+    "embedding_concurrency": 1,
+    "embedding_cache_access": "readwrite",
+    "max_results": 4,
+    "max_chars": 6000,
+    "agent_workers": 15,
+    "observation_codec": "xml",
+    "code_search": true,
+    "workspace_preload": true,
+    "command_timeout": "1m",
+    "case_timeout": "2h"
+  },
+  "preflight_observed": {
+    "status": "passed",
+    "source_checkout_clean": true,
+    "output_directory_absent": true,
+    "no_competing_formal_runner": true,
+    "required_runtime_dependencies_healthy": true,
+    "private_resource_headroom_checks": "passed",
+    "public_data_and_revision_fingerprints_match": true
+  },
+  "projection_from_v5r_B": {
+    "source_outcomes": 108,
+    "projected_total_tokens": 225125861,
+    "projected_estimated_model_cost_billing_units": 582.035741,
+    "uncertainty": "Linear extrapolation from two outcome-selected 54-case B runs; repository mix and Agent trajectories can materially change actual totals."
+  },
+  "launch_contract": {
+    "start_only_if": [
+      "The run directory remains absent.",
+      "No formal Agent runner is active.",
+      "Public data and revision fingerprints match this plan.",
+      "Private memory and disk headroom checks pass.",
+      "Required runtime dependencies are healthy."
+    ],
+    "resume_boundary": "preds.json",
+    "resume_policy": "Resume only with the identical command and fingerprints; never use redo-existing and never overwrite completed artifacts.",
+    "container_policy": "Do not mutate unrelated containers; preserve required managed test dependencies.",
+    "failure_policy": "On abnormal exit, preserve logs, progress, predictions, manifests, and private operational evidence before diagnosis."
+  },
+  "monitoring": {
+    "progress": [
+      "runner PID/process",
+      "tag-runner-progress.json",
+      "preds.json count",
+      "per-case errors",
+      "manifest status"
+    ],
+    "logs": [
+      "retry",
+      "502",
+      "fatal",
+      "panic",
+      "OOM"
+    ],
+    "retrieval": [
+      "workspace coverage",
+      "hash mismatches",
+      "fallback reasons",
+      "node types",
+      "duplicate rate",
+      "code_search calls and bytes"
+    ],
+    "resources": [
+      "resource headroom",
+      "runtime dependency health",
+      "embedding/cache errors and corruption"
+    ],
+    "notification_policy": "Notify on meaningful case progress, abnormal signals, generation-to-harness transition, or completion."
+  },
+  "official_harness": {
+    "timing": "Start only after a completed generation manifest with 500 predictions, zero case errors, and exact fingerprints.",
+    "target": "tag",
+    "workers": 4,
+    "verifier_mode": "calibrated",
+    "cache_level": "instance",
+    "clean": false,
+    "apply_harness_compat": true,
+    "instances_from_predictions": true
+  },
+  "reporting": {
+    "primary_descriptive": [
+      "resolved instances",
+      "resolved rate",
+      "unresolved",
+      "empty patches",
+      "harness errors"
+    ],
+    "secondary": [
+      "tokens",
+      "estimated cost",
+      "LLM/tool calls",
+      "code_search calls/bytes",
+      "Agent errors",
+      "latency"
+    ],
+    "retrieval_operations": [
+      "coverage",
+      "hashes",
+      "fallbacks",
+      "node types",
+      "duplicates",
+      "documents",
+      "index/embedding/cache metrics",
+      "resource-headroom summary"
+    ],
+    "historical_context": [
+      "V5-R B repetitions on the selected 54-case panel",
+      "v3 BGE-M3 full500 result, explicitly non-controlled because revisions and representation differ"
+    ],
+    "adoption_rule": "No default-adoption decision can be made from this single-arm run."
+  },
+  "publication_profile": {
+    "public_sanitized": true,
+    "billing_and_token_metrics_included": true,
+    "omitted": [
+      "verbatim user text",
+      "credentials and endpoints",
+      "absolute filesystem paths",
+      "host and process identifiers",
+      "binary and private-config fingerprints",
+      "private resource thresholds"
+    ]
+  }
+}

@@ -926,3 +926,220 @@ Complete provenance, hashes, paired estimands, operations, transitions, and all
 The repeated, order-balanced Agent A/B that follows this gate is pre-registered
 in
 [`v5-bge-m3-ast-agent-ab-54-plan.json`](./v5-bge-m3-ast-agent-ab-54-plan.json).
+
+## BGE-M3 AST Agent A/B 54-case gate (stopped)
+
+The linked V5/V5-R artifacts use a public-sanitized publication profile.
+Aggregate quality, token, billing, tool, and retrieval metrics are included;
+credentials, endpoints, absolute host paths, process/host identifiers, raw
+artifacts, and per-case outcome rows remain in the internal evidence archive.
+
+The pre-registered `A1,B1,B2,A2` Agent experiment did not reach a resolve-rate
+estimate. `A1` (`fixed-raw`) completed all 54 generations under the frozen
+15-worker configuration. `B1` (`ast-structured`) was then killed by the host
+OOM killer during concurrent workspace indexing, before its first case result.
+This is an evidence-integrity failure and a representation-dependent
+operational instability under the formal configuration.
+
+| Run | Representation | Generation result | Predictions | Formal harness |
+|---|---|---|---:|---|
+| `A1` | `fixed-raw` | completed; 54/54 `Submitted`, 0 case errors | 54 | not run |
+| `B1` | `ast-structured` | OOM-killed during indexing | 0 | not run |
+| `B2` | `ast-structured` | not started | 0 | not run |
+| `A2` | `fixed-raw` | not started | 0 | not run |
+
+`A1` took 1,368,611 ms, made 1,562 LLM calls and 1,627 tool calls,
+used 27,359,926 total model tokens, and recorded an estimated model cost of
+70.613020 billing units. Its completed manifest reports zero final embedding
+or cache errors. Across all 54 case artifacts it indexed 728,047 documents
+from all 74,293 eligible files, with no coverage/hash mismatch, no fallback,
+and 2,452 duplicate documents (0.3368% weighted). The Agent called
+`code_search` 12 times for 88,282 result bytes. These are one-run operational
+observations, not an arm comparison.
+
+The persistent embedding cache was already warm and completed without cache
+errors, so its timing is not cold-index evidence.
+
+The host OOM killer terminated `B1` during concurrent AST indexing before its
+first prediction. The runner wrote no case artifact or manifest, and both the
+prediction and progress counts remained zero. Host, kernel, process, and
+container-level evidence is retained in the internal archive rather than the
+public result.
+
+Host capacity changed before recovery. That discontinuity is recorded as a
+nuisance condition: it does not invalidate the completed `A1` predictions, but
+it prevents causal comparison of timing or memory across the two environments.
+
+The fixed two-worker smoke had passed for both representations, while the
+formal 15-worker `fixed-raw` run completed and the first 15-worker
+`ast-structured` run exhausted the host. Restarting with fewer workers would
+change a pre-registered fixed parameter; restarting unchanged would not repair
+the failed evidence boundary. The formal sequence therefore stopped before
+`B2` and `A2`.
+
+The protocol requires all four generations before official local-harness
+evaluation, so no formal harness run was started. Pooled resolved rate,
+`B-A`, per-case direction, repeat agreement, and resolved-set Jaccard are all
+unavailable. This result does **not** show that AST retrieval lowers solve
+quality; it shows that this frozen Agent configuration cannot produce a valid
+quality comparison on the assigned host.
+
+The gate does not expand to 136 or 500 cases and does not recommend
+`ast-structured` as a default. A retry would need a new pre-registered,
+resource-bounded design—for example a lower fixed worker count, bounded index
+lifetime, or a larger memory envelope—followed by a fresh order-balanced A/B.
+The same 54-case limitation remains: it is an outcome-selected diagnostic
+panel, not a population resolve-rate sample.
+
+The frozen design is in
+[`v5-bge-m3-ast-agent-ab-54-plan.json`](./v5-bge-m3-ast-agent-ab-54-plan.json).
+Machine-readable provenance, the completed `A1` observations, the `B1` OOM
+evidence, unavailable estimands, and the stop decision are in
+[`v5-bge-m3-ast-agent-ab-54-result.json`](./v5-bge-m3-ast-agent-ab-54-result.json).
+
+### V5-R resource-recovery amendment
+
+Because the failed `B1` produced zero predictions and no official-harness
+outcome, a dated amendment was frozen before any candidate-arm quality result
+existed. It retains the completed `A1` prediction set, preserves the original
+`B1` directory and OOM as operational evidence, and first requires a model-free,
+15-worker `ast-structured` index soak on 15 cases disjoint from the formal
+panel.
+
+If every resource and integrity condition passes, recovery continues in the
+effective order `A1,B1R1,B2,A2` with the original 15-worker quality contract.
+The quality result is labeled V5-R and the old/new host discontinuity is always
+reported as a sensitivity limitation. If the soak fails, no lower-worker run is
+mixed into this design; a separately balanced V6 must be pre-registered.
+
+The predeclared recovery boundary, non-panel selection, resource-headroom
+conditions, analysis sets, immutable failed-attempt policy, and unchanged
+quality gate are in
+[`v5-bge-m3-ast-agent-ab-54-amendment-01.json`](./v5-bge-m3-ast-agent-ab-54-amendment-01.json).
+
+## BGE-M3 AST Agent A/B 54-case V5-R result
+
+The amended recovery completed the repeated, order-balanced comparison without
+changing the frozen quality contract. The model-free 15-worker resource soak
+passed 15/15 with full file coverage, zero case/index/embedding/cache errors,
+no OOM or retry/502 signal, and sufficient private resource headroom. The
+original zero-prediction `B1` OOM directory remains immutable and is excluded
+from quality estimates while
+remaining part of the operational evidence.
+
+All four effective generations produced 54/54 `Submitted` predictions with
+zero case errors and exact frozen fingerprints. The official calibrated local
+harness then completed every prediction with zero verifier errors:
+
+| Run | Representation | Generated | Official resolved | Harness errors |
+|---|---|---:|---:|---:|
+| `A1` | `fixed-raw` | 54/54 | 41/54 (75.93%) | 0 |
+| `B1R1` | `ast-structured` | 54/54 | 42/54 (77.78%) | 0 |
+| `B2` | `ast-structured` | 54/54 | 39/54 (72.22%) | 0 |
+| `A2` | `fixed-raw` | 54/54 | 40/54 (74.07%) | 0 |
+
+The primary result is an exact pooled tie: `fixed-raw` resolved 81/108
+(75.00%) and `ast-structured` resolved 81/108 (75.00%), so `B-A = 0/108`.
+Eight cases favor B, eight favor A, and 38 tie. The success-count distribution
+is one case at -2, seven at -1, 38 at zero, seven at +1, and one at +2.
+There is one stable B improvement and one stable A improvement; stable case
+identifiers remain in the internal evidence archive.
+
+Repeatability is also identical. Each arm resolves the same outcome in both
+repetitions for 41/54 cases (75.93%), and each arm's resolved-set Jaccard is
+34/47 (72.34%). Comparing post-recovery `A2` with `B1R1` gives 40/54 agreement
+and 70.83% Jaccard; comparing it with `B2` gives 43/54 agreement and 75.56%
+Jaccard. These checks do not reveal an anomalous retained `A1`.
+
+### Secondary cost and operational evidence
+
+| Arm | Total tokens | Estimated cost | LLM / tool calls | `code_search` calls / bytes | Aggregate index time |
+|---|---:|---:|---:|---:|---:|
+| `fixed-raw` | 57,794,783 | 147.388252 | 3,232 / 3,378 | 24 / 180,073 | 2,596,900 ms |
+| `ast-structured` | 48,627,186 | 125.719720 | 2,970 / 3,128 | 28 / 127,688 | 9,138,707 ms |
+
+At equal resolved count, B used 9,167,597 fewer total tokens (-15.86%) and
+21.668532 fewer estimated billing units (-14.70%). These are secondary
+stochastic Agent observations, not a demonstrated representation benefit.
+Timing is also descriptive: the run order used a warming persistent read-write
+cache, and `A1` preceded a recorded host-capacity discontinuity.
+
+Both representations indexed every one of the 74,293 eligible file instances
+with zero eligible/indexed hash mismatch. Same-representation eligible,
+indexed, and document hashes match across repetitions; cross-arm document
+hashes differ for all 54 cases by design.
+
+| Representation | Documents | Fallbacks | Weighted duplicates | Two-run index time |
+|---|---:|---:|---:|---:|
+| `fixed-raw` | 728,047 | 0 | 2,452 (0.3368%) | 2,596,900 ms |
+| `ast-structured` | 1,483,836 | 1,832 | 83,778 (5.6460%) | 9,138,707 ms |
+
+The AST fallbacks are 1,799 files with no supported node and 33 parse errors;
+they preserve full file coverage. AST emits 2.04x as many documents, takes
+3.52x the aggregate indexing time, and retains a much higher duplicate rate.
+The recovery runs had no final embedding/cache errors or corruption, and the
+persistent cache passed its integrity check.
+
+### Gate decision
+
+V5-R passes evidence integrity but fails the pre-registered efficacy gate.
+Candidate B is not at least +3/108, does not have more favoring cases, and
+shows no repeat-stability advantage. The V4 retrieval-only localization signal
+therefore did not translate into an Agent resolve-rate gain on this panel.
+
+Do **not** expand to 136 or 500 cases and do **not** make `ast-structured` the
+default workspace representation. The lower observed token/cost total does not
+override the zero quality delta and the material indexing footprint. A
+future AST design should first reduce document multiplication and duplicate
+content, then establish a new small controlled signal before another Agent
+gate.
+
+This remains a 54-case outcome-selected RAG-sensitive panel, not a population
+estimate for SWE-bench Verified. It has only two stochastic repetitions per
+arm, a recorded host discontinuity, fixed-order warm-cache timing, and a frozen
+framework revision with a known pre-existing race-detector warning shared by
+both arms. The earlier retrieval replay also used the problem statement as its
+query, whereas the Agent can formulate later `code_search` calls differently.
+
+Public aggregate provenance, recovery status, per-run metrics, paired
+estimands, and the final stop decision are in
+[`v5r-bge-m3-ast-agent-ab-54-result.json`](./v5r-bge-m3-ast-agent-ab-54-result.json).
+Host-specific evidence, raw artifact hashes, and per-case rows remain internal.
+
+## Post-gate B-only 500-case exploratory run
+
+After the V5-R stop decision, the user explicitly authorized one additional
+`ast-structured` run over the canonical 500-case Verified panel. This is a
+post-gate, single-arm exploratory run. It does not pass or revise the V5-R
+efficacy gate, cannot estimate `B-A`, and must not use historical runs with
+different revisions or configurations as a controlled counterfactual.
+
+The formal run is
+`tag-rag-ast-b500-exploratory-20260721-r1`. It keeps the V5-R B configuration:
+GLM-5.2, BGE-M3 hybrid retrieval, 1,024 embedding dimensions, embedding batch
+64/concurrency 1, persistent read-write cache, four results / 6,000 characters,
+15 Agent workers, XML observations, workspace preload, and
+`ast-structured`. The source, framework, runner binary, safe cases, model,
+embedding, and environment fingerprints remain frozen. The only panel change
+is from the outcome-selected 54 cases to
+`verified-test-500.case_ids.txt` (SHA-256
+`a6b0fd7c8c2969a0eef892e032250adcfa6d32362d395c246930e61b575ac9b9`).
+
+The run was launched on 2026-07-21 after confirming a clean source checkout,
+an absent output directory, no competing formal runner, healthy required
+runtime dependencies, and sufficient private memory/disk headroom. Linear
+projection from the two V5-R B repetitions is about
+225.1 million total tokens, 582.0 billing units, and 3.32 hours of generation;
+these are planning estimates rather than limits or results.
+
+The official calibrated local harness will run only after generation produces
+500 predictions with zero case errors and exact fingerprints. Final reporting
+will cover the absolute resolved rate, cost, errors, retrieval/tool usage,
+coverage, fallbacks, duplicates, indexing, embedding/cache behavior, and
+resource-headroom status. No default-adoption decision can be made from this
+single arm.
+
+The inference boundary, explicit post-gate authorization, public run contract,
+resume policy, projected token/billing budget, harness configuration, and
+reporting contract are frozen in
+[`v6-bge-m3-ast-b500-exploratory-plan.json`](./v6-bge-m3-ast-b500-exploratory-plan.json).

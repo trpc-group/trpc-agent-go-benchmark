@@ -1,0 +1,830 @@
+{
+  "schema_version": 1,
+  "status": "completed",
+  "evidence_status": "complete",
+  "completed_on": "2026-07-21",
+  "result_id": "v5r-bge-m3-ast-agent-ab-54",
+  "question": "Does ast-structured workspace retrieval improve official-harness Agent resolve rate over indentation-preserving fixed-raw chunks?",
+  "plan": {
+    "path": "results/experiments/workspace-rag/v5-bge-m3-ast-agent-ab-54-plan.json",
+    "amendment_path": "results/experiments/workspace-rag/v5-bge-m3-ast-agent-ab-54-amendment-01.json",
+    "original_attempt_result": "results/experiments/workspace-rag/v5-bge-m3-ast-agent-ab-54-result.json",
+    "effective_generation_order": [
+      "A1",
+      "B1R1",
+      "B2",
+      "A2"
+    ],
+    "repetitions_per_arm": 2,
+    "amendment_frozen_before_b_quality_outcomes": true
+  },
+  "provenance": {
+    "benchmark_revision": "1532343d90ed0e86d9bab7365166ee060ab2a34d",
+    "source_revision": "1532343d90ed0e86d9bab7365166ee060ab2a34d",
+    "source_modified": false,
+    "framework_revision": "9c4a839314a2f0f0b782196e52a45c733a94f213",
+    "case_list": "data/case-lists/tag-rag-preload-ablation-54.case_ids.txt",
+    "case_count": 54,
+    "case_list_sha256": "b70ede78c4ff8bb13ebb087a12c8ed204dfe7256a72d98410239697a17325d0d",
+    "selected_case_set_sha256": "b70ede78c4ff8bb13ebb087a12c8ed204dfe7256a72d98410239697a17325d0d",
+    "safe_cases": "data/generated/cases.jsonl",
+    "safe_cases_sha256": "4b2a050a82d356963320cbfa8e2efdf6a133af8863f31b291a973ab4dd349d07",
+    "prior_ast_retrieval_result": "results/experiments/workspace-rag/v4-bge-m3-ast-retrieval-54-result.json"
+  },
+  "fixed_parameters": {
+    "model": "GLM-5.2",
+    "embedding_model": "bge-m3",
+    "retrieval_mode": "hybrid",
+    "embedding_dimensions": 1024,
+    "embedding_batch_size": 64,
+    "embedding_concurrency": 1,
+    "embedding_cache_access": "readwrite",
+    "max_results": 4,
+    "max_chars": 6000,
+    "agent_workers": 15,
+    "observation_codec": "xml",
+    "code_search": true,
+    "workspace_preload": true,
+    "command_timeout": "1m",
+    "case_timeout": "2h",
+    "only_changed_quality_variable": "workspace representation"
+  },
+  "arms": {
+    "A_fixed_raw": {
+      "representation": "fixed-raw",
+      "schema": "workspace-representation/v1;reader=text;chunk=fixed;size=1024;overlap=128;whitespace=preserve",
+      "representation_sha256": "2a0419991facdf15219d487f6c1ec59dc9796da5e49aff17f80bfb05e33fc163",
+      "runs": [
+        "A1",
+        "A2"
+      ]
+    },
+    "B_ast_structured": {
+      "representation": "ast-structured",
+      "schema": "workspace-representation/v1;reader=python-ast;tests=include;hidden=include;paths=stable;fallback=file;embedding=structured-code",
+      "representation_sha256": "3178d3482124b20f29259fc59e8954975c44384e38779958118bf60b68748ec1",
+      "runs": [
+        "B1R1",
+        "B2"
+      ]
+    }
+  },
+  "panel": {
+    "case_count": 54,
+    "role": "Outcome-selected RAG-sensitive diagnostic panel; not a population resolve-rate sample.",
+    "query_used_for_retrieval_replay_selection": "problem_statement",
+    "inference_scope": "Conditional comparison on this 54-case outcome-selected panel."
+  },
+  "smoke": {
+    "status": "passed",
+    "excluded_from_primary_estimands": true,
+    "agent_workers": 2,
+    "fixed_raw": {
+      "submitted": 2,
+      "official_harness_resolved": 2,
+      "errors": 0
+    },
+    "ast_structured": {
+      "submitted": 2,
+      "official_harness_resolved": 2,
+      "errors": 0
+    }
+  },
+  "recovery": {
+    "status": "completed",
+    "original_B1_attempt": {
+      "run_id": "tag-rag-ast-agent54-b1-20260721",
+      "representation": "ast-structured",
+      "status": "oom_killed",
+      "completed_cases": 0,
+      "prediction_count": 0,
+      "quality_role": "excluded because no prediction or official-harness outcome exists",
+      "operational_role": "preserved treatment-dependent feasibility incident"
+    },
+    "model_free_resource_preflight": {
+      "run_id": "tag-rag-ast-resource-soak15-20260721-r1",
+      "status": "completed",
+      "formal_estimand_role": "excluded",
+      "selected_cases": 15,
+      "completed_cases": 15,
+      "case_errors": 0,
+      "arm_errors": 0,
+      "file_coverage_min": 1,
+      "all_fallback_cases": 0,
+      "embedding_errors": 0,
+      "cache_errors": 0,
+      "cache_corruptions": 0,
+      "anomaly_log_count": 0,
+      "runtime_dependency_failures": 0,
+      "resource_headroom": "passed"
+    },
+    "host_discontinuity": {
+      "present": true,
+      "interpretation": "A host-capacity discontinuity occurred between A1 and the recovery runs. Quality parameters remained frozen, but timing and memory are not causal cross-environment comparisons."
+    },
+    "formal_generation_health": {
+      "embedding_errors": 0,
+      "cache_errors": 0,
+      "cache_corruptions": 0,
+      "anomaly_log_count": 0,
+      "host_specific_measurements": "retained in the internal evidence archive"
+    }
+  },
+  "generation_integrity": {
+    "required_runs": 4,
+    "completed_runs": 4,
+    "predictions_per_run": 54,
+    "total_predictions": 216,
+    "case_errors": 0,
+    "all_exit_status_submitted": true,
+    "fingerprints_match": true,
+    "imports_completed": 4,
+    "run_configs_completed": 4,
+    "original_failed_B1_excluded_from_quality_estimands": true
+  },
+  "official_harness": {
+    "status": "completed",
+    "implementation": "official local harness",
+    "target": "tag",
+    "workers": 4,
+    "verifier_mode": "calibrated",
+    "cache_level": "instance",
+    "clean": false,
+    "apply_harness_compat": true,
+    "instances_from_predictions": true,
+    "order": [
+      "A1",
+      "B1R1",
+      "B2",
+      "A2"
+    ],
+    "submitted_instances": 216,
+    "completed_instances": 216,
+    "error_instances": 0
+  },
+  "runs": {
+    "A1": {
+      "run_id": "tag-rag-ast-agent54-a1-20260721",
+      "arm": "A",
+      "workspace_representation": "fixed-raw",
+      "status": "completed",
+      "generation_duration_ms": 1368611,
+      "case_count": 54,
+      "prediction_count": 54,
+      "case_errors": 0,
+      "exit_status_counts": {
+        "Submitted": 54
+      },
+      "model_metrics": {
+        "llm_calls": 1562,
+        "tool_calls": 1627,
+        "prompt_tokens": 26899671,
+        "cached_tokens": 26245248,
+        "uncached_tokens": 654423,
+        "completion_tokens": 460255,
+        "reasoning_tokens": 0,
+        "total_tokens": 27359926,
+        "estimated_model_cost": 70.61302,
+        "cost_currency": "billing_unit"
+      },
+      "retrieval_metrics": {
+        "case_duration_ms_aggregate": 17381410,
+        "code_search_calls": 12,
+        "code_search_result_bytes": 88282,
+        "case_runs_with_code_search": 12,
+        "workspace_index": {
+          "documents": 728047,
+          "eligible_files": 74293,
+          "indexed_files": 74293,
+          "fallback_documents": 0,
+          "content_chars": 788212816,
+          "embedding_text_chars": 0,
+          "duplicate_documents": 2452,
+          "duration_ms": 1557109,
+          "preloaded_documents": 216,
+          "preloaded_chars": 260404,
+          "successful_cases": 54,
+          "representation": "fixed-raw",
+          "representation_schema": "workspace-representation/v1;reader=text;chunk=fixed;size=1024;overlap=128;whitespace=preserve",
+          "representation_sha256": "2a0419991facdf15219d487f6c1ec59dc9796da5e49aff17f80bfb05e33fc163",
+          "retrieval_mode": "hybrid",
+          "file_coverage_min": 1,
+          "file_coverage_max": 1,
+          "eligible_indexed_hash_mismatch_cases": 0,
+          "unique_eligible_file_set_hashes": 47,
+          "unique_indexed_file_set_hashes": 47,
+          "unique_document_set_hashes": 54,
+          "fallback_reasons": {},
+          "node_types": {},
+          "duplicate_document_rate_weighted": 0.003367914434095601,
+          "duplicate_document_rate_case_mean": 0.0032852628410924927,
+          "preload_injected_cases": 54
+        },
+        "embedding": {
+          "requests": 12,
+          "batch_requests": 0,
+          "inputs": 12,
+          "errors": 0,
+          "duration_ms": 1138
+        },
+        "embedding_cache": {
+          "requests": 11467,
+          "batch_requests": 11401,
+          "inputs": 728113,
+          "hits": 728101,
+          "misses": 12,
+          "writes": 12,
+          "corruptions": 0,
+          "errors": 0,
+          "bytes_read": 2979921920,
+          "bytes_written": 49152,
+          "read_duration_ms": 868121,
+          "write_duration_ms": 24
+        }
+      },
+      "official_harness": {
+        "submitted_instances": 54,
+        "completed_instances": 54,
+        "resolved_instances": 41,
+        "resolved_rate": 0.7592592592592593,
+        "unresolved_instances": 13,
+        "empty_patch_instances": 0,
+        "error_instances": 0,
+        "duration_ms": 444644,
+        "verifier_mode": "calibrated",
+        "workers": 4,
+        "cache_level": "instance",
+        "clean": false,
+        "compat_patch": true
+      }
+    },
+    "B1R1": {
+      "run_id": "tag-rag-ast-agent54-b1r1-20260721",
+      "arm": "B",
+      "workspace_representation": "ast-structured",
+      "status": "completed",
+      "generation_duration_ms": 1262743,
+      "case_count": 54,
+      "prediction_count": 54,
+      "case_errors": 0,
+      "exit_status_counts": {
+        "Submitted": 54
+      },
+      "model_metrics": {
+        "llm_calls": 1433,
+        "tool_calls": 1520,
+        "prompt_tokens": 21982680,
+        "cached_tokens": 21364160,
+        "uncached_tokens": 618520,
+        "completion_tokens": 400175,
+        "reasoning_tokens": 0,
+        "total_tokens": 22382855,
+        "estimated_model_cost": 58.88138,
+        "cost_currency": "billing_unit"
+      },
+      "retrieval_metrics": {
+        "case_duration_ms_aggregate": 17124874,
+        "code_search_calls": 12,
+        "code_search_result_bytes": 55530,
+        "case_runs_with_code_search": 12,
+        "workspace_index": {
+          "documents": 1483836,
+          "eligible_files": 74293,
+          "indexed_files": 74293,
+          "fallback_documents": 1832,
+          "content_chars": 730308768,
+          "embedding_text_chars": 1267740501,
+          "duplicate_documents": 83778,
+          "duration_ms": 4706243,
+          "preloaded_documents": 158,
+          "preloaded_chars": 284230,
+          "successful_cases": 54,
+          "representation": "ast-structured",
+          "representation_schema": "workspace-representation/v1;reader=python-ast;tests=include;hidden=include;paths=stable;fallback=file;embedding=structured-code",
+          "representation_sha256": "3178d3482124b20f29259fc59e8954975c44384e38779958118bf60b68748ec1",
+          "retrieval_mode": "hybrid",
+          "file_coverage_min": 1,
+          "file_coverage_max": 1,
+          "eligible_indexed_hash_mismatch_cases": 0,
+          "unique_eligible_file_set_hashes": 47,
+          "unique_indexed_file_set_hashes": 47,
+          "unique_document_set_hashes": 54,
+          "fallback_reasons": {
+            "no_nodes": 1799,
+            "parse_error": 33
+          },
+          "node_types": {
+            "Class": 266551,
+            "Function": 280019,
+            "Interface": 30,
+            "Method": 797851,
+            "Variable": 137553,
+            "file": 1832
+          },
+          "duplicate_document_rate_weighted": 0.056460417458533155,
+          "duplicate_document_rate_case_mean": 0.05746182760993095,
+          "preload_injected_cases": 54
+        },
+        "embedding": {
+          "requests": 10,
+          "batch_requests": 0,
+          "inputs": 10,
+          "errors": 0,
+          "duration_ms": 764
+        },
+        "embedding_cache": {
+          "requests": 23279,
+          "batch_requests": 23213,
+          "inputs": 1483902,
+          "hits": 1483892,
+          "misses": 10,
+          "writes": 10,
+          "corruptions": 0,
+          "errors": 0,
+          "bytes_read": 6014074880,
+          "bytes_written": 40960,
+          "read_duration_ms": 271401,
+          "write_duration_ms": 6
+        }
+      },
+      "official_harness": {
+        "submitted_instances": 54,
+        "completed_instances": 54,
+        "resolved_instances": 42,
+        "resolved_rate": 0.7777777777777778,
+        "unresolved_instances": 12,
+        "empty_patch_instances": 0,
+        "error_instances": 0,
+        "duration_ms": 434105,
+        "verifier_mode": "calibrated",
+        "workers": 4,
+        "cache_level": "instance",
+        "clean": false,
+        "compat_patch": true
+      }
+    },
+    "B2": {
+      "run_id": "tag-rag-ast-agent54-b2-20260721",
+      "arm": "B",
+      "workspace_representation": "ast-structured",
+      "status": "completed",
+      "generation_duration_ms": 1318650,
+      "case_count": 54,
+      "prediction_count": 54,
+      "case_errors": 0,
+      "exit_status_counts": {
+        "Submitted": 54
+      },
+      "model_metrics": {
+        "llm_calls": 1537,
+        "tool_calls": 1608,
+        "prompt_tokens": 25842988,
+        "cached_tokens": 25190528,
+        "uncached_tokens": 652460,
+        "completion_tokens": 401343,
+        "reasoning_tokens": 0,
+        "total_tokens": 26244331,
+        "estimated_model_cost": 66.83834,
+        "cost_currency": "billing_unit"
+      },
+      "retrieval_metrics": {
+        "case_duration_ms_aggregate": 17656153,
+        "code_search_calls": 16,
+        "code_search_result_bytes": 72158,
+        "case_runs_with_code_search": 16,
+        "workspace_index": {
+          "documents": 1483836,
+          "eligible_files": 74293,
+          "indexed_files": 74293,
+          "fallback_documents": 1832,
+          "content_chars": 730308768,
+          "embedding_text_chars": 1267740501,
+          "duplicate_documents": 83778,
+          "duration_ms": 4432464,
+          "preloaded_documents": 158,
+          "preloaded_chars": 284230,
+          "successful_cases": 54,
+          "representation": "ast-structured",
+          "representation_schema": "workspace-representation/v1;reader=python-ast;tests=include;hidden=include;paths=stable;fallback=file;embedding=structured-code",
+          "representation_sha256": "3178d3482124b20f29259fc59e8954975c44384e38779958118bf60b68748ec1",
+          "retrieval_mode": "hybrid",
+          "file_coverage_min": 1,
+          "file_coverage_max": 1,
+          "eligible_indexed_hash_mismatch_cases": 0,
+          "unique_eligible_file_set_hashes": 47,
+          "unique_indexed_file_set_hashes": 47,
+          "unique_document_set_hashes": 54,
+          "fallback_reasons": {
+            "no_nodes": 1799,
+            "parse_error": 33
+          },
+          "node_types": {
+            "Class": 266551,
+            "Function": 280019,
+            "Interface": 30,
+            "Method": 797851,
+            "Variable": 137553,
+            "file": 1832
+          },
+          "duplicate_document_rate_weighted": 0.056460417458533155,
+          "duplicate_document_rate_case_mean": 0.05746182760993095,
+          "preload_injected_cases": 54
+        },
+        "embedding": {
+          "requests": 13,
+          "batch_requests": 0,
+          "inputs": 13,
+          "errors": 0,
+          "duration_ms": 1160
+        },
+        "embedding_cache": {
+          "requests": 23283,
+          "batch_requests": 23213,
+          "inputs": 1483906,
+          "hits": 1483893,
+          "misses": 13,
+          "writes": 13,
+          "corruptions": 0,
+          "errors": 0,
+          "bytes_read": 6014078976,
+          "bytes_written": 53248,
+          "read_duration_ms": 273980,
+          "write_duration_ms": 10
+        }
+      },
+      "official_harness": {
+        "submitted_instances": 54,
+        "completed_instances": 54,
+        "resolved_instances": 39,
+        "resolved_rate": 0.7222222222222222,
+        "unresolved_instances": 15,
+        "empty_patch_instances": 0,
+        "error_instances": 0,
+        "duration_ms": 432942,
+        "verifier_mode": "calibrated",
+        "workers": 4,
+        "cache_level": "instance",
+        "clean": false,
+        "compat_patch": true
+      }
+    },
+    "A2": {
+      "run_id": "tag-rag-ast-agent54-a2-20260721",
+      "arm": "A",
+      "workspace_representation": "fixed-raw",
+      "status": "completed",
+      "generation_duration_ms": 1627264,
+      "case_count": 54,
+      "prediction_count": 54,
+      "case_errors": 0,
+      "exit_status_counts": {
+        "Submitted": 54
+      },
+      "model_metrics": {
+        "llm_calls": 1670,
+        "tool_calls": 1751,
+        "prompt_tokens": 29996291,
+        "cached_tokens": 29245824,
+        "uncached_tokens": 750467,
+        "completion_tokens": 438566,
+        "reasoning_tokens": 0,
+        "total_tokens": 30434857,
+        "estimated_model_cost": 76.775232,
+        "cost_currency": "billing_unit"
+      },
+      "retrieval_metrics": {
+        "case_duration_ms_aggregate": 18901277,
+        "code_search_calls": 12,
+        "code_search_result_bytes": 91791,
+        "case_runs_with_code_search": 12,
+        "workspace_index": {
+          "documents": 728047,
+          "eligible_files": 74293,
+          "indexed_files": 74293,
+          "fallback_documents": 0,
+          "content_chars": 788212816,
+          "embedding_text_chars": 0,
+          "duplicate_documents": 2452,
+          "duration_ms": 1039791,
+          "preloaded_documents": 216,
+          "preloaded_chars": 260404,
+          "successful_cases": 54,
+          "representation": "fixed-raw",
+          "representation_schema": "workspace-representation/v1;reader=text;chunk=fixed;size=1024;overlap=128;whitespace=preserve",
+          "representation_sha256": "2a0419991facdf15219d487f6c1ec59dc9796da5e49aff17f80bfb05e33fc163",
+          "retrieval_mode": "hybrid",
+          "file_coverage_min": 1,
+          "file_coverage_max": 1,
+          "eligible_indexed_hash_mismatch_cases": 0,
+          "unique_eligible_file_set_hashes": 47,
+          "unique_indexed_file_set_hashes": 47,
+          "unique_document_set_hashes": 54,
+          "fallback_reasons": {},
+          "node_types": {},
+          "duplicate_document_rate_weighted": 0.003367914434095601,
+          "duplicate_document_rate_case_mean": 0.0032852628410924927,
+          "preload_injected_cases": 54
+        },
+        "embedding": {
+          "requests": 8,
+          "batch_requests": 0,
+          "inputs": 8,
+          "errors": 0,
+          "duration_ms": 303
+        },
+        "embedding_cache": {
+          "requests": 11467,
+          "batch_requests": 11401,
+          "inputs": 728113,
+          "hits": 728105,
+          "misses": 8,
+          "writes": 8,
+          "corruptions": 0,
+          "errors": 0,
+          "bytes_read": 2979938304,
+          "bytes_written": 32768,
+          "read_duration_ms": 525058,
+          "write_duration_ms": 4
+        }
+      },
+      "official_harness": {
+        "submitted_instances": 54,
+        "completed_instances": 54,
+        "resolved_instances": 40,
+        "resolved_rate": 0.7407407407407407,
+        "unresolved_instances": 14,
+        "empty_patch_instances": 0,
+        "error_instances": 0,
+        "duration_ms": 435354,
+        "verifier_mode": "calibrated",
+        "workers": 4,
+        "cache_level": "instance",
+        "clean": false,
+        "compat_patch": true
+      }
+    }
+  },
+  "arm_pooled": {
+    "A_fixed_raw": {
+      "runs": [
+        "A1",
+        "A2"
+      ],
+      "resolved_outcomes": 81,
+      "total_outcomes": 108,
+      "resolved_probability": 0.75,
+      "prompt_tokens": 56895962,
+      "cached_tokens": 55491072,
+      "uncached_tokens": 1404890,
+      "completion_tokens": 898821,
+      "total_tokens": 57794783,
+      "estimated_model_cost": 147.38825200000002,
+      "tokens_per_resolved_outcome": 713515.8395061728,
+      "cost_per_resolved_outcome": 1.8196080493827163,
+      "llm_calls": 3232,
+      "tool_calls": 3378,
+      "code_search_calls": 24,
+      "code_search_result_bytes": 180073,
+      "case_runs_with_code_search": 24,
+      "generation_duration_ms": 2995875,
+      "case_duration_ms_aggregate": 36282687,
+      "index_duration_ms_aggregate": 2596900,
+      "embedding_duration_ms": 1441,
+      "embedding_cache_read_duration_ms": 1393179,
+      "agent_case_errors": 0,
+      "harness_errors": 0
+    },
+    "B_ast_structured": {
+      "runs": [
+        "B1R1",
+        "B2"
+      ],
+      "resolved_outcomes": 81,
+      "total_outcomes": 108,
+      "resolved_probability": 0.75,
+      "prompt_tokens": 47825668,
+      "cached_tokens": 46554688,
+      "uncached_tokens": 1270980,
+      "completion_tokens": 801518,
+      "total_tokens": 48627186,
+      "estimated_model_cost": 125.71972,
+      "tokens_per_resolved_outcome": 600335.6296296297,
+      "cost_per_resolved_outcome": 1.5520953086419753,
+      "llm_calls": 2970,
+      "tool_calls": 3128,
+      "code_search_calls": 28,
+      "code_search_result_bytes": 127688,
+      "case_runs_with_code_search": 28,
+      "generation_duration_ms": 2581393,
+      "case_duration_ms_aggregate": 34781027,
+      "index_duration_ms_aggregate": 9138707,
+      "embedding_duration_ms": 1924,
+      "embedding_cache_read_duration_ms": 545381,
+      "agent_case_errors": 0,
+      "harness_errors": 0
+    }
+  },
+  "primary_estimands": {
+    "pooled_b_minus_a_resolved_outcomes": 0,
+    "pooled_b_minus_a_probability": 0,
+    "favor_b_cases": 8,
+    "favor_a_cases": 8,
+    "tied_cases": 38,
+    "success_delta_distribution": {
+      "0": 38,
+      "1": 7,
+      "2": 1,
+      "-2": 1,
+      "-1": 7
+    },
+    "within_arm_repeatability": {
+      "A_fixed_raw": {
+        "first_run": "A1",
+        "second_run": "A2",
+        "both_resolved": 34,
+        "A1_only": 7,
+        "A2_only": 6,
+        "neither_resolved": 7,
+        "agreement_count": 41,
+        "agreement_rate": 0.7592592592592593,
+        "resolved_set_jaccard": 0.723404255319149
+      },
+      "B_ast_structured": {
+        "first_run": "B1R1",
+        "second_run": "B2",
+        "both_resolved": 34,
+        "B1R1_only": 8,
+        "B2_only": 5,
+        "neither_resolved": 7,
+        "agreement_count": 41,
+        "agreement_rate": 0.7592592592592593,
+        "resolved_set_jaccard": 0.723404255319149
+      }
+    },
+    "stable_b_improvement_case_count": 1,
+    "stable_a_improvement_case_count": 1,
+    "post_recovery_sensitivity": {
+      "A2_vs_B1R1": {
+        "first_run": "A2",
+        "second_run": "B1R1",
+        "both_resolved": 34,
+        "A2_only": 6,
+        "B1R1_only": 8,
+        "neither_resolved": 6,
+        "agreement_count": 40,
+        "agreement_rate": 0.7407407407407407,
+        "resolved_set_jaccard": 0.7083333333333334
+      },
+      "A2_vs_B2": {
+        "first_run": "A2",
+        "second_run": "B2",
+        "both_resolved": 34,
+        "A2_only": 6,
+        "B2_only": 5,
+        "neither_resolved": 9,
+        "agreement_count": 43,
+        "agreement_rate": 0.7962962962962963,
+        "resolved_set_jaccard": 0.7555555555555555
+      }
+    }
+  },
+  "secondary_estimands": {
+    "quality_equal": true,
+    "B_minus_A": {
+      "prompt_tokens": -9070294,
+      "completion_tokens": -97303,
+      "total_tokens": -9167597,
+      "total_tokens_relative_to_A": -0.15862326189545517,
+      "estimated_model_cost": -21.668532000000027,
+      "estimated_model_cost_relative_to_A": -0.14701668352780264,
+      "llm_calls": -262,
+      "tool_calls": -250,
+      "code_search_calls": 4,
+      "code_search_result_bytes": -52385,
+      "generation_duration_ms": -414482,
+      "case_duration_ms_aggregate": -1501660,
+      "index_duration_ms_aggregate": 6541807,
+      "index_duration_ratio": 3.519083137587123,
+      "embedding_duration_ms": 483,
+      "embedding_cache_read_duration_ms": -847798
+    },
+    "interpretation": "Token and cost differences are secondary stochastic Agent observations. Latency, indexing, and cache timing are operational observations, not causal performance estimates because of fixed order, a warm read-write cache, and a recorded host discontinuity."
+  },
+  "workspace_integrity": {
+    "A1_vs_A2": {
+      "eligible_file_set_sha256_mismatch_cases": 0,
+      "indexed_file_set_sha256_mismatch_cases": 0,
+      "document_set_sha256_mismatch_cases": 0
+    },
+    "B1R1_vs_B2": {
+      "eligible_file_set_sha256_mismatch_cases": 0,
+      "indexed_file_set_sha256_mismatch_cases": 0,
+      "document_set_sha256_mismatch_cases": 0
+    },
+    "A1_vs_B1R1": {
+      "eligible_file_set_sha256_mismatch_cases": 0,
+      "indexed_file_set_sha256_mismatch_cases": 0,
+      "document_set_sha256_mismatch_cases": 54
+    },
+    "A2_vs_B2": {
+      "eligible_file_set_sha256_mismatch_cases": 0,
+      "indexed_file_set_sha256_mismatch_cases": 0,
+      "document_set_sha256_mismatch_cases": 54
+    }
+  },
+  "representation_operations": {
+    "fixed_raw": {
+      "documents": 728047,
+      "eligible_files": 74293,
+      "indexed_files": 74293,
+      "file_coverage_min": 1,
+      "file_coverage_max": 1,
+      "eligible_indexed_hash_mismatch_cases": 0,
+      "fallback_documents": 0,
+      "fallback_reasons": {},
+      "node_types": {},
+      "duplicate_documents": 2452,
+      "duplicate_document_rate_weighted": 0.003367914434095601,
+      "index_duration_ms_across_two_runs": 2596900,
+      "preloaded_documents": 216,
+      "preloaded_chars": 260404,
+      "preload_injected_cases": 54
+    },
+    "ast_structured": {
+      "documents": 1483836,
+      "documents_ratio_vs_fixed_raw": 2.038104682802072,
+      "eligible_files": 74293,
+      "indexed_files": 74293,
+      "file_coverage_min": 1,
+      "file_coverage_max": 1,
+      "eligible_indexed_hash_mismatch_cases": 0,
+      "fallback_documents": 1832,
+      "fallback_reasons": {
+        "no_nodes": 1799,
+        "parse_error": 33
+      },
+      "node_types": {
+        "Class": 266551,
+        "Function": 280019,
+        "Interface": 30,
+        "Method": 797851,
+        "Variable": 137553,
+        "file": 1832
+      },
+      "duplicate_documents": 83778,
+      "duplicate_document_rate_weighted": 0.056460417458533155,
+      "index_duration_ms_across_two_runs": 9138707,
+      "preloaded_documents": 158,
+      "preloaded_chars": 284230,
+      "preload_injected_cases": 54
+    },
+    "interpretation": "Both arms indexed the same eligible files with full coverage. AST changed document boundaries and structured embedding text, producing more documents, fallbacks, duplicates, and indexing time."
+  },
+  "validation": {
+    "json_parse": "passed",
+    "result_consistency_assertions": "passed",
+    "git_diff_check": "passed",
+    "go_test": {
+      "status": "passed",
+      "scope": "benchmark and frozen framework workspace modules"
+    }
+  },
+  "decision": {
+    "gate": "stop_no_expansion",
+    "expand_to_136": false,
+    "expand_to_500": false,
+    "recommend_default_ast_structured": false,
+    "evidence_integrity_passed": true,
+    "material_agent_error_regression": false,
+    "reasons": [
+      "B pooled resolved outcomes equal A: 81/108 versus 81/108.",
+      "Paired case direction is exactly balanced: 8 favor B, 8 favor A, and 38 tie.",
+      "Stable effects are symmetric: one stable B improvement and one stable A improvement.",
+      "Both arms have identical within-arm agreement and resolved-set Jaccard.",
+      "The pre-registered advance threshold requires at least +3/108 for B and more cases favoring B than A.",
+      "AST operational cost is material: 2.04x documents, 3.52x aggregate indexing time, and a 5.646% duplicate rate."
+    ],
+    "conclusion": "The V4 retrieval-only localization signal did not translate into an Agent resolve-rate gain on the 54-case outcome-selected panel. Stop expansion and do not adopt ast-structured as the default representation."
+  },
+  "limitations": [
+    "The 54 cases are an outcome-selected RAG-sensitive panel, not a population estimate for SWE-bench Verified.",
+    "There are only two stochastic Agent repetitions per arm.",
+    "A1 preceded a host-capacity discontinuity while the other runs followed it; quality parameters were frozen, but timing and memory are not causally comparable.",
+    "The persistent read-write embedding cache and fixed run order make cache and latency metrics descriptive.",
+    "The frozen framework revision has a known pre-existing race-detector warning shared by both arms.",
+    "The prior retrieval-only replay used the problem statement as its query; Agent tool use and query formulation can differ.",
+    "The original B1 OOM at 0/54 is excluded from quality estimates but retained as operational feasibility evidence."
+  ],
+  "publication_profile": {
+    "public_sanitized": true,
+    "billing_and_token_metrics_included": true,
+    "omitted": [
+      "credentials and endpoints",
+      "absolute filesystem paths",
+      "host and process identifiers",
+      "binary and private-config fingerprints",
+      "raw artifact hashes",
+      "per-case outcome rows and stable instance names"
+    ]
+  }
+}

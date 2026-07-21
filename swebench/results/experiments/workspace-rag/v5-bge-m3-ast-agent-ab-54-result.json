@@ -1,0 +1,239 @@
+{
+  "schema_version": 1,
+  "status": "aborted",
+  "evidence_status": "failed",
+  "completed_on": "2026-07-21",
+  "question": "Does ast-structured workspace retrieval improve official-harness Agent resolve rate over indentation-preserving fixed-raw chunks?",
+  "plan": {
+    "path": "results/experiments/workspace-rag/v5-bge-m3-ast-agent-ab-54-plan.json",
+    "generation_order": [
+      "A1",
+      "B1",
+      "B2",
+      "A2"
+    ],
+    "repetitions_per_arm": 2
+  },
+  "provenance": {
+    "benchmark_revision": "1532343d90ed0e86d9bab7365166ee060ab2a34d",
+    "source_modified": false,
+    "framework_revision": "9c4a839314a2f0f0b782196e52a45c733a94f213",
+    "case_list": "data/case-lists/tag-rag-preload-ablation-54.case_ids.txt",
+    "case_count": 54,
+    "case_list_sha256": "b70ede78c4ff8bb13ebb087a12c8ed204dfe7256a72d98410239697a17325d0d",
+    "selected_case_set_sha256": "b70ede78c4ff8bb13ebb087a12c8ed204dfe7256a72d98410239697a17325d0d",
+    "safe_cases": "data/generated/cases.jsonl",
+    "safe_cases_sha256": "4b2a050a82d356963320cbfa8e2efdf6a133af8863f31b291a973ab4dd349d07"
+  },
+  "fixed_parameters": {
+    "model": "GLM-5.2",
+    "embedding_model": "bge-m3",
+    "retrieval_mode": "hybrid",
+    "embedding_dimensions": 1024,
+    "embedding_batch_size": 64,
+    "embedding_concurrency": 1,
+    "embedding_cache_access": "readwrite",
+    "max_results": 4,
+    "max_chars": 6000,
+    "agent_workers": 15,
+    "observation_codec": "xml",
+    "code_search": true,
+    "workspace_preload": true,
+    "command_timeout": "1m",
+    "case_timeout": "2h"
+  },
+  "panel": {
+    "case_count": 54,
+    "role": "Outcome-selected RAG-sensitive diagnostic panel; not a population resolve-rate sample."
+  },
+  "smoke": {
+    "status": "passed",
+    "excluded_from_primary_estimands": true,
+    "agent_workers": 2,
+    "fixed_raw": {
+      "submitted": 2,
+      "official_harness_resolved": 2,
+      "errors": 0
+    },
+    "ast_structured": {
+      "submitted": 2,
+      "official_harness_resolved": 2,
+      "errors": 0
+    }
+  },
+  "generation_integrity": {
+    "required_runs": 4,
+    "completed_runs": 1,
+    "failed_runs": 1,
+    "not_started_runs": 2,
+    "official_harness_started": false,
+    "primary_estimands_available": false,
+    "stop_reason": "The first ast-structured formal run was killed by the host OOM killer during concurrent workspace indexing before it produced a case result."
+  },
+  "runs": {
+    "A1": {
+      "run_id": "tag-rag-ast-agent54-a1-20260721",
+      "arm": "A",
+      "workspace_representation": "fixed-raw",
+      "workspace_representation_schema": "workspace-representation/v1;reader=text;chunk=fixed;size=1024;overlap=128;whitespace=preserve",
+      "workspace_representation_sha256": "2a0419991facdf15219d487f6c1ec59dc9796da5e49aff17f80bfb05e33fc163",
+      "status": "completed",
+      "duration_ms": 1368611,
+      "case_count": 54,
+      "attempted_count": 54,
+      "prediction_count": 54,
+      "case_errors": 0,
+      "exit_status_counts": {
+        "Submitted": 54
+      },
+      "case_artifact_count": 54,
+      "response_artifact_count": 54,
+      "model_metrics": {
+        "llm_calls": 1562,
+        "tool_calls": 1627,
+        "prompt_tokens": 26899671,
+        "cached_tokens": 26245248,
+        "completion_tokens": 460255,
+        "reasoning_tokens": 0,
+        "total_tokens": 27359926,
+        "estimated_model_cost": 70.61302,
+        "cost_currency": "billing_unit"
+      },
+      "retrieval_metrics": {
+        "case_duration_ms_aggregate": 17381410,
+        "code_search_calls": 12,
+        "code_search_result_bytes": 88282,
+        "case_runs_with_code_search": 12,
+        "workspace_index": {
+          "successful_cases": 54,
+          "representation": "fixed-raw",
+          "representation_schema": "workspace-representation/v1;reader=text;chunk=fixed;size=1024;overlap=128;whitespace=preserve",
+          "representation_sha256": "2a0419991facdf15219d487f6c1ec59dc9796da5e49aff17f80bfb05e33fc163",
+          "retrieval_mode": "hybrid",
+          "documents": 728047,
+          "eligible_files": 74293,
+          "indexed_files": 74293,
+          "file_coverage_min": 1,
+          "file_coverage_max": 1,
+          "eligible_indexed_hash_mismatch_cases": 0,
+          "unique_eligible_file_set_hashes": 47,
+          "unique_indexed_file_set_hashes": 47,
+          "unique_document_set_hashes": 54,
+          "missing_files": 0,
+          "fallback_documents": 0,
+          "fallback_reasons": {},
+          "node_types": {},
+          "content_chars": 788212816,
+          "embedding_text_chars": 0,
+          "duplicate_documents": 2452,
+          "duplicate_document_rate_weighted": 0.003367914434095601,
+          "duplicate_document_rate_case_mean": 0.0032852628410924927,
+          "duration_ms_aggregate": 1557109,
+          "preloaded_documents": 216,
+          "preloaded_chars": 260404,
+          "preload_injected_cases": 54
+        },
+        "embedding": {
+          "requests": 12,
+          "batch_requests": 0,
+          "inputs": 12,
+          "errors": 0,
+          "prompt_tokens": 12,
+          "total_tokens": 12,
+          "duration_ms": 1138
+        },
+        "embedding_cache": {
+          "requests": 11467,
+          "batch_requests": 11401,
+          "inputs": 728113,
+          "hits": 728101,
+          "misses": 12,
+          "writes": 12,
+          "corruptions": 0,
+          "errors": 0,
+          "bytes_read": 2979921920,
+          "bytes_written": 49152,
+          "read_duration_ms": 868121,
+          "write_duration_ms": 24
+        }
+      }
+    },
+    "B1": {
+      "run_id": "tag-rag-ast-agent54-b1-20260721",
+      "arm": "B",
+      "workspace_representation": "ast-structured",
+      "workspace_representation_schema": "workspace-representation/v1;reader=python-ast;tests=include;hidden=include;paths=stable;fallback=file;embedding=structured-code",
+      "workspace_representation_sha256": "3178d3482124b20f29259fc59e8954975c44384e38779958118bf60b68748ec1",
+      "status": "oom_killed",
+      "duration_ms_approximate": 288000,
+      "completed_cases": 0,
+      "prediction_count": 0,
+      "case_artifact_count": 0,
+      "manifest_written": false,
+      "response_artifact_count": 0
+    },
+    "B2": {
+      "run_id": "tag-rag-ast-agent54-b2-20260721",
+      "arm": "B",
+      "workspace_representation": "ast-structured",
+      "status": "not_started"
+    },
+    "A2": {
+      "run_id": "tag-rag-ast-agent54-a2-20260721",
+      "arm": "A",
+      "workspace_representation": "fixed-raw",
+      "status": "not_started"
+    }
+  },
+  "incident": {
+    "classification": "representation-dependent operational instability and evidence-integrity failure",
+    "phase": "B1 concurrent ast-structured workspace indexing",
+    "signal": "The host OOM killer terminated B1 during concurrent indexing before the first candidate-arm prediction.",
+    "comparison": "A1 fixed-raw completed under the same 15-worker host and frozen configuration. B1 ast-structured reached the host OOM threshold before its first completed case; the two-worker ast-structured smoke had passed.",
+    "quality_role": "Operational feasibility evidence only; no candidate-arm quality outcome was produced.",
+    "evidence_preserved_in_internal_archive": true
+  },
+  "official_harness": {
+    "status": "not_run",
+    "reason": "The pre-registered protocol requires all four Agent generations before any formal harness run; generation integrity failed at B1.",
+    "official_resolved_outcomes": null
+  },
+  "primary_estimands": {
+    "status": "not_computed",
+    "pooled_b_minus_a_resolved_outcomes": null,
+    "per_case_success_differences": null,
+    "favor_b_favor_a_tie": null,
+    "within_arm_agreement": null,
+    "resolved_set_jaccard": null,
+    "interpretation": "This run provides no Agent solve-quality comparison. It establishes only that the frozen 15-worker ast-structured configuration could not produce the required evidence on this host."
+  },
+  "decision": {
+    "rule_triggered": "Stop on evidence-integrity failure or representation-dependent instability.",
+    "formal_sequence": "stopped_after_B1",
+    "resume_b1": false,
+    "change_workers_within_this_plan": false,
+    "run_b2": false,
+    "run_a2": false,
+    "run_official_harness": false,
+    "advance_to_136": false,
+    "advance_to_500": false,
+    "recommend_default_ast_structured": false,
+    "conclusion": "Do not expand or adopt ast-structured from this gate. A separate pre-registered resource-bounded experiment is required before retrying the Agent quality comparison."
+  },
+  "limitations": [
+    "The primary resolve-rate estimands are unavailable because only A1 completed and B1 produced no case prediction.",
+    "The incident establishes an operational failure for the frozen 15-worker configuration in the original environment, not a minimum safe worker count or a quality result.",
+    "Changing worker count, index lifetime, or resource envelope requires a separately recorded recovery design.",
+    "The 54 cases are an outcome-selected diagnostic panel and would not support a population resolve-rate estimate even if the A/B had completed."
+  ],
+  "publication_profile": {
+    "public_sanitized": true,
+    "billing_and_token_metrics_included": true,
+    "omitted": [
+      "credentials and endpoints",
+      "absolute filesystem paths",
+      "host and process identifiers",
+      "raw artifacts and artifact hashes"
+    ]
+  }
+}
