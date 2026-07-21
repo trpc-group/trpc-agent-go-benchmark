@@ -11,6 +11,7 @@ package runner
 
 import (
 	"math"
+	"os"
 	"path/filepath"
 	"reflect"
 	"strings"
@@ -114,5 +115,66 @@ func TestWorkspaceRepresentationRejectsUnknownValue(t *testing.T) {
 	})
 	if err == nil || !strings.Contains(err.Error(), "unsupported workspace representation") {
 		t.Fatalf("error = %v, want unsupported representation", err)
+	}
+}
+
+func TestCaseListAndFilterAreMutuallyExclusive(t *testing.T) {
+	err := Run([]string{
+		"trpc-agent-go-impl",
+		"-run-id=test",
+		"-model-config=unused",
+		"-case-list=cases.txt",
+		"-filter=case-a",
+	})
+	if err == nil || !strings.Contains(err.Error(), "mutually exclusive") {
+		t.Fatalf("error = %v, want mutually exclusive selection error", err)
+	}
+}
+
+func TestLoadCaseIDsAndSelectCases(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "cases.txt")
+	if err := os.WriteFile(path, []byte("# panel\ncase-c\n\ncase-a\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	ids, err := loadCaseIDs(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	selected, err := selectCases([]contract.Case{
+		{InstanceID: "case-b"},
+		{InstanceID: "case-a"},
+		{InstanceID: "case-c"},
+	}, "", ids)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []contract.Case{{InstanceID: "case-a"}, {InstanceID: "case-c"}}
+	if !reflect.DeepEqual(selected, want) {
+		t.Fatalf("selected = %#v, want %#v", selected, want)
+	}
+	if got, wantHash := selectedCaseSetSHA256(selected),
+		stringSHA256("case-a\ncase-c\n"); got != wantHash {
+		t.Fatalf("selected hash = %s, want %s", got, wantHash)
+	}
+}
+
+func TestLoadCaseIDsRejectsDuplicates(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "cases.txt")
+	if err := os.WriteFile(path, []byte("case-a\ncase-a\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := loadCaseIDs(path); err == nil || !strings.Contains(err.Error(), "duplicate") {
+		t.Fatalf("error = %v, want duplicate case error", err)
+	}
+}
+
+func TestSelectCasesRejectsMissingCaseListID(t *testing.T) {
+	_, err := selectCases(
+		[]contract.Case{{InstanceID: "case-a"}},
+		"",
+		map[string]struct{}{"case-a": {}, "case-missing": {}},
+	)
+	if err == nil || !strings.Contains(err.Error(), "case-missing") {
+		t.Fatalf("error = %v, want missing case error", err)
 	}
 }

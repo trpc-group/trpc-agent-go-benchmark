@@ -42,6 +42,7 @@ type manifest struct {
 	RunID                         string                  `json:"run_id"`
 	RunnerType                    string                  `json:"runner_type"`
 	FrameworkVersion              string                  `json:"framework_version"`
+	FrameworkRevision             string                  `json:"framework_revision,omitempty"`
 	AgentProtocol                 string                  `json:"agent_protocol"`
 	UpstreamCommit                string                  `json:"upstream_commit"`
 	ObservationCodec              string                  `json:"observation_codec"`
@@ -52,8 +53,12 @@ type manifest struct {
 	SourceModified                bool                    `json:"source_modified"`
 	BinarySHA256                  string                  `json:"binary_sha256,omitempty"`
 	CasesSHA256                   string                  `json:"cases_sha256"`
+	CaseList                      string                  `json:"case_list,omitempty"`
+	CaseListSHA256                string                  `json:"case_list_sha256,omitempty"`
+	SelectedCaseSetSHA256         string                  `json:"selected_case_set_sha256"`
 	ModelConfigSHA256             string                  `json:"model_config_sha256"`
 	EmbeddingConfigSHA256         string                  `json:"embedding_config_sha256,omitempty"`
+	EnvironmentConfigSHA256       string                  `json:"environment_config_sha256"`
 	StartedAt                     time.Time               `json:"started_at"`
 	FinishedAt                    time.Time               `json:"finished_at"`
 	DurationMS                    int64                   `json:"duration_ms"`
@@ -119,6 +124,7 @@ func Run(args []string) error {
 	fs := flag.NewFlagSet("trpc-agent-go-impl", flag.ContinueOnError)
 	runID := fs.String("run-id", "", "run id")
 	casesPath := fs.String("cases", "data/generated/cases.jsonl", "safe SWE-Bench cases.jsonl")
+	caseListPath := fs.String("case-list", "", "optional newline-delimited exact instance ids")
 	modelConfigPath := fs.String("model-config", "", "model config YAML/env path")
 	embeddingConfigPath := fs.String("embedding-config", "", "optional workspace embedding YAML path")
 	environmentConfigPath := fs.String("environment-config", "config/environments/swebench-testbed.yaml", "environment YAML path")
@@ -132,6 +138,7 @@ func Run(args []string) error {
 	codecValue := fs.String("observation-codec", string(minicompat.ObservationCodecXML), "observation codec: xml, json, or text")
 	billingTag := fs.String("billing-tag", "", "suffix appended to X-SMG-Agent-Name for billing isolation")
 	experimentID := fs.String("experiment-id", "", "experiment identifier recorded with billing-tag")
+	frameworkRevision := fs.String("framework-revision", "", "framework source revision recorded in the manifest")
 	codeSearch := fs.Bool("code-search", false, "enable local workspace code retrieval")
 	workspacePreload := fs.Bool("workspace-preload", true, "inject retrieved workspace context into the initial prompt")
 	workspaceRepresentationValue := fs.String(
@@ -147,6 +154,9 @@ func Run(args []string) error {
 	}
 	if strings.TrimSpace(*modelConfigPath) == "" {
 		return fmt.Errorf("-model-config is required")
+	}
+	if strings.TrimSpace(*caseListPath) != "" && strings.TrimSpace(*filter) != "" {
+		return fmt.Errorf("-case-list and -filter are mutually exclusive")
 	}
 	if *workers <= 0 {
 		return fmt.Errorf("-agent-workers must be positive")
@@ -184,6 +194,18 @@ func Run(args []string) error {
 	if err != nil {
 		return fmt.Errorf("hash cases: %w", err)
 	}
+	var caseListHash string
+	var caseIDs map[string]struct{}
+	if strings.TrimSpace(*caseListPath) != "" {
+		caseListHash, err = fileSHA256(*caseListPath)
+		if err != nil {
+			return fmt.Errorf("hash case list: %w", err)
+		}
+		caseIDs, err = loadCaseIDs(*caseListPath)
+		if err != nil {
+			return fmt.Errorf("load case list: %w", err)
+		}
+	}
 	modelHash, err := fileSHA256(*modelConfigPath)
 	if err != nil {
 		return fmt.Errorf("hash model config: %w", err)
@@ -204,10 +226,11 @@ func Run(args []string) error {
 	if err != nil {
 		return fmt.Errorf("read cases: %w", err)
 	}
-	selected, err := selectCases(cases, *filter)
+	selected, err := selectCases(cases, *filter, caseIDs)
 	if err != nil {
 		return err
 	}
+	selectedCaseSetHash := selectedCaseSetSHA256(selected)
 	modelCfg, err := modelconfig.Load(*modelConfigPath)
 	if err != nil {
 		return fmt.Errorf("load model config: %w", err)
@@ -229,6 +252,10 @@ func Run(args []string) error {
 	}
 	if billingAgentName != "" {
 		modelCfg["X_SMG_AGENT_NAME"] = billingAgentName
+	}
+	environmentHash, err := fileSHA256(*environmentConfigPath)
+	if err != nil {
+		return fmt.Errorf("hash environment config: %w", err)
 	}
 	envCfg, err := sweenv.LoadConfig(*environmentConfigPath)
 	if err != nil {
@@ -389,12 +416,15 @@ func Run(args []string) error {
 	}
 	doc := manifest{
 		RunID: *runID, RunnerType: "tag", FrameworkVersion: frameworkVersion,
-		AgentProtocol: agentProtocol(codec), UpstreamCommit: minicompat.UpstreamCommit,
+		FrameworkRevision: strings.TrimSpace(*frameworkRevision),
+		AgentProtocol:     agentProtocol(codec), UpstreamCommit: minicompat.UpstreamCommit,
 		ObservationCodec: string(codec), BillingAgentName: billingAgentName,
 		BillingTag: strings.TrimSpace(*billingTag), ExperimentID: strings.TrimSpace(*experimentID),
 		SourceRevision: build.SourceRevision, SourceModified: build.SourceModified, BinarySHA256: build.BinarySHA256,
-		CasesSHA256: casesHash, ModelConfigSHA256: modelHash,
-		EmbeddingConfigSHA256: embeddingHash, StartedAt: started.UTC(),
+		CasesSHA256: casesHash, CaseList: artifact.AbsPath(*caseListPath),
+		CaseListSHA256: caseListHash, SelectedCaseSetSHA256: selectedCaseSetHash,
+		ModelConfigSHA256: modelHash, EmbeddingConfigSHA256: embeddingHash,
+		EnvironmentConfigSHA256: environmentHash, StartedAt: started.UTC(),
 		FinishedAt: finished.UTC(), DurationMS: finished.Sub(started).Milliseconds(),
 		Cases: artifact.AbsPath(*casesPath), OutputDir: artifact.AbsPath(*output), Filter: *filter,
 		CaseCount: len(selected), AttemptedCount: len(pending), SkippedExisting: len(skipped),
@@ -472,25 +502,77 @@ func prepareResume(path string, selected []contract.Case, redo bool) (map[string
 	return preds, pending, skipped, nil
 }
 
-func selectCases(cases []contract.Case, filter string) ([]contract.Case, error) {
-	if strings.TrimSpace(filter) == "" {
+func selectCases(
+	cases []contract.Case,
+	filter string,
+	caseIDs map[string]struct{},
+) ([]contract.Case, error) {
+	if strings.TrimSpace(filter) == "" && len(caseIDs) == 0 {
 		return cases, nil
 	}
-	re, err := regexp.Compile(filter)
-	if err != nil {
-		return nil, fmt.Errorf("compile filter: %w", err)
+	var re *regexp.Regexp
+	var err error
+	if strings.TrimSpace(filter) != "" {
+		re, err = regexp.Compile(filter)
+		if err != nil {
+			return nil, fmt.Errorf("compile filter: %w", err)
+		}
 	}
 	selected := make([]contract.Case, 0)
+	foundIDs := make(map[string]struct{}, len(caseIDs))
 	for _, c := range cases {
-		if re.MatchString(c.InstanceID) {
-			selected = append(selected, c)
+		if len(caseIDs) > 0 {
+			if _, ok := caseIDs[c.InstanceID]; !ok {
+				continue
+			}
+			foundIDs[c.InstanceID] = struct{}{}
+		}
+		if re != nil && !re.MatchString(c.InstanceID) {
+			continue
+		}
+		selected = append(selected, c)
+	}
+	for instanceID := range caseIDs {
+		if _, ok := foundIDs[instanceID]; !ok {
+			return nil, fmt.Errorf("case list instance %s is absent from cases JSONL", instanceID)
 		}
 	}
 	sort.Slice(selected, func(i, j int) bool { return selected[i].InstanceID < selected[j].InstanceID })
 	if len(selected) == 0 {
-		return nil, fmt.Errorf("filter matched zero cases")
+		return nil, fmt.Errorf("case selection matched zero cases")
 	}
 	return selected, nil
+}
+
+func loadCaseIDs(path string) (map[string]struct{}, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	ids := make(map[string]struct{})
+	for _, line := range strings.Split(string(data), "\n") {
+		instanceID := strings.TrimSpace(line)
+		if instanceID == "" || strings.HasPrefix(instanceID, "#") {
+			continue
+		}
+		if _, exists := ids[instanceID]; exists {
+			return nil, fmt.Errorf("duplicate instance id %s", instanceID)
+		}
+		ids[instanceID] = struct{}{}
+	}
+	if len(ids) == 0 {
+		return nil, fmt.Errorf("case list is empty")
+	}
+	return ids, nil
+}
+
+func selectedCaseSetSHA256(cases []contract.Case) string {
+	ids := make([]string, 0, len(cases))
+	for _, c := range cases {
+		ids = append(ids, c.InstanceID)
+	}
+	sort.Strings(ids)
+	return stringSHA256(strings.Join(ids, "\n") + "\n")
 }
 
 func markArtifactError(result *executor.CaseResult, err error) {

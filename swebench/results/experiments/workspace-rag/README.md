@@ -923,3 +923,6 @@ The predeclared design is in
 Complete provenance, hashes, paired estimands, operations, transitions, and all
 54 case-level metric rows are in
 [`v4-bge-m3-ast-retrieval-54-result.json`](./v4-bge-m3-ast-retrieval-54-result.json).
+The repeated, order-balanced Agent A/B that follows this gate is pre-registered
+in
+[`v5-bge-m3-ast-agent-ab-54-plan.json`](./v5-bge-m3-ast-agent-ab-54-plan.json).

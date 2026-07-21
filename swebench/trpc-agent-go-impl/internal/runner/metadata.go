@@ -66,6 +66,11 @@ func fileSHA256(path string) (string, error) {
 	return hex.EncodeToString(h.Sum(nil)), nil
 }
 
+func stringSHA256(value string) string {
+	digest := sha256.Sum256([]byte(value))
+	return hex.EncodeToString(digest[:])
+}
+
 func currentBuildMetadata() (buildMetadata, error) {
 	metadata := buildMetadata{}
 	if info, ok := debug.ReadBuildInfo(); ok {

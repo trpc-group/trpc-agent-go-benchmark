@@ -1,0 +1,169 @@
+{
+  "schema_version": 1,
+  "status": "pre_registered",
+  "created_on": "2026-07-21",
+  "question": "Does ast-structured workspace retrieval improve official-harness Agent resolve rate over indentation-preserving fixed-raw chunks?",
+  "prior_gate": {
+    "plan": "results/experiments/workspace-rag/v4-bge-m3-ast-retrieval-plan.json",
+    "result": "results/experiments/workspace-rag/v4-bge-m3-ast-retrieval-54-result.json",
+    "result_sha256": "fe06863412a848d9f6ee030520ab014886631b782c687b1be05e0b1a9f9dbf5b",
+    "decision": "Advance ast-structured, and only ast-structured, to a repeated order-balanced Agent A/B against fixed-raw."
+  },
+  "panel": {
+    "case_list": "data/case-lists/tag-rag-preload-ablation-54.case_ids.txt",
+    "case_count": 54,
+    "case_list_sha256": "b70ede78c4ff8bb13ebb087a12c8ed204dfe7256a72d98410239697a17325d0d",
+    "safe_cases": "data/generated/cases.jsonl",
+    "safe_cases_sha256": "4b2a050a82d356963320cbfa8e2efdf6a133af8863f31b291a973ab4dd349d07",
+    "role": "Outcome-selected RAG-sensitive diagnostic panel; not a population resolve-rate sample."
+  },
+  "design": {
+    "only_changed_variable": "workspace representation",
+    "arms": {
+      "A": {
+        "workspace_representation": "fixed-raw",
+        "representation_sha256": "2a0419991facdf15219d487f6c1ec59dc9796da5e49aff17f80bfb05e33fc163",
+        "description": "Fixed 1024-character chunks with 128-character overlap and indentation preserved."
+      },
+      "B": {
+        "workspace_representation": "ast-structured",
+        "representation_sha256": "3178d3482124b20f29259fc59e8954975c44384e38779958118bf60b68748ec1",
+        "description": "Python AST node boundaries with stable structural fields plus node code as embedding text."
+      }
+    },
+    "generation_order": [
+      "A1",
+      "B1",
+      "B2",
+      "A2"
+    ],
+    "repetitions_per_arm": 2,
+    "runs": {
+      "A1": "tag-rag-ast-agent54-a1-20260721",
+      "B1": "tag-rag-ast-agent54-b1-20260721",
+      "B2": "tag-rag-ast-agent54-b2-20260721",
+      "A2": "tag-rag-ast-agent54-a2-20260721"
+    },
+    "fixed_parameters": {
+      "model": "GLM-5.2",
+      "model_config": "config/models/glm-5.2.local.yaml",
+      "model_config_sha256": "fbfdf25e9fced3ecc51d244ccbb652c078b02ac640abbdbcca53ddbaa7af27de",
+      "embedding_model": "bge-m3",
+      "embedding_config": "config/embeddings/workspace-rag.cache.local.yaml",
+      "embedding_config_sha256": "2452624a6a38fbd6f414a70b0c66e48653204662fe1b96c9026350bcc6d79bd1",
+      "environment_config": "config/environments/swebench-testbed.yaml",
+      "environment_config_sha256": "3cfa72f92f4010d242e6adb9bb507ccdf9db261ba5726163b5adecd509c140f0",
+      "retrieval_mode": "hybrid",
+      "embedding_dimensions": 1024,
+      "embedding_batch_size": 64,
+      "embedding_concurrency": 1,
+      "embedding_cache_access": "readwrite",
+      "agent_workers": 15,
+      "observation_codec": "xml",
+      "code_search": true,
+      "workspace_preload": true,
+      "command_timeout": "1m",
+      "case_timeout": "2h",
+      "billing_tag": "ast-repr54",
+      "experiment_id": "ast-repr54-20260721"
+    },
+    "binary_policy": "Build one fixed runner binary from a clean benchmark commit and one clean framework commit; record both revisions and the binary SHA-256 in every manifest.",
+    "cache_policy": "Use the same persistent cache identity already populated by the retrieval gate. Treat cache and timing measurements as order-affected operational observations, not causal speed estimates."
+  },
+  "implementation_contract": {
+    "runner_flags": [
+      "--case-list",
+      "--framework-revision",
+      "--workspace-representation",
+      "--code-search",
+      "--workspace-preload"
+    ],
+    "required_manifest_fields": [
+      "source_revision",
+      "source_modified",
+      "framework_revision",
+      "binary_sha256",
+      "cases_sha256",
+      "case_list_sha256",
+      "selected_case_set_sha256",
+      "model_config_sha256",
+      "embedding_config_sha256",
+      "environment_config_sha256",
+      "workspace_representation",
+      "workspace_representation_schema",
+      "workspace_representation_sha256"
+    ],
+    "resume_boundary": "preds.json",
+    "formal_revision_policy": "Freeze the exact clean benchmark and framework revisions after the implementation-and-plan commit; all smoke and formal runs use the resulting single binary."
+  },
+  "preflight": {
+    "ordinary_tests": "pass",
+    "ordinary_test_command": "go test ./trpc-agent-go-impl/... ./internal/minicompat ./internal/sweenv",
+    "race_test": "known_framework_failure",
+    "race_test_command": "go test -race ./trpc-agent-go-impl/internal/executor",
+    "race_findings": [
+      "runner diagnostics read invocation identity while LLMAgent setup writes it",
+      "session cloning reads UpdatedAt while event persistence updates it"
+    ],
+    "scope_decision": "Do not mix a framework concurrency fix into the representation A/B. Both arms freeze the same framework revision; repeated runs expose gross instability. Stop before formal runs if smoke shows artifact inconsistency, unexplained errors, or representation-dependent instability."
+  },
+  "smoke": {
+    "required_before_formal_runs": true,
+    "instance_ids": [
+      "django__django-14349",
+      "scikit-learn__scikit-learn-10297"
+    ],
+    "arms": [
+      "fixed-raw",
+      "ast-structured"
+    ],
+    "agent_workers": 2,
+    "harness_workers": 2,
+    "excluded_from_primary_estimands": true,
+    "pass_conditions": [
+      "Both arms write predictions, progress, per-case TAG artifacts, and completed runner manifests.",
+      "Manifest fingerprints match this plan and the frozen revisions/binary.",
+      "Per-case workspace_index records the requested representation, full eligible-file coverage, and no unexplained fallback concentration.",
+      "Official local harness verify and import complete for both arms."
+    ]
+  },
+  "official_harness": {
+    "implementation": "SWE-bench official local evaluator",
+    "target": "tag",
+    "python": "/data/validation/swebench-py/bin/python",
+    "workers": 4,
+    "verifier_mode": "calibrated",
+    "cache_level": "instance",
+    "clean": false,
+    "compat_patch": true,
+    "timing": "Run all four generations first, then evaluate A1, B1, B2, and A2 so harness work does not alter generation order timing."
+  },
+  "primary_estimands": [
+    "Pooled B-minus-A official-harness resolved probability across 108 outcomes per arm.",
+    "Per-case B-minus-A resolved successes across two repetitions.",
+    "Counts of cases favoring B, favoring A, or tying across the two repetitions.",
+    "Within-arm agreement and resolved-set Jaccard across repetitions."
+  ],
+  "secondary_evidence": [
+    "Total and per-resolved prompt, cached, completion, reasoning, and total tokens.",
+    "Estimated model cost and cost per resolved outcome.",
+    "LLM calls, tool calls, code_search calls, and retrieval-result bytes.",
+    "Index, embedding, cache, case, and wall-clock durations and errors.",
+    "Workspace coverage, fallback reasons, node types, and duplicate rate."
+  ],
+  "decision_rules": {
+    "stop": "Stop if B has a lower pooled resolved rate than A, stable regressions outnumber stable improvements, or evidence integrity fails.",
+    "inconclusive": "Do not expand when B improves by only zero to two of 108 pooled outcomes, case-level direction is non-positive, or repetitions disagree materially.",
+    "advance_to_136": "Advance provisionally only when B improves by at least three of 108 pooled outcomes, more cases favor B than A, evidence integrity passes, and no material error regression appears.",
+    "advance_to_500": "Require the 136-case official-harness result to preserve or improve resolve rate before a full-500 run.",
+    "adoption": "Do not recommend a default change until resolve evidence is positive and any token, cost, latency, or duplicate-document regression is separately judged acceptable."
+  },
+  "limitations": [
+    "The 54 cases were selected from prior RAG outcomes, so this experiment is a directional Agent gate rather than a population estimate.",
+    "Two repetitions per arm expose gross effects and instability but have limited statistical power.",
+    "Generation order balances first-order service drift but cannot eliminate all time-period or endpoint confounding.",
+    "A persistent warmed cache reduces repeated embedding work but prevents causal cold-index timing claims.",
+    "The frozen framework revision has pre-existing race-detector findings; they are held constant across arms and make repeated-run stability and artifact-integrity checks mandatory.",
+    "Official-harness resolve rate is authoritative; retrieval-only gains are supporting evidence, not substitutes."
+  ]
+}
