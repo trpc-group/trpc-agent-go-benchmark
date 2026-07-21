@@ -58,6 +58,8 @@
       "embedding_batch_size": 64,
       "embedding_concurrency": 1,
       "embedding_cache_access": "readwrite",
+      "max_results": 4,
+      "max_chars": 6000,
       "agent_workers": 15,
       "observation_codec": "xml",
       "code_search": true,
@@ -160,6 +162,7 @@
   },
   "limitations": [
     "The 54 cases were selected from prior RAG outcomes, so this experiment is a directional Agent gate rather than a population estimate.",
+    "The retrieval replay requested six results to score both @4 and @6; this Agent A/B preserves the established four-result, 6000-character model-facing retrieval budget.",
     "Two repetitions per arm expose gross effects and instability but have limited statistical power.",
     "Generation order balances first-order service drift but cannot eliminate all time-period or endpoint confounding.",
     "A persistent warmed cache reduces repeated embedding work but prevents causal cold-index timing claims.",
