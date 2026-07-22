@@ -1226,3 +1226,103 @@ are in
 [`v6-bge-m3-ast-b500-exploratory-result.json`](./v6-bge-m3-ast-b500-exploratory-result.json).
 Host-specific evidence, raw artifact hashes, and per-case results remain
 internal.
+
+## Fixed-raw full-500 completion and single-replicate pairing
+
+V7 fills the missing strict `fixed-raw` full-500 arm once. It uses the same
+500 cases, public source/framework revisions, GLM-5.2 high-effort model,
+BGE-M3 hybrid retrieval configuration, prompt/tool contract, preload,
+timeouts, and generation concurrency as the frozen V6 `ast-structured` arm.
+The only quality variable changed from V6 is workspace representation. This is
+a single-replicate sequential comparison: it provides a realized
+instance-paired direction but cannot estimate run-to-run variance or exclude
+backend-time, host-order, and persistent-cache effects.
+
+### Fixed-raw absolute result
+
+Generation produced 500/500 terminal predictions: 499 `Submitted` and one
+genuine `max LLM calls (250) exceeded` Agent failure. There were two empty
+patches in total, no non-Agent generation failure, and no final embedding,
+cache, fatal, panic, or OOM error. The official calibrated local harness
+reported:
+
+| Submitted | Completed patches | Resolved | Non-empty unresolved | Empty | Harness errors |
+|---:|---:|---:|---:|---:|---:|
+| 500 | 497 | **396 (79.2%)** | 101 | 2 | 1 |
+
+The one harness error was a 1,800-second test timeout. Before inspecting patch
+quality or a resolved label, it was selected for a quality-blind targeted
+official-harness rerun. The rerun reproduced the same timeout after environment
+setup, container start, and patch application completed. It is therefore
+retained as a deterministic Agent-induced quality failure rather than
+infrastructure missingness. The original and recovery official reports remain
+unmodified; analysis counts the case as not resolved while reporting the raw
+official error separately. No synthetic official report was created.
+
+| Metric | Fixed-raw V7 |
+|---|---:|
+| Prompt tokens | 234,985,393 |
+| Cached / uncached input tokens | 229,644,864 / 5,340,529 |
+| Completion / total tokens | 3,445,329 / 238,430,722 |
+| Estimated billing units | 598.483172 |
+| LLM / tool calls | 13,134 / 13,698 |
+| Tokens / billing units per resolved case | 602,097.78 / 1.511321 |
+| `code_search` calls / cases / result bytes | 77 / 77 / 578,595 |
+| Initial preload documents / characters | 2,000 / 2,401,706 |
+
+### V6 AST minus V7 fixed-raw paired outcome
+
+| Paired cell | Cases |
+|---|---:|
+| Both resolved | 373 |
+| Fixed-raw only | 23 |
+| AST only | 30 |
+| Neither resolved | 74 |
+
+Frozen V6 `ast-structured` resolved 403/500 (80.6%), versus 396/500
+(79.2%) for V7 `fixed-raw`: the realized AST-minus-fixed-raw difference is
+**+7 cases / +1.4 percentage points**. The exact two-sided McNemar p-value is
+0.4101. A paired Wald interval over the 500 per-instance binary differences is
+-1.45 to +4.25 percentage points at 95%, so this run does not establish a
+stable nonzero representation effect.
+
+The full-panel cost direction differs from the selected repeated V5-R panel.
+Here V6 AST used 14,999,564 more tokens (+6.29%) and 40.099928 more estimated
+billing units (+6.70%) than fixed-raw; tokens and cost per resolved case were
+4.44% and 4.85% higher. V5-R instead observed lower AST model-side usage on
+its outcome-selected 54-case panel. This sign change reinforces that neither
+single-panel cost direction should be generalized without repeated full-panel
+evidence.
+
+### Retrieval and index profile
+
+| Metric | Fixed-raw V7 | AST V6 |
+|---|---:|---:|
+| Documents | 6,781,187 | 13,704,528 |
+| Eligible / indexed files | 699,590 / 699,578 | 699,590 / 699,544 |
+| Weighted duplicate rate | 0.3379% | 5.6448% |
+| Aggregate index duration | 107,380,496 ms | 70,726,517 ms |
+| Embedding inputs | 878,237 | 253,371 |
+| Cache hit rate | 87.0491% | 98.1419% |
+
+AST emitted 2.02x as many documents. Index duration, embedding misses, cache
+hits, latency, and memory are descriptive only because the two arms ran
+sequentially with different cache histories. Fixed-raw's 12 missing-file
+counts across six cases are a scanner/reader symlink-accounting difference,
+not runtime index loss.
+
+### Decision
+
+Record `fixed-raw` as a strict 79.2% absolute full-panel profile and record the
+single realized +7-case AST direction. Do **not** promote `ast-structured`, call
+the difference a stable causal gain, or revise the V5-R no-expansion decision:
+the paired interval crosses zero, the exact discordance test is not
+significant, and there is only one sequential realization per arm.
+
+The pre-registered design is in
+[`v7-bge-m3-fixedraw-a500-completion-plan.json`](./v7-bge-m3-fixedraw-a500-completion-plan.json).
+The repeated-timeout classification and report-integrity rule are in
+[`v7-bge-m3-fixedraw-a500-completion-amendment-01.json`](./v7-bge-m3-fixedraw-a500-completion-amendment-01.json).
+Sanitized aggregate metrics, paired estimands, validation, limitations, and
+the decision are in
+[`v7-bge-m3-fixedraw-a500-completion-result.json`](./v7-bge-m3-fixedraw-a500-completion-result.json).

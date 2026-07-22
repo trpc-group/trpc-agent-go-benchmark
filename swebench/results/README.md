@@ -38,3 +38,12 @@ Committed files:
   sanitized machine-readable post-gate single-arm AST full-500 result,
   quality-blind infrastructure recovery, aggregate runtime metrics, and the
   unchanged no-default-promotion decision.
+- `experiments/workspace-rag/v7-bge-m3-fixedraw-a500-completion-plan.json`:
+  sanitized pre-registered contract for the strict fixed-raw full-500 arm and
+  its single-realization pairing with frozen V6 AST.
+- `experiments/workspace-rag/v7-bge-m3-fixedraw-a500-completion-amendment-01.json`:
+  quality-blind repeated-timeout classification and official-report integrity
+  rule.
+- `experiments/workspace-rag/v7-bge-m3-fixedraw-a500-completion-result.json`:
+  sanitized official-harness result, aggregate model/retrieval/index metrics,
+  paired V6 comparison, limitations, and unchanged no-promotion decision.

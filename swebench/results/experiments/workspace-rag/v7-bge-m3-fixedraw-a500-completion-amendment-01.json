@@ -1,0 +1,64 @@
+{
+  "schema_version": 1,
+  "status": "classified_after_quality_blind_harness_recovery",
+  "created_at": "2026-07-23",
+  "amendment_id": "v7-fixedraw-a500-agent-induced-harness-timeout-20260723",
+  "question": "How should a repeated official-harness timeout be represented without confusing an Agent-induced non-terminating patch with transient infrastructure failure?",
+  "parent": {
+    "plan": "results/experiments/workspace-rag/v7-bge-m3-fixedraw-a500-completion-plan.json"
+  },
+  "policy_basis": {
+    "non_agent_failure_rule": "Rerun failures not caused by the Agent so that infrastructure failures do not become quality missingness.",
+    "agent_outcome_rule": "Do not rerun valid Agent outcomes merely because they are unresolved, empty, slow, or otherwise low quality.",
+    "official_result_integrity": "Do not edit or synthesize an official SWE-bench report. Preserve the original and recovery reports exactly as emitted."
+  },
+  "original_official_harness": {
+    "selection_before_recovery": {
+      "case_count": 1,
+      "official_error": "Test timed out after 1800 seconds",
+      "patch_quality_inspected": false,
+      "resolved_outcome_inspected": false,
+      "selection_reason": "The sole official-harness error was provisionally treated as a potentially non-Agent test infrastructure failure."
+    },
+    "counts": {
+      "total": 500,
+      "submitted": 500,
+      "completed": 497,
+      "resolved": 396,
+      "unresolved_nonempty": 101,
+      "empty_patch": 2,
+      "error": 1
+    },
+    "verifier_exit_code": 0
+  },
+  "quality_blind_recovery": {
+    "case_count": 1,
+    "quality_parameters_changed": false,
+    "timeout_seconds": 1800,
+    "result": "The same case again timed out after 1800 seconds at the same target regression test.",
+    "verifier_exit_code": 0
+  },
+  "post_recovery_diagnosis": {
+    "patch_applied_cleanly": true,
+    "environment_setup_completed": true,
+    "container_started": true,
+    "test_process_ran_for_seconds": 1800,
+    "repeated_same_signature": true,
+    "interpretation": "The completed Agent patch deterministically causes or preserves non-termination on the target regression test. After an outcome-blind rerun reproduced the same patch/test interaction, this is an Agent quality outcome rather than transient host, container, transport, artifact, or environment failure."
+  },
+  "canonical_analysis_rule": {
+    "rerun_again": false,
+    "official_harness_report": "Use the unmodified original 500-case official report and disclose its one error.",
+    "quality_denominator": 500,
+    "resolved_value": 0,
+    "analysis_status": "unresolved_agent_induced_test_timeout",
+    "paired_binary_outcome": 0,
+    "harness_error_reported_separately": true,
+    "synthetic_merged_official_report": false
+  },
+  "inference_boundary": {
+    "quality": "Counting the repeated Agent-induced hang as not resolved preserves the fixed 500-case denominator and prevents a deterministic low-quality patch from being removed as infrastructure missingness.",
+    "operations": "The original harness duration and targeted recovery duration are reported separately; neither is a representation-causal latency estimate.",
+    "causality": "The study remains a single-replicate sequential comparison and cannot estimate run-to-run variance or exclude backend-time effects."
+  }
+}

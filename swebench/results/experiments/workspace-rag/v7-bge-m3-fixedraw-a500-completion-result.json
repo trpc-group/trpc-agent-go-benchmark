@@ -1,0 +1,308 @@
+{
+  "schema_version": 1,
+  "status": "completed_with_classified_agent_harness_timeout",
+  "evidence_status": "complete",
+  "completed_on": "2026-07-23",
+  "result_id": "v7-bge-m3-fixedraw-a500-completion",
+  "question": "Under the frozen V6 Agent configuration, what is the full-panel official-harness quality and model-side cost of indentation-preserving fixed-raw workspace retrieval, and how does its single realized 500-case outcome pair descriptively with the frozen V6 ast-structured panel?",
+  "inference_scope": {
+    "design": "single-replicate sequential paired full-panel representation comparison",
+    "new_arm": "A_fixed_raw",
+    "frozen_counterpart": "B_ast_structured_v6",
+    "panel": "canonical SWE-bench Verified 500-case panel",
+    "same_panel_and_quality_configuration": true,
+    "repeated_full_panel_evidence": false,
+    "notes": [
+      "This run fills the previously missing strict fixed-raw full-500 arm.",
+      "One realization per arm cannot estimate run-to-run stochastic variance.",
+      "Sequential execution cannot exclude backend-time, host-order, or cache-history effects.",
+      "The V5-R repeated order-balanced 54-case no-expansion decision remains unchanged."
+    ]
+  },
+  "protocol": {
+    "plan": "results/experiments/workspace-rag/v7-bge-m3-fixedraw-a500-completion-plan.json",
+    "amendment": "results/experiments/workspace-rag/v7-bge-m3-fixedraw-a500-completion-amendment-01.json",
+    "quality_blind_harness_recovery": {
+      "case_count": 1,
+      "selection_before_patch_quality_inspection": true,
+      "selection_before_resolved_outcome_inspection": true,
+      "result": "The same target test again ran for 1800 seconds and timed out.",
+      "post_recovery_classification": "Agent-induced non-terminating quality outcome; count not resolved and do not rerun again",
+      "official_reports_preserved_unmodified": true,
+      "synthetic_official_report_created": false
+    }
+  },
+  "frozen_counterpart": {
+    "result": "results/experiments/workspace-rag/v6-bge-m3-ast-b500-exploratory-result.json",
+    "representation": "ast-structured",
+    "resolved": 403,
+    "resolved_rate": 0.806
+  },
+  "public_provenance": {
+    "benchmark_revision": "1532343d90ed0e86d9bab7365166ee060ab2a34d",
+    "source_revision": "1532343d90ed0e86d9bab7365166ee060ab2a34d",
+    "framework_revision": "9c4a839314a2f0f0b782196e52a45c733a94f213",
+    "case_list": "data/case-lists/verified-test-500.case_ids.txt",
+    "case_count": 500,
+    "case_list_sha256": "a6b0fd7c8c2969a0eef892e032250adcfa6d32362d395c246930e61b575ac9b9"
+  },
+  "fixed_parameters": {
+    "model": "GLM-5.2",
+    "reasoning_effort": "high",
+    "embedding_model": "bge-m3",
+    "retrieval_mode": "hybrid",
+    "embedding_dimensions": 1024,
+    "embedding_batch_size": 64,
+    "embedding_concurrency": 1,
+    "embedding_cache_access": "readwrite",
+    "max_results": 4,
+    "max_chars": 6000,
+    "agent_workers": 15,
+    "observation_codec": "xml",
+    "code_search": true,
+    "workspace_preload": true,
+    "command_timeout": "1m",
+    "case_timeout": "2h",
+    "workspace_representation": "fixed-raw",
+    "workspace_representation_schema": "workspace-representation/v1;reader=text;chunk=fixed;size=1024;overlap=128;whitespace=preserve",
+    "only_changed_quality_variable_from_v6": "workspace representation"
+  },
+  "generation_integrity": {
+    "case_count": 500,
+    "prediction_count": 500,
+    "trace_count": 500,
+    "status_counts": {
+      "Submitted": 499,
+      "Error": 1
+    },
+    "empty_patches": 2,
+    "agent_error_signatures": [
+      {
+        "error_category": "agent_error",
+        "error": "max LLM calls (250) exceeded",
+        "llm_calls": 250,
+        "patch_nonempty": false,
+        "count": 1,
+        "rerun": false,
+        "quality_classification": "empty and unresolved"
+      }
+    ],
+    "fingerprints_match": true,
+    "non_agent_generation_failures": 0,
+    "valid_agent_outcomes_rerun": false
+  },
+  "official_harness": {
+    "status": "completed_with_one_agent_induced_test_timeout",
+    "implementation": "official SWE-bench local harness",
+    "target": "tag",
+    "workers": 4,
+    "verifier_mode": "calibrated",
+    "cache_level": "instance",
+    "clean": false,
+    "apply_harness_compat": true,
+    "instances_from_predictions": true,
+    "total_instances": 500,
+    "submitted_instances": 500,
+    "completed_instances": 497,
+    "resolved_instances": 396,
+    "resolved_rate": 0.792,
+    "unresolved_nonempty_instances": 101,
+    "empty_patch_instances": 2,
+    "error_instances": 1,
+    "analysis_not_resolved_instances": 104,
+    "analysis_not_resolved_rate": 0.208,
+    "verifier_exit_code": 0,
+    "agent_induced_timeout": {
+      "count": 1,
+      "timeout_seconds": 1800,
+      "quality_classification": "unresolved Agent outcome",
+      "official_classification_preserved": "error",
+      "quality_blind_recovery_reproduced_same_timeout": true
+    },
+    "report_integrity": "The original and recovery official reports are preserved unmodified; no synthetic merged official report was created."
+  },
+  "paired_comparison": {
+    "comparison": "B_ast_structured_v6 minus A_fixed_raw_v7",
+    "panel_cases": 500,
+    "a_fixed_raw": {
+      "resolved": 396,
+      "resolved_rate": 0.792
+    },
+    "b_ast_structured": {
+      "resolved": 403,
+      "resolved_rate": 0.806
+    },
+    "b_minus_a": {
+      "resolved_cases": 7,
+      "resolved_rate_percentage_points": 1.4
+    },
+    "paired_cells": {
+      "both_resolved": 373,
+      "a_only_resolved": 23,
+      "b_only_resolved": 30,
+      "neither_resolved": 74,
+      "discordant": 53
+    },
+    "exact_mcnemar_two_sided_p": 0.4101027163746913,
+    "paired_difference_95_percent_interval": {
+      "method": "paired Wald interval over per-instance B-minus-A binary differences",
+      "lower_percentage_points": -1.453966438161937,
+      "upper_percentage_points": 4.253966438161937
+    },
+    "interpretation": "The realized direction favors ast-structured by 7 cases, but the paired interval includes zero and the exact discordance test is not significant. One sequential replicate per arm is insufficient to establish a stable representation effect."
+  },
+  "model_metrics": {
+    "llm_calls": 13134,
+    "prompt_tokens": 234985393,
+    "cached_input_tokens": 229644864,
+    "uncached_input_tokens": 5340529,
+    "completion_tokens": 3445329,
+    "total_tokens": 238430722,
+    "rate_card": {
+      "cached_input_per_million": 2.0,
+      "uncached_input_per_million": 8.0,
+      "output_per_million": 28.0
+    },
+    "estimated_cost": 598.483172,
+    "cost_currency": "billing_unit",
+    "tokens_per_resolved": 602097.7828282828,
+    "cost_per_resolved": 1.5113211414141414,
+    "v6_ast_minus_v7_fixed_raw": {
+      "total_tokens": 14999564,
+      "total_tokens_percent_of_fixed_raw": 6.290952723785319,
+      "estimated_cost": 40.099928,
+      "estimated_cost_percent_of_fixed_raw": 6.700259903047028,
+      "tokens_per_resolved_percent": 4.444707887392041,
+      "cost_per_resolved_percent": 4.846905512671507,
+      "llm_calls": 421,
+      "tool_calls": 401
+    }
+  },
+  "agent_metrics": {
+    "tool_calls": 13698,
+    "case_duration_ms": {
+      "aggregate": 334895100,
+      "count": 500,
+      "mean": 669790.2,
+      "median": 406971.5,
+      "p95_nearest_rank": 1956275,
+      "max": 5674695
+    }
+  },
+  "retrieval_metrics": {
+    "preloaded_documents": 2000,
+    "preloaded_characters": 2401706,
+    "preload_injected_cases": 500,
+    "code_search_calls": 77,
+    "code_search_responses": 77,
+    "case_runs_with_code_search": 77,
+    "code_search_result_bytes": 578595
+  },
+  "workspace_index": {
+    "successful_cases": 500,
+    "representation": "fixed-raw",
+    "retrieval_mode": "hybrid",
+    "documents": 6781187,
+    "eligible_files": 699590,
+    "indexed_files": 699578,
+    "missing_files": 12,
+    "file_coverage_min": 0.9984871406959153,
+    "file_coverage_mean": 0.9999855933395967,
+    "cases_below_full_coverage": 6,
+    "eligible_indexed_hash_mismatch_cases": 6,
+    "content_chars": 7335134789,
+    "embedding_text_chars": 0,
+    "duplicate_documents": 22912,
+    "duplicate_document_rate_weighted": 0.003378759500364759,
+    "duration_ms": {
+      "aggregate": 107380496,
+      "count": 500,
+      "mean": 214760.992,
+      "median": 47301.5,
+      "p95_nearest_rank": 1015804,
+      "max": 1287732
+    },
+    "coverage_mismatch_diagnosis": {
+      "total_missing_files": 12,
+      "case_count": 6,
+      "cause": "scanner counts symlink entries while the source reader skips non-regular files",
+      "classification": "frozen scanner/reader accounting difference; not runtime index loss"
+    }
+  },
+  "embedding": {
+    "requests": 26342,
+    "batch_requests": 26272,
+    "inputs": 878237,
+    "errors": 0,
+    "duration_ms": 99983633
+  },
+  "embedding_cache": {
+    "requests": 106774,
+    "batch_requests": 106197,
+    "inputs": 6781764,
+    "hits": 5903462,
+    "misses": 878302,
+    "hit_rate": 0.8704906275122519,
+    "writes": 878237,
+    "errors": 0,
+    "corruptions": 0,
+    "bytes_read": 24156581888,
+    "bytes_written": 3597258752,
+    "integrity_evidence": "Preflight cache integrity passed and the completed runner recorded zero cache errors or corruptions."
+  },
+  "transport": {
+    "embedding_retry_attempt_1_of_3": 75,
+    "embedding_retry_attempt_2_of_3": 2,
+    "embedding_retry_attempt_3_of_3": 0,
+    "final_embedding_errors": 0,
+    "interpretation": "Transient transport failures recovered; no attempt 3/3 or final embedding error affected a case outcome."
+  },
+  "controlled_context": {
+    "v5r_panel_cases": 54,
+    "v5r_outcomes_per_arm": 108,
+    "v5r_b_minus_a_resolved_outcomes": 0,
+    "v5r_fixed_raw_total_tokens": 57794783,
+    "v5r_ast_structured_total_tokens": 48627186,
+    "v5r_ast_token_change_percent": -15.86,
+    "v5r_decision": "no expansion and no default promotion",
+    "unchanged_by_v7": true,
+    "cost_direction_note": "V5-R's selected repeated panel favored AST on model-side usage, whereas this single full-panel realization used more tokens and cost for AST; neither direction should be generalized without repeated full-panel evidence."
+  },
+  "validation": {
+    "generation_completed": true,
+    "prediction_count_matches_panel": true,
+    "all_generation_errors_agent_outcomes": true,
+    "non_agent_generation_failures_zero": true,
+    "official_harness_exit_zero": true,
+    "official_harness_raw_error_count": 1,
+    "official_harness_error_quality_blind_rerun": true,
+    "official_harness_error_reproduced": true,
+    "official_harness_error_classified_agent_outcome": true,
+    "binary_quality_outcome_available_for_all_500": true,
+    "fingerprints_match": true,
+    "embedding_errors_zero": true,
+    "cache_errors_zero": true,
+    "cache_corruptions_zero": true,
+    "json_parse": true,
+    "metric_consistency_assertions": true,
+    "case_list_sha256_verified": true,
+    "markdown_links_verified": true,
+    "credential_and_internal_path_scan": "passed",
+    "official_reports_preserved_unmodified": true
+  },
+  "decision": {
+    "strict_fixed_raw_full_panel_completed": true,
+    "realized_full_panel_direction": "ast-structured +7 resolved cases and +1.4 percentage points",
+    "evidence_of_stable_ast_quality_gain": false,
+    "recommend_default_ast_structured": false,
+    "revise_v5r_no_expansion": false,
+    "conclusion": "Record the strict fixed-raw absolute profile and the realized +7-case AST direction, but do not promote AST, call the difference a stable causal gain, or rewrite the V5-R stop decision from a single sequential full-panel replicate."
+  },
+  "limitations": [
+    "One stochastic realization per full-panel arm; no run-to-run variance estimate.",
+    "Sequential execution; backend-time, host-order, and persistent-cache histories differ.",
+    "One genuine generation call-limit failure is retained as empty and unresolved.",
+    "One non-empty Agent patch deterministically timed out the target official test twice; the official error is preserved and analysis counts it not resolved.",
+    "Latency, index, cache, embedding, and resource metrics are operational observations rather than representation-causal estimates."
+  ]
+}

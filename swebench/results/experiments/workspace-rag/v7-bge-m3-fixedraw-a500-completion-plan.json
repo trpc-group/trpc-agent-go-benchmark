@@ -1,0 +1,134 @@
+{
+  "schema_version": 1,
+  "status": "pre_registered",
+  "created_at": "2026-07-22",
+  "plan_id": "v7-fixedraw-a500-completion-20260722",
+  "question": "Under the frozen V6 Agent configuration, what is the full-panel official-harness quality and model-side cost of indentation-preserving fixed-raw workspace retrieval, and how does its single realized 500-case outcome pair descriptively with the frozen V6 ast-structured panel?",
+  "authorization": {
+    "explicit_user_authorization": true,
+    "interpretation": "Generate one fixed-raw arm over the canonical 500 cases, recover only non-Agent failures without consulting quality outcomes, run the official local harness, and pair the result by instance id with the frozen V6 ast-structured panel.",
+    "replicate_count": 1
+  },
+  "inference_boundary": {
+    "design": "single-replicate sequential paired full-panel representation comparison",
+    "new_arm": "A_fixed_raw",
+    "frozen_counterpart": "B_ast_structured_v6",
+    "causal_strength": "The same panel and frozen implementation/configuration isolate workspace representation in the recorded runs, but one realization per arm cannot estimate run-to-run stochastic variance and sequential execution cannot exclude backend-time or host-order effects.",
+    "prohibited_claims": [
+      "Do not describe legacy current-fixed V3 as the fixed-raw counterfactual.",
+      "Do not claim repeated or order-balanced full-500 evidence.",
+      "Do not use latency, cache hits, index timing, or resource metrics as treatment-causal estimates.",
+      "Do not retroactively rewrite the V5-R pre-registered no-expansion decision."
+    ],
+    "permitted_claims": [
+      "Absolute official-harness quality and model-side usage for fixed-raw on the canonical 500-case panel.",
+      "A single-realization paired resolved-outcome comparison against frozen V6 ast-structured, with limitations stated.",
+      "Aggregate paired discordance counts, exact McNemar test, and paired difference interval."
+    ]
+  },
+  "frozen_counterpart": {
+    "result": "results/experiments/workspace-rag/v6-bge-m3-ast-b500-exploratory-result.json",
+    "representation": "ast-structured",
+    "case_count": 500,
+    "resolved": 403,
+    "resolved_rate": 0.806,
+    "empty_agent_errors": 2,
+    "harness_errors": 0
+  },
+  "panel": {
+    "case_list": "data/case-lists/verified-test-500.case_ids.txt",
+    "case_count": 500,
+    "case_list_sha256": "a6b0fd7c8c2969a0eef892e032250adcfa6d32362d395c246930e61b575ac9b9",
+    "safe_cases": "data/generated/cases.jsonl",
+    "safe_cases_sha256": "4b2a050a82d356963320cbfa8e2efdf6a133af8863f31b291a973ab4dd349d07"
+  },
+  "run": {
+    "workspace_representation": "fixed-raw",
+    "workspace_representation_schema": "workspace-representation/v1;reader=text;chunk=fixed;size=1024;overlap=128;whitespace=preserve",
+    "workspace_representation_sha256": "2a0419991facdf15219d487f6c1ec59dc9796da5e49aff17f80bfb05e33fc163"
+  },
+  "public_provenance": {
+    "source_revision": "1532343d90ed0e86d9bab7365166ee060ab2a34d",
+    "source_modified_required": false,
+    "framework_revision": "9c4a839314a2f0f0b782196e52a45c733a94f213"
+  },
+  "fixed_parameters": {
+    "model": "GLM-5.2",
+    "model_reasoning_effort": "high",
+    "embedding_model": "bge-m3",
+    "retrieval_mode": "hybrid",
+    "embedding_dimensions": 1024,
+    "embedding_batch_size": 64,
+    "embedding_concurrency": 1,
+    "embedding_cache_access": "readwrite",
+    "max_results": 4,
+    "max_chars": 6000,
+    "agent_workers": 15,
+    "observation_codec": "xml",
+    "code_search": true,
+    "workspace_preload": true,
+    "command_timeout": "1m",
+    "case_timeout": "2h",
+    "only_changed_quality_variable_from_v6": "workspace representation"
+  },
+  "launch_contract": {
+    "preflight_status": "passed",
+    "requirements": [
+      "The output directory is absent and no competing formal runner is active.",
+      "Public data and revision fingerprints match this plan.",
+      "Private resource-headroom and runtime-dependency checks pass.",
+      "Resume only with identical arguments and fingerprints; never overwrite terminal artifacts."
+    ]
+  },
+  "failure_and_recovery": {
+    "canonical_experiment_count": 1,
+    "quality_blind_rule": "Freeze recovery membership before consulting official-harness quality labels or patch quality.",
+    "retain_without_rerun": [
+      "Every valid Submitted outcome, including unresolved or empty patches produced by a completed Agent trajectory.",
+      "Audited genuine Agent failures such as a fixed model-call limit with no infrastructure symptom."
+    ],
+    "rerun": [
+      "Missing or corrupt artifacts.",
+      "Container or environment setup failures.",
+      "Exhausted model or embedding transport retries.",
+      "Resource, host, or runner interruption not caused by a completed Agent outcome."
+    ],
+    "ambiguous_errors": "Pause and audit before consulting resolved status.",
+    "no_second_replicate": true
+  },
+  "official_harness": {
+    "target": "tag",
+    "workers": 4,
+    "verifier_mode": "calibrated",
+    "cache_level": "instance",
+    "clean": false,
+    "apply_harness_compat": true,
+    "instances_from_predictions": true
+  },
+  "analysis": {
+    "primary": [
+      "Fixed-raw resolved count and rate out of 500.",
+      "AST minus fixed-raw resolved cases and percentage points.",
+      "Paired both-resolved, fixed-raw-only, AST-only, and neither-resolved counts.",
+      "Exact McNemar test and paired resolved-rate difference interval."
+    ],
+    "secondary": [
+      "Empty patches, Agent errors, non-Agent recovery, and harness errors.",
+      "Token categories, estimated model-only cost, LLM/tool/code_search calls, and retrieval bytes.",
+      "Workspace coverage, documents, duplicates, index, embedding, and cache aggregates."
+    ]
+  },
+  "publication_profile": {
+    "public_sanitized": true,
+    "aggregate_quality_and_cost_included": true,
+    "omitted": [
+      "verbatim user text",
+      "credentials and endpoints",
+      "absolute filesystem paths",
+      "host and process identifiers",
+      "binary and private-config fingerprints",
+      "raw artifact paths and hashes",
+      "per-case quality rows"
+    ]
+  }
+}
