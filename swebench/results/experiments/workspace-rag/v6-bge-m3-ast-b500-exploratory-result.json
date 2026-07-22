@@ -1,0 +1,321 @@
+{
+  "schema_version": 1,
+  "status": "completed_with_recovery",
+  "evidence_status": "complete",
+  "completed_on": "2026-07-22",
+  "result_id": "v6-bge-m3-ast-b500-exploratory",
+  "question": "What absolute official-harness quality, cost, and operational profile does ast-structured produce on the canonical 500-case SWE-bench Verified panel under the frozen V5-R Agent configuration?",
+  "inference_scope": {
+    "arm": "B_ast_structured",
+    "panel": "canonical SWE-bench Verified 500-case panel",
+    "classification": "post-gate single-arm exploratory absolute profile",
+    "controlled_b_minus_a_effect_available": false,
+    "cannot_revise_v5r_gate": true,
+    "notes": [
+      "This run estimates absolute B-arm quality and cost on the full panel.",
+      "It is not a controlled comparison with V3 or V5-R and cannot establish that ast-structured is better than fixed-raw."
+    ]
+  },
+  "public_provenance": {
+    "benchmark_revision": "1532343d90ed0e86d9bab7365166ee060ab2a34d",
+    "source_revision": "1532343d90ed0e86d9bab7365166ee060ab2a34d",
+    "framework_revision": "9c4a839314a2f0f0b782196e52a45c733a94f213",
+    "case_list": "data/case-lists/verified-test-500.case_ids.txt",
+    "case_count": 500,
+    "case_list_sha256": "a6b0fd7c8c2969a0eef892e032250adcfa6d32362d395c246930e61b575ac9b9"
+  },
+  "fixed_parameters": {
+    "model": "GLM-5.2",
+    "reasoning_effort": "high",
+    "embedding_model": "bge-m3",
+    "retrieval_mode": "hybrid",
+    "embedding_dimensions": 1024,
+    "embedding_batch_size": 64,
+    "embedding_concurrency": 1,
+    "embedding_cache_access": "readwrite",
+    "max_results": 4,
+    "max_chars": 6000,
+    "agent_workers_formal": 15,
+    "agent_workers_successful_recovery": 6,
+    "recovery_worker_change_classification": "execution concurrency only; per-case treatment remained frozen",
+    "observation_codec": "xml",
+    "code_search": true,
+    "workspace_preload": true,
+    "command_timeout": "1m",
+    "case_timeout": "2h",
+    "workspace_representation": "ast-structured",
+    "workspace_representation_schema": "workspace-representation/v1;reader=python-ast;tests=include;hidden=include;paths=stable;fallback=file;embedding=structured-code"
+  },
+  "generation_integrity": {
+    "case_count": 500,
+    "prediction_count": 500,
+    "trace_count": 500,
+    "status_counts": {
+      "Submitted": 498,
+      "Error": 2
+    },
+    "empty_patches": 2,
+    "agent_error_signatures": [
+      {
+        "error_category": "agent_error",
+        "error": "max LLM calls (250) exceeded",
+        "llm_calls": 250,
+        "patch_nonempty": false,
+        "count": 2,
+        "rerun": false,
+        "quality_classification": "empty and unresolved"
+      }
+    ],
+    "recovery": {
+      "retained_original_outcomes": 464,
+      "quality_blind_recovery_cases": 36,
+      "selection_rule": {
+        "infrastructure_or_environment_errors": 7,
+        "timeouts_under_host_pressure": 6,
+        "unfinished_at_host_termination": 23
+      },
+      "successful_recovery_submitted": 36,
+      "successful_recovery_errors": 0,
+      "valid_agent_outcomes_rerun": false,
+      "all_non_agent_failures_rerun": true
+    },
+    "fingerprints_match": true
+  },
+  "official_harness": {
+    "status": "completed",
+    "implementation": "official SWE-bench local harness",
+    "target": "tag",
+    "workers": 4,
+    "verifier_mode": "calibrated",
+    "cache_level": "instance",
+    "clean": false,
+    "apply_harness_compat": true,
+    "instances_from_predictions": true,
+    "total_instances": 500,
+    "submitted_instances": 500,
+    "completed_instances": 498,
+    "resolved_instances": 403,
+    "resolved_rate": 0.806,
+    "unresolved_nonempty_instances": 95,
+    "empty_patch_instances": 2,
+    "unresolved_including_empty_instances": 97,
+    "error_instances": 0,
+    "verifier_exit_code": 0,
+    "duration_ms": 5271841
+  },
+  "model_metrics": {
+    "llm_calls": 13555,
+    "prompt_tokens": 249636343,
+    "cached_input_tokens": 244123008,
+    "uncached_input_tokens": 5513335,
+    "completion_tokens": 3793943,
+    "total_tokens": 253430286,
+    "rate_card": {
+      "cached_input_per_million": 2.0,
+      "uncached_input_per_million": 8.0,
+      "output_per_million": 28.0
+    },
+    "estimated_cost": 638.5831,
+    "cost_currency": "billing_unit",
+    "tokens_per_resolved": 628859.270471464,
+    "cost_per_resolved": 1.5845734491315135
+  },
+  "agent_metrics": {
+    "tool_calls": 14099,
+    "case_duration_ms": {
+      "aggregate": 187712336,
+      "count": 500,
+      "mean": 375424.672,
+      "median": 206294.0,
+      "p95_nearest_rank": 1139132,
+      "max": 4641078
+    }
+  },
+  "retrieval_metrics": {
+    "preloaded_documents": 1556,
+    "preloaded_characters": 2513855,
+    "preload_injected_cases": 500,
+    "code_search_calls": 81,
+    "code_search_responses": 81,
+    "case_runs_with_code_search": 80,
+    "code_search_result_bytes": 381700
+  },
+  "workspace_index": {
+    "successful_cases": 500,
+    "representation": "ast-structured",
+    "retrieval_mode": "hybrid",
+    "documents": 13704528,
+    "eligible_files": 699590,
+    "indexed_files": 699544,
+    "missing_files": 46,
+    "file_coverage_min": 0.9809417040358744,
+    "file_coverage_mean": 0.9999096148323009,
+    "cases_below_full_coverage": 8,
+    "eligible_indexed_hash_mismatch_cases": 8,
+    "all_fallback_cases": 0,
+    "fallback_documents": 18380,
+    "fallback_document_rate": 0.0013411625705022456,
+    "fallback_reasons": {
+      "no_nodes": 18096,
+      "parse_error": 284
+    },
+    "node_types": {
+      "Class": 2455870,
+      "Function": 2575672,
+      "Interface": 478,
+      "Method": 7324748,
+      "Variable": 1329380,
+      "file": 18380
+    },
+    "content_chars": 6747758849,
+    "embedding_text_chars": 11749853448,
+    "duplicate_documents": 773592,
+    "duplicate_document_rate_weighted": 0.05644791268987885,
+    "duration_ms": {
+      "aggregate": 70726517,
+      "count": 500,
+      "mean": 141453.034,
+      "median": 95706.0,
+      "p95_nearest_rank": 690041,
+      "max": 1556568
+    },
+    "coverage_mismatch_diagnosis": {
+      "total_missing_files": 46,
+      "case_count": 8,
+      "categories": [
+        {
+          "case_count": 2,
+          "missing_files_per_case": 17,
+          "cause": "scanner and reader apply different case sensitivity to a generated build-directory name"
+        },
+        {
+          "case_count": 6,
+          "missing_files_per_case": 2,
+          "cause": "scanner counts symlink entries while the source reader skips non-regular files"
+        }
+      ],
+      "classification": "frozen scanner/reader accounting difference; not runtime or recovery index loss"
+    }
+  },
+  "embedding": {
+    "requests": 18369,
+    "batch_requests": 17891,
+    "inputs": 253371,
+    "errors": 0,
+    "duration_ms": 28112788
+  },
+  "embedding_cache": {
+    "requests": 214965,
+    "batch_requests": 214384,
+    "inputs": 13705109,
+    "hits": 13450459,
+    "misses": 254650,
+    "hit_rate": 0.9814193378542265,
+    "writes": 253371,
+    "errors": 0,
+    "corruptions": 0,
+    "bytes_read": 54511476736,
+    "bytes_written": 1037807616,
+    "integrity_check": "ok"
+  },
+  "transport": {
+    "embedding_retry_attempt_1_of_3": 54,
+    "embedding_retry_attempt_2_of_3": 1,
+    "embedding_retry_attempt_3_of_3": 0,
+    "final_embedding_errors_in_canonical_500": 0,
+    "interpretation": "Transient transport failures recovered for canonical outcomes."
+  },
+  "operational_accounting": {
+    "canonical_quality_estimate": {
+      "terminal_artifacts": 500,
+      "total_tokens": 253430286,
+      "estimated_cost": 638.5831,
+      "llm_calls": 13555,
+      "tool_calls": 14099
+    },
+    "discarded_infrastructure_affected_terminal_attempts": {
+      "count": 13,
+      "total_tokens": 3079805,
+      "estimated_cost": 8.270188,
+      "llm_calls": 192,
+      "tool_calls": 191
+    },
+    "minimum_terminal_artifact_total": {
+      "terminal_artifacts": 513,
+      "total_tokens": 256510091,
+      "estimated_cost": 646.853288,
+      "llm_calls": 13747,
+      "tool_calls": 14290
+    },
+    "limitation": "This is a lower bound because interrupted work without a terminal trace cannot be reconstructed."
+  },
+  "resource_recovery": {
+    "storage_pause": true,
+    "later_storage_expansion": true,
+    "host_oom_during_resume": true,
+    "zero_outcome_high_concurrency_recovery_stopped": true,
+    "successful_recovery_at_lower_execution_concurrency": true,
+    "quality_treatment_changed": false,
+    "interpretation": "Resource events are disclosed as operational discontinuities, not quality signals."
+  },
+  "descriptive_historical_context": {
+    "controlled_comparison": false,
+    "warning": "V3 and V6 differ in revisions, configuration, representation, cache state, and run conditions.",
+    "v3_full500": {
+      "resolved": 394,
+      "resolved_rate": 0.788,
+      "total_tokens": 214214949,
+      "estimated_cost": 552.6726
+    },
+    "v6_minus_v3_descriptive": {
+      "resolved": 9,
+      "resolved_rate_percentage_points": 1.8,
+      "total_tokens": 39215337,
+      "total_tokens_percent": 18.3065,
+      "estimated_cost": 85.9105,
+      "estimated_cost_percent": 15.5446
+    }
+  },
+  "controlled_context": {
+    "v5r_panel_cases": 54,
+    "v5r_outcomes_per_arm": 108,
+    "v5r_b_minus_a_resolved_outcomes": 0,
+    "v5r_favor_b_cases": 8,
+    "v5r_favor_a_cases": 8,
+    "v5r_tied_cases": 38,
+    "v5r_decision": "no expansion and no default promotion",
+    "unchanged_by_v6": true
+  },
+  "validation": {
+    "official_harness_exit_zero": true,
+    "official_harness_error_zero": true,
+    "prediction_count_matches_panel": true,
+    "all_non_agent_failures_rerun": true,
+    "all_recovery_cases_submitted": true,
+    "fingerprints_match": true,
+    "embedding_errors_zero": true,
+    "cache_errors_zero": true,
+    "cache_corruptions_zero": true,
+    "cache_integrity_check": "ok",
+    "json_parse": true,
+    "metric_consistency_assertions": true,
+    "case_list_sha256_verified": true,
+    "markdown_links_verified": true,
+    "credential_and_internal_path_scan": "passed"
+  },
+  "decision": {
+    "absolute_full_panel_profile_complete": true,
+    "evidence_that_b_is_better_than_a": false,
+    "revise_v5r_no_expansion": false,
+    "recommend_default_ast_structured": false,
+    "conclusion": "Record ast-structured as a viable 80.6% absolute full-panel profile, but do not claim representation gain, revise the V5-R stop decision, or promote it as the default."
+  },
+  "limitations": [
+    "B-only exploratory design: no contemporaneous fixed-raw control arm.",
+    "Historical V3 comparison is descriptive only.",
+    "Generation crossed storage and host-resource discontinuities.",
+    "Recovery lowered only execution concurrency after a zero-outcome high-concurrency attempt; performance segments are not directly comparable.",
+    "Two fixed call-limit Agent failures are retained as real empty unresolved outcomes.",
+    "Minimum operational cost excludes usage not represented by a terminal trace."
+  ]
+}

@@ -1108,38 +1108,121 @@ Host-specific evidence, raw artifact hashes, and per-case rows remain internal.
 
 ## Post-gate B-only 500-case exploratory run
 
-After the V5-R stop decision, the user explicitly authorized one additional
-`ast-structured` run over the canonical 500-case Verified panel. This is a
-post-gate, single-arm exploratory run. It does not pass or revise the V5-R
-efficacy gate, cannot estimate `B-A`, and must not use historical runs with
-different revisions or configurations as a controlled counterfactual.
+Following the V5-R stop decision, one additional `ast-structured` run was
+authorized over the canonical 500-case Verified panel. This is a post-gate,
+single-arm exploratory run. It reports B's absolute quality and operational
+profile; it cannot estimate `B-A`, revise the controlled V5-R gate, or use
+historical runs as a controlled counterfactual.
 
-The formal run is
-`tag-rag-ast-b500-exploratory-20260721-r1`. It keeps the V5-R B configuration:
-GLM-5.2, BGE-M3 hybrid retrieval, 1,024 embedding dimensions, embedding batch
-64/concurrency 1, persistent read-write cache, four results / 6,000 characters,
-15 Agent workers, XML observations, workspace preload, and
-`ast-structured`. The source, framework, runner binary, safe cases, model,
-embedding, and environment fingerprints remain frozen. The only panel change
-is from the outcome-selected 54 cases to
-`verified-test-500.case_ids.txt` (SHA-256
+The run kept the V5-R B treatment: GLM-5.2 at high effort, BGE-M3 hybrid
+retrieval, 1,024 embedding dimensions, embedding batch 64/concurrency 1,
+persistent read-write cache, four results / 6,000 characters, XML observations,
+workspace preload, and `ast-structured`. The public revisions and per-case
+treatment were frozen. The panel is `verified-test-500.case_ids.txt` (SHA-256
 `a6b0fd7c8c2969a0eef892e032250adcfa6d32362d395c246930e61b575ac9b9`).
 
-The run was launched on 2026-07-21 after confirming a clean source checkout,
-an absent output directory, no competing formal runner, healthy required
-runtime dependencies, and sufficient private memory/disk headroom. Linear
-projection from the two V5-R B repetitions is about
-225.1 million total tokens, 582.0 billing units, and 3.32 hours of generation;
-these are planning estimates rather than limits or results.
+### Official result
 
-The official calibrated local harness will run only after generation produces
-500 predictions with zero case errors and exact fingerprints. Final reporting
-will cover the absolute resolved rate, cost, errors, retrieval/tool usage,
-coverage, fallbacks, duplicates, indexing, embedding/cache behavior, and
-resource-headroom status. No default-adoption decision can be made from this
-single arm.
+The calibrated official local harness completed with exit code 0 and no
+verifier errors.
 
-The inference boundary, explicit post-gate authorization, public run contract,
-resume policy, projected token/billing budget, harness configuration, and
-reporting contract are frozen in
+| Submitted | Completed patches | Resolved | Non-empty unresolved | Empty | Harness errors |
+|---:|---:|---:|---:|---:|---:|
+| 500 | 498 | **403 (80.6%)** | 95 | 2 | 0 |
+
+The two empty outcomes are genuine Agent failures with the frozen signature
+`max LLM calls (250) exceeded`. They were preserved without rerunning or
+post-selection and count in the 500 denominator as Agent errors, empty patches,
+and unresolved outcomes.
+
+| Metric | Canonical 500-case value |
+|---|---:|
+| Prompt tokens | 249,636,343 |
+| Cached / uncached input tokens | 244,123,008 / 5,513,335 |
+| Completion / total tokens | 3,793,943 / 253,430,286 |
+| Estimated billing units | 638.583100 |
+| LLM / tool calls | 13,555 / 14,099 |
+| Tokens / billing units per resolved case | 628,859.27 / 1.584573 |
+| `code_search` calls / cases / result bytes | 81 / 80 / 381,700 |
+| Initial preload documents / characters | 1,556 / 2,513,855 |
+
+The aggregate per-case Agent duration is 187,712,336 ms (mean 375,425 ms,
+median 206,294 ms, nearest-rank p95 1,139,132 ms). Timing spans a host resource
+discontinuity and a recovery worker-count change, so it is descriptive rather
+than a clean throughput comparison.
+
+### Quality-blind infrastructure recovery
+
+Generation first paused for storage safety and later encountered host OOM
+pressure after resuming. A frozen error-signature audit, performed without
+consulting quality outcomes, retained 462 submitted patches plus the two
+genuine call-limit Agent errors.
+
+Exactly 36 cases were recovered: seven infrastructure/environment errors, six
+timeouts under host pressure, and 23 unfinished cases. A high-concurrency
+recovery was stopped before any outcome when memory again approached
+exhaustion. A pre-registered execution-only amendment lowered recovery
+concurrency to six while keeping every per-case treatment fixed. That recovery
+finished 36/36 `Submitted`, with no case, embedding, cache, retry, transport,
+fatal, panic, or OOM error. The deterministic merge therefore contains 464
+retained original outcomes plus 36 recovery outcomes. Valid Agent outcomes were
+never rerun, while every non-Agent failure was rerun.
+
+The canonical 500 outcomes account for 253.43 million tokens and 638.583100
+billing units. Thirteen discarded infrastructure-affected terminal attempts
+add at least 3,079,805 tokens and 8.270188 billing units, making the
+terminal-artifact operational lower bound 256,510,091 tokens and 646.853288
+billing units. Actual operational usage is higher because interrupted work
+without a terminal trace cannot be reconstructed.
+
+### Index, embedding, and cache profile
+
+| Metric | Value |
+|---|---:|
+| AST documents | 13,704,528 |
+| Eligible / indexed files | 699,590 / 699,544 |
+| Minimum / mean file coverage | 98.0942% / 99.9910% |
+| Cases with eligible/indexed mismatch | 8 |
+| Fallback documents | 18,380 (0.1341%) |
+| `no_nodes` / parse-error fallbacks | 18,096 / 284 |
+| Duplicate documents | 773,592 (5.6448%) |
+| Content / embedding-text characters | 6,747,758,849 / 11,749,853,448 |
+| Aggregate index duration | 70,726,517 ms |
+| Embedding requests / batches / inputs | 18,369 / 17,891 / 253,371 |
+| Embedding errors | 0 |
+| Cache hits / misses / hit rate | 13,450,459 / 254,650 / 98.1419% |
+| Cache writes / errors / corruptions | 253,371 / 0 / 0 |
+
+The 46 missing-file counts across eight cases were diagnosed as frozen
+scanner/reader accounting differences involving generated build-directory
+case handling and non-regular symlink entries. They are not runtime indexing
+loss or recovery loss. The persistent cache passed its integrity check.
+
+Across the initial and resumed logs there were 54 embedding retries at attempt
+1/3 and one at attempt 2/3; all recovered for the canonical outcomes, with no
+attempt 3/3 or final embedding error. Infrastructure-only failures remain
+reported in the operational accounting and are not canonical treatment
+outcomes.
+
+### Interpretation and decision
+
+For descriptive context only, V3 resolved 394/500 (78.8%) with 214.21 million
+tokens and 552.6726 billing units. V6 is +9 resolved (+1.8 percentage points),
+but uses 18.31% more tokens and 15.54% more estimated cost. Revisions,
+configuration, representation, cache state, and run conditions differ, so this
+is not evidence that AST caused the quality difference.
+
+The controlled V5-R result remains `B-A = 0/108`, with 8 cases favoring B, 8
+favoring A, and 38 ties. Therefore the decision is unchanged: record
+`ast-structured` as a viable **80.6% absolute full-panel profile**, but do not
+claim a representation gain, reopen expansion, or promote it as the default.
+The 13.7 million-document index and 5.64% duplicate rate remain material
+operational costs.
+
+The public run contract is in
 [`v6-bge-m3-ast-b500-exploratory-plan.json`](./v6-bge-m3-ast-b500-exploratory-plan.json).
+The sanitized aggregate metrics, recovery accounting, validation, and decision
+are in
+[`v6-bge-m3-ast-b500-exploratory-result.json`](./v6-bge-m3-ast-b500-exploratory-result.json).
+Host-specific evidence, raw artifact hashes, and per-case results remain
+internal.

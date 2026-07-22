@@ -34,3 +34,7 @@ Committed files:
 - `experiments/workspace-rag/v3-bge-m3-full500-r1.json`: machine-readable
   full-500 official-harness result, baseline comparison, 136-case projection,
   model cost, retrieval runtime, and default-promotion decision.
+- `experiments/workspace-rag/v6-bge-m3-ast-b500-exploratory-result.json`:
+  sanitized machine-readable post-gate single-arm AST full-500 result,
+  quality-blind infrastructure recovery, aggregate runtime metrics, and the
+  unchanged no-default-promotion decision.
