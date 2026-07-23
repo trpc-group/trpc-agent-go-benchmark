@@ -1,0 +1,129 @@
+{
+  "schema_version": 1,
+  "status": "pre_registered",
+  "created_at": "2026-07-23",
+  "plan_id": "v9-glm52-native-e3-full500-20260723",
+  "question": "What absolute official-harness quality and model-side cost does the current frozen TAG Native configuration achieve on the canonical 500-case panel, and where does that one realization sit relative to the frozen current-revision workspace-RAG panels and the two older Native runs?",
+  "authorization": {
+    "explicit_authorization": true,
+    "replicate_count": 1,
+    "scope": "One additional Native full-panel realization, with quality-blind recovery only for non-Agent failures and official local-harness evaluation."
+  },
+  "inference_boundary": {
+    "design": "single current-revision Native full-panel realization executed sequentially after the frozen V6-V8 workspace-RAG runs",
+    "historical_sequence_label": "Native E3",
+    "revision_boundary": "Historical Native E1 and E2 used different source revisions and the older framework dependency. E3 uses the V6-V8 frozen current source and framework checkout, so E1, E2, and E3 are not exchangeable same-revision replicates.",
+    "causal_strength": "The current source, framework checkout, model configuration, panel, protocol, codec, timeouts, and initial generation worker count match V6-V8, with workspace retrieval disabled. One realization per current-revision arm cannot estimate run-to-run stochastic variance, and sequential execution cannot exclude backend-time or host-order effects.",
+    "prohibited_claims": [
+      "Do not pool E1, E2, and E3 as three exchangeable same-revision replicates.",
+      "Do not describe E3 minus any single workspace-RAG run as a stable causal retrieval effect.",
+      "Do not use latency, image reuse, memory, or host timing as treatment-causal estimates.",
+      "Do not retroactively rewrite V5-R or any frozen V6-V8 conclusion."
+    ],
+    "permitted_claims": [
+      "Absolute official-harness quality and model-side usage for the current-revision Native run.",
+      "Single-realization paired resolved-outcome comparisons by instance ID against frozen V6, V7, and V8, with limitations stated.",
+      "Descriptive placement relative to historical Native E1 and E2 with the revision boundary disclosed."
+    ]
+  },
+  "historical_native_runs": [
+    {
+      "label": "E1",
+      "source_revision": "61b6e46c9a72247de69e49893722ee8093d4a6e7",
+      "resolved": 383,
+      "resolved_rate": 0.766
+    },
+    {
+      "label": "E2",
+      "source_revision": "c5504d802a9a3a1b952f0a2c9efbff597b18a9b0",
+      "resolved": 399,
+      "resolved_rate": 0.798
+    }
+  ],
+  "frozen_current_revision_references": {
+    "v6_ast_preload": {
+      "result": "results/experiments/workspace-rag/v6-bge-m3-ast-b500-exploratory-result.json",
+      "resolved": 403,
+      "resolved_rate": 0.806
+    },
+    "v7_fixed_raw_preload": {
+      "result": "results/experiments/workspace-rag/v7-bge-m3-fixedraw-a500-completion-result.json",
+      "resolved": 396,
+      "resolved_rate": 0.792
+    },
+    "v8_ast_no_preload": {
+      "result": "results/experiments/workspace-rag/v8-bge-m3-ast-no-preload-c500-result.json",
+      "resolved": 389,
+      "resolved_rate": 0.778
+    }
+  },
+  "panel": {
+    "case_list": "data/case-lists/verified-test-500.case_ids.txt",
+    "case_count": 500,
+    "case_list_sha256": "a6b0fd7c8c2969a0eef892e032250adcfa6d32362d395c246930e61b575ac9b9"
+  },
+  "public_provenance": {
+    "source_revision": "1532343d90ed0e86d9bab7365166ee060ab2a34d",
+    "source_modified_required": false,
+    "framework_revision": "9c4a839314a2f0f0b782196e52a45c733a94f213"
+  },
+  "fixed_parameters": {
+    "model": "GLM-5.2",
+    "model_reasoning_effort": "high",
+    "model_timeout_seconds": 300,
+    "agent_workers": 15,
+    "observation_codec": "xml",
+    "command_timeout": "1m",
+    "case_timeout": "2h",
+    "max_llm_calls": 250,
+    "code_search": false,
+    "workspace_preload": false,
+    "embedding": "disabled"
+  },
+  "failure_and_recovery": {
+    "canonical_experiment_count": 1,
+    "quality_blind_rule": "Freeze recovery membership before consulting official-harness quality labels or patch quality.",
+    "retain_without_rerun": [
+      "Every valid Submitted outcome, including unresolved or empty patches produced by a completed Agent trajectory.",
+      "Audited genuine Agent failures such as a fixed model-call limit with no infrastructure symptom."
+    ],
+    "rerun": [
+      "Missing or corrupt artifacts.",
+      "Container or environment setup failures.",
+      "Exhausted model transport retries.",
+      "Resource, host, or runner interruption not caused by a completed Agent outcome."
+    ],
+    "ambiguous_errors": "Pause and audit before consulting resolved status.",
+    "no_second_replicate": true
+  },
+  "official_harness": {
+    "target": "tag",
+    "workers": 4,
+    "verifier_mode": "calibrated",
+    "cache_level": "instance",
+    "clean": false,
+    "apply_harness_compat": true,
+    "instances_from_predictions": true
+  },
+  "analysis": {
+    "primary": [
+      "Native E3 resolved count and rate out of the canonical 500.",
+      "Empty patches, Agent outcomes, non-Agent recovery count, and harness errors.",
+      "Total and categorized model tokens, estimated model-only cost, LLM calls, and tool calls."
+    ],
+    "paired_descriptive": [
+      "E3 versus each frozen current-revision V6, V7, and V8 arm: both resolved, E3-only, counterpart-only, neither, exact McNemar test, and paired difference interval.",
+      "Historical E1/E2/E3 absolute profiles with revision differences explicitly shown."
+    ]
+  },
+  "publication_profile": {
+    "public_sanitized": true,
+    "aggregate_quality_and_cost_included": true,
+    "omitted": [
+      "credentials and endpoints",
+      "absolute host paths and process identifiers",
+      "private runtime fingerprints and raw artifact hashes",
+      "per-instance quality outcomes"
+    ]
+  }
+}

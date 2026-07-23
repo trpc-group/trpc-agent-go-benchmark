@@ -1,0 +1,325 @@
+{
+  "schema_version": 1,
+  "status": "completed",
+  "evidence_status": "complete",
+  "completed_on": "2026-07-23",
+  "result_id": "v9-glm52-native-e3-full500",
+  "question": "What absolute official-harness quality and model-side cost does the current frozen TAG Native configuration achieve on the canonical 500-case panel, and where does that one realization sit relative to the frozen current-revision workspace-RAG panels and the two older Native runs?",
+  "inference_scope": {
+    "design": "single current-revision Native full-panel realization executed sequentially after the frozen V6-V8 workspace-RAG runs",
+    "new_arm": "native_e3_current_revision",
+    "panel": "canonical SWE-bench Verified 500-case panel",
+    "repeated_current_revision_native_evidence": false,
+    "notes": [
+      "E3 shares the frozen current source, framework checkout, model configuration, panel, protocol, XML codec, timeouts, and initial 15-worker generation configuration used by V6-V8, with workspace retrieval disabled.",
+      "Each paired comparison is one sequential realization per arm and cannot estimate run-to-run stochastic variance or exclude backend-time and host-order effects.",
+      "Historical Native E1 and E2 used different source revisions and the older framework dependency; E1, E2, and E3 are not three exchangeable same-revision replicates.",
+      "Operational timing and host resource metrics are not treatment-causal estimates.",
+      "The frozen V5-R, V6, V7, and V8 conclusions remain unchanged."
+    ]
+  },
+  "protocol": {
+    "plan": "results/experiments/workspace-rag/v9-glm52-native-e3-full500-plan.json",
+    "quality_blind_generation_recovery": {
+      "required": false,
+      "selected_cases": 0,
+      "valid_outcomes_rerun": false,
+      "second_replicate": false
+    }
+  },
+  "frozen_current_revision_references": {
+    "v6_ast_preload": {
+      "result": "results/experiments/workspace-rag/v6-bge-m3-ast-b500-exploratory-result.json",
+      "resolved": 403,
+      "resolved_rate": 0.806,
+      "total_tokens": 253430286,
+      "estimated_cost": 638.5831
+    },
+    "v7_fixed_raw_preload": {
+      "result": "results/experiments/workspace-rag/v7-bge-m3-fixedraw-a500-completion-result.json",
+      "resolved": 396,
+      "resolved_rate": 0.792,
+      "total_tokens": 238430722,
+      "estimated_cost": 598.483172
+    },
+    "v8_ast_no_preload": {
+      "result": "results/experiments/workspace-rag/v8-bge-m3-ast-no-preload-c500-result.json",
+      "resolved": 389,
+      "resolved_rate": 0.778,
+      "total_tokens": 228711205,
+      "estimated_cost": 581.261772
+    }
+  },
+  "historical_native_references": {
+    "warning": "These are descriptive historical placements only because E1, E2, and E3 differ in source revision, framework provenance, backend time, and run conditions.",
+    "e1": {
+      "source_revision": "61b6e46c9a72247de69e49893722ee8093d4a6e7",
+      "resolved": 383,
+      "resolved_rate": 0.766,
+      "empty_patches": 2,
+      "harness_errors": 0,
+      "llm_calls": 13090,
+      "tool_calls": 14048,
+      "total_tokens": 209803789,
+      "estimated_cost": 541.309256,
+      "tokens_per_resolved": 547790.5718015666,
+      "cost_per_resolved": 1.413340093994778
+    },
+    "e2": {
+      "source_revision": "c5504d802a9a3a1b952f0a2c9efbff597b18a9b0",
+      "resolved": 399,
+      "resolved_rate": 0.798,
+      "empty_patches": 5,
+      "harness_errors": 1,
+      "llm_calls": 13829,
+      "tool_calls": 14707,
+      "total_tokens": 258800596,
+      "estimated_cost": 646.375208,
+      "tokens_per_resolved": 648623.0476190476,
+      "cost_per_resolved": 1.6199879899749374
+    }
+  },
+  "public_provenance": {
+    "benchmark_revision": "1532343d90ed0e86d9bab7365166ee060ab2a34d",
+    "source_revision": "1532343d90ed0e86d9bab7365166ee060ab2a34d",
+    "framework_revision": "9c4a839314a2f0f0b782196e52a45c733a94f213",
+    "case_list": "data/case-lists/verified-test-500.case_ids.txt",
+    "case_count": 500,
+    "case_list_sha256": "a6b0fd7c8c2969a0eef892e032250adcfa6d32362d395c246930e61b575ac9b9"
+  },
+  "fixed_parameters": {
+    "model": "GLM-5.2",
+    "reasoning_effort": "high",
+    "model_timeout_seconds": 300,
+    "agent_workers": 15,
+    "observation_codec": "xml",
+    "command_timeout": "1m",
+    "case_timeout": "2h",
+    "max_llm_calls": 250,
+    "code_search": false,
+    "workspace_preload": false,
+    "embedding": "disabled"
+  },
+  "generation_integrity": {
+    "case_count": 500,
+    "prediction_count": 500,
+    "trace_count": 500,
+    "status_counts": {
+      "Submitted": 500
+    },
+    "empty_patches": 1,
+    "agent_errors": 0,
+    "valid_empty_submissions": 1,
+    "non_agent_generation_failures": 0,
+    "generation_recovery_cases": 0,
+    "canonical_order_matches_case_list": true,
+    "unique_predictions": 500,
+    "redo_existing": false,
+    "fingerprints_match": true,
+    "imports_completed": true,
+    "run_config_completed": true
+  },
+  "official_harness": {
+    "status": "completed",
+    "implementation": "official SWE-bench local harness",
+    "target": "tag",
+    "workers": 4,
+    "verifier_mode": "calibrated",
+    "cache_level": "instance",
+    "clean": false,
+    "apply_harness_compat": true,
+    "instances_from_predictions": true,
+    "total_instances": 500,
+    "submitted_instances": 500,
+    "completed_instances": 499,
+    "resolved_instances": 378,
+    "resolved_rate": 0.756,
+    "unresolved_nonempty_instances": 121,
+    "empty_patch_instances": 1,
+    "error_instances": 0,
+    "analysis_not_resolved_instances": 122,
+    "analysis_not_resolved_rate": 0.244,
+    "verifier_exit_code": 0,
+    "unstopped_case_containers": 0
+  },
+  "model_metrics": {
+    "llm_calls": 12880,
+    "prompt_tokens": 202936938,
+    "cached_input_tokens": 198262656,
+    "uncached_input_tokens": 4674282,
+    "completion_tokens": 3361415,
+    "total_tokens": 206298353,
+    "rate_card": {
+      "cached_input_per_million": 2.0,
+      "uncached_input_per_million": 8.0,
+      "output_per_million": 28.0
+    },
+    "estimated_cost": 528.039188,
+    "cost_currency": "billing_unit",
+    "tokens_per_resolved": 545762.8386243386,
+    "cost_per_resolved": 1.3969290687830687
+  },
+  "agent_and_retrieval_metrics": {
+    "tool_calls": 13816,
+    "code_search_calls": 0,
+    "workspace_index_documents": 0,
+    "preload_injected_cases": 0,
+    "embedding_requests": 0,
+    "embedding_errors": 0,
+    "interpretation": "Native E3 does not build or query a workspace index."
+  },
+  "paired_comparisons": {
+    "direction": "native_e3 minus counterpart",
+    "panel_cases": 500,
+    "v6_ast_preload": {
+      "counterpart_resolved": 403,
+      "native_e3_resolved": 378,
+      "resolved_cases": -25,
+      "resolved_rate_percentage_points": -5.0,
+      "paired_cells": {
+        "both_resolved": 361,
+        "counterpart_only_resolved": 42,
+        "native_e3_only_resolved": 17,
+        "neither_resolved": 80,
+        "discordant": 59
+      },
+      "exact_mcnemar_two_sided_p": 0.0015471669302425245,
+      "paired_difference_95_percent_interval": {
+        "method": "paired Wald interval over per-instance Native-E3-minus-counterpart binary differences",
+        "lower_percentage_points": -7.981870718486461,
+        "upper_percentage_points": -2.0181292815135397
+      }
+    },
+    "v7_fixed_raw_preload": {
+      "counterpart_resolved": 396,
+      "native_e3_resolved": 378,
+      "resolved_cases": -18,
+      "resolved_rate_percentage_points": -3.6,
+      "paired_cells": {
+        "both_resolved": 356,
+        "counterpart_only_resolved": 40,
+        "native_e3_only_resolved": 22,
+        "neither_resolved": 82,
+        "discordant": 62
+      },
+      "exact_mcnemar_two_sided_p": 0.030015864349067292,
+      "paired_difference_95_percent_interval": {
+        "method": "paired Wald interval over per-instance Native-E3-minus-counterpart binary differences",
+        "lower_percentage_points": -6.673457262070287,
+        "upper_percentage_points": -0.5265427379297128
+      }
+    },
+    "v8_ast_no_preload": {
+      "counterpart_resolved": 389,
+      "native_e3_resolved": 378,
+      "resolved_cases": -11,
+      "resolved_rate_percentage_points": -2.2,
+      "paired_cells": {
+        "both_resolved": 360,
+        "counterpart_only_resolved": 29,
+        "native_e3_only_resolved": 18,
+        "neither_resolved": 93,
+        "discordant": 47
+      },
+      "exact_mcnemar_two_sided_p": 0.14386508844054902,
+      "paired_difference_95_percent_interval": {
+        "method": "paired Wald interval over per-instance Native-E3-minus-counterpart binary differences",
+        "lower_percentage_points": -4.883124218642508,
+        "upper_percentage_points": 0.483124218642508
+      }
+    },
+    "interpretation": "The realized direction places E3 below all three current-revision workspace-RAG panels. These are descriptive sequential single-realization comparisons, not stable causal retrieval estimates."
+  },
+  "descriptive_model_change_vs_current_references": {
+    "v6_ast_preload": {
+      "resolved_cases": -25,
+      "total_tokens_percent": -18.597592949092125,
+      "estimated_cost_percent": -17.31081076213886,
+      "tokens_per_resolved_percent": -13.213835869005619,
+      "cost_per_resolved_percent": -11.841949040058108
+    },
+    "v7_fixed_raw_preload": {
+      "resolved_cases": -18,
+      "total_tokens_percent": -13.476606005496217,
+      "estimated_cost_percent": -11.770420171479778,
+      "tokens_per_resolved_percent": -9.356444386710328,
+      "cost_per_resolved_percent": -7.569011608216913
+    },
+    "v8_ast_no_preload": {
+      "resolved_cases": -11,
+      "total_tokens_percent": -9.799630061850273,
+      "estimated_cost_percent": -9.156388147954786,
+      "tokens_per_resolved_percent": -7.174751571586658,
+      "cost_per_resolved_percent": -6.512790977657168
+    },
+    "interpretation": "E3 used fewer model tokens and less estimated model-only cost than every current-revision RAG panel, but also resolved fewer cases. Sequential trajectory differences prevent assigning the full usage delta mechanically to retrieval."
+  },
+  "historical_native_descriptive_placement": {
+    "e3": {
+      "resolved": 378,
+      "resolved_rate": 0.756,
+      "total_tokens": 206298353,
+      "estimated_cost": 528.039188
+    },
+    "e3_minus_e1": {
+      "resolved_cases": -5,
+      "resolved_rate_percentage_points": -1.0,
+      "total_tokens": -3505436,
+      "estimated_cost": -13.270068
+    },
+    "e3_minus_e2": {
+      "resolved_cases": -21,
+      "resolved_rate_percentage_points": -4.2,
+      "total_tokens": -52502243,
+      "estimated_cost": -118.33602
+    },
+    "interpretation": "E3 is lower-quality and lower-cost than both historical Native runs in this realization. Revision and run-condition differences prohibit treating these gaps as same-configuration repeat variance or framework effects."
+  },
+  "operational_accounting": {
+    "canonical_terminal_artifacts": 500,
+    "discarded_or_replaced_attempts": 0,
+    "known_operational_usage_equals_canonical_usage": true,
+    "generation_exit_code": 0,
+    "harness_exit_code": 0,
+    "import_exit_code": 0,
+    "run_config_exit_code": 0,
+    "missing_usage_objects": 0
+  },
+  "transport": {
+    "model_transport_retry_or_error_lines": 0,
+    "fatal_panic_oom_or_disk_error_lines": 0,
+    "generation_host_resource_interruption": false,
+    "harness_errors": 0
+  },
+  "validation": {
+    "generation_exit_zero": true,
+    "prediction_count_matches_panel": true,
+    "all_generation_outcomes_submitted": true,
+    "non_agent_generation_failures_zero": true,
+    "canonical_order_and_fingerprints_match": true,
+    "official_harness_exit_zero": true,
+    "official_harness_error_zero": true,
+    "binary_quality_outcome_available_for_all_500": true,
+    "usage_matches_import": true,
+    "workspace_index_and_embedding_zero": true,
+    "json_parse": true,
+    "metric_consistency_assertions": true,
+    "case_list_sha256_verified": true
+  },
+  "decision": {
+    "absolute_native_full_panel_complete": true,
+    "native_e3_result": "378/500 (75.6%)",
+    "realized_current_revision_ordering": "V6 AST preload 80.6%, V7 fixed-raw preload 79.2%, V8 AST no-preload 77.8%, Native E3 75.6%",
+    "evidence_of_stable_retrieval_effect": false,
+    "revise_v5r_or_frozen_v6_v8_conclusions": false,
+    "conclusion": "Record Native E3 as a 75.6% absolute current-revision Native profile with the lowest canonical model usage of the current V6-V9 panels. The realized ordering favors each workspace-RAG arm on quality, but it is descriptive single-realization evidence rather than a stable causal retrieval estimate."
+  },
+  "limitations": [
+    "One stochastic realization per current-revision arm; no current-revision Native repeat variance estimate.",
+    "Sequential V6-V9 execution; backend-time, host-order, and model-cache conditions differ.",
+    "Three paired comparisons are descriptive and were not pre-registered as a multiplicity-adjusted confirmatory family.",
+    "Historical Native E1 and E2 use different source and framework provenance and cannot be pooled with E3 as exact repeats.",
+    "One valid empty submission is retained as unresolved in the 500-case denominator.",
+    "Operational timing and host resource metrics are not retrieval-causal estimates."
+  ]
+}

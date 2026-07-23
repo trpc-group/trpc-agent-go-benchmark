@@ -1437,3 +1437,91 @@ and
 Sanitized aggregate metrics, canonical and operational accounting, paired
 estimands, validation, limitations, and the decision are in
 [`v8-bge-m3-ast-no-preload-c500-result.json`](./v8-bge-m3-ast-no-preload-c500-result.json).
+
+## Current-revision Native E3 full-500
+
+V9 adds one Native realization on the same frozen current source, framework
+checkout, 500-case panel, GLM-5.2 configuration, XML protocol, timeouts, and
+initial 15-worker generation configuration as V6-V8. Workspace retrieval is
+disabled: no index is built, no preload is injected, no embedding request is
+made, and `code_search` is unavailable.
+
+This is a single sequential realization. It supports an absolute Native
+profile and paired descriptive comparisons by instance ID, but it cannot
+estimate run-to-run variance or turn any E3-minus-RAG difference into a stable
+causal retrieval effect.
+
+### Native E3 absolute result
+
+Generation completed all 500 cases without recovery: every outcome is
+`Submitted`, with one valid empty submission and no Agent or infrastructure
+error. The official calibrated local harness reported:
+
+| Submitted | Completed patches | Resolved | Non-empty unresolved | Empty | Harness errors |
+|---:|---:|---:|---:|---:|---:|
+| 500 | 499 | **378 (75.6%)** | 121 | 1 | 0 |
+
+The empty submission is retained as unresolved in the 500-case denominator.
+Canonical and known operational model usage are identical because no
+generation attempt was discarded or replaced.
+
+### Paired current-revision outcomes
+
+All differences below are Native E3 minus the named frozen counterpart.
+
+| Counterpart | Both resolved | Counterpart only | E3 only | Neither | Difference | Exact McNemar p | Paired 95% interval |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| V6 AST preload | 361 | 42 | 17 | 80 | -25 / -5.0pp | 0.00155 | [-7.98, -2.02]pp |
+| V7 fixed-raw preload | 356 | 40 | 22 | 82 | -18 / -3.6pp | 0.03002 | [-6.67, -0.53]pp |
+| V8 AST no-preload | 360 | 29 | 18 | 93 | -11 / -2.2pp | 0.14387 | [-4.88, 0.48]pp |
+
+The realized quality ordering is V6 80.6%, V7 79.2%, V8 77.8%, and Native
+E3 75.6%. These are three descriptive comparisons from sequential
+single-realization arms, not a pre-registered multiplicity-adjusted
+confirmatory family. In particular, small p-values for two realized
+discordance tables do not supply a run-to-run stability estimate.
+
+### Model-side profile
+
+| Metric | Native E3 | V6 AST preload | V7 fixed-raw preload | V8 AST no-preload |
+|---|---:|---:|---:|---:|
+| Resolved | 378 (75.6%) | 403 (80.6%) | 396 (79.2%) | 389 (77.8%) |
+| Total tokens | 206,298,353 | 253,430,286 | 238,430,722 | 228,711,205 |
+| Estimated billing units | 528.039188 | 638.583100 | 598.483172 | 581.261772 |
+| Tokens per resolved | 545,762.84 | 628,859.27 | 602,097.78 | 587,946.54 |
+| Billing units per resolved | 1.396929 | 1.584573 | 1.511321 | 1.494246 |
+| LLM / tool calls | 12,880 / 13,816 | 13,555 / 14,099 | 13,134 / 13,698 | 13,405 / 13,988 |
+
+Relative to V6, V7, and V8 respectively, E3 used 18.60%, 13.48%, and 9.80%
+fewer model tokens and 17.31%, 11.77%, and 9.16% less estimated model-only
+cost. It also resolved 25, 18, and 11 fewer cases. Sequential trajectories
+differ, so the full usage deltas must not be mechanically assigned to
+retrieval payload alone.
+
+### Historical Native placement
+
+| Native run | Revision boundary | Resolved | Total tokens | Estimated billing units | Cost per resolved |
+|---|---|---:|---:|---:|---:|
+| E1 | old source/framework provenance | 383 (76.6%) | 209,803,789 | 541.309256 | 1.413340 |
+| E2 | old source/framework provenance | 399 (79.8%) | 258,800,596 | 646.375208 | 1.619988 |
+| E3 | V6-V8 frozen current source/framework | 378 (75.6%) | 206,298,353 | 528.039188 | 1.396929 |
+
+E3 is lower-quality and lower-cost than both historical Native runs in this
+realization. E1, E2, and E3 are not three exchangeable technical repeats:
+their revisions, framework provenance, backend times, and host conditions
+differ.
+
+### Decision
+
+Record Native E3 as a **75.6%** absolute current-revision Native profile and
+as the lowest canonical model-usage result among V6-V9. The realized ordering
+favors every workspace-RAG arm on quality, while Native E3 favors lower model
+usage and cost. Do not call that ordering a stable causal retrieval effect
+without repeated current-revision Native and matching-arm evidence. The frozen
+V5-R, V6, V7, and V8 conclusions remain unchanged.
+
+The pre-registered design is in
+[`v9-glm52-native-e3-full500-plan.json`](./v9-glm52-native-e3-full500-plan.json).
+Sanitized aggregate quality, model accounting, paired estimands, validation,
+limitations, and the decision are in
+[`v9-glm52-native-e3-full500-result.json`](./v9-glm52-native-e3-full500-result.json).
