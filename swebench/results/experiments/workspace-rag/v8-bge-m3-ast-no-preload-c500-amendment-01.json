@@ -1,0 +1,92 @@
+{
+  "schema_version": 1,
+  "status": "pre_registered_resource_recovery",
+  "created_at": "2026-07-23",
+  "amendment_id": "v8-ast-no-preload-c500-oom-recovery43-w6-20260723",
+  "question": "How should the quality-blind V8 canonical panel recover after global host OOM killed the 15-worker Agent with 43 cases unfinished?",
+  "parent": {
+    "plan": "results/experiments/workspace-rag/v8-bge-m3-ast-no-preload-c500-plan.json"
+  },
+  "authorization": {
+    "decision": "Recover every non-Agent infrastructure failure and unfinished case quality-blind so that infrastructure failure is not scored as Agent quality.",
+    "prohibition": "Do not rerun, delete, overwrite, or replace any valid terminal Submitted outcome or genuine Agent outcome.",
+    "replicate_interpretation": "The recovery remains part of the single canonical V8 experiment and is not a second replicate."
+  },
+  "outcome_blinding": {
+    "official_harness_started": false,
+    "official_harness_outcomes_seen": 0,
+    "selection_inputs": [
+      "Canonical 500-case list order",
+      "Frozen progress membership and terminal status",
+      "Generation error category and exact Agent error signature",
+      "Kernel OOM and process-exit evidence"
+    ],
+    "selection_excludes": [
+      "Patch contents except whether an audited terminal Agent error is empty",
+      "Official-harness outcome",
+      "Expected case difficulty",
+      "Any recovery quality result"
+    ]
+  },
+  "frozen_original_boundary": {
+    "terminal_cases": 457,
+    "status_counts": {
+      "Submitted": 456,
+      "Error": 1
+    },
+    "retained_genuine_agent_errors": 1,
+    "retained_agent_error_signature": {
+      "exit_status": "Error",
+      "error_category": "agent_error",
+      "error": "max LLM calls (250) exceeded",
+      "llm_calls": 250,
+      "tool_calls": 250,
+      "patch_bytes": 0
+    },
+    "unfinished_cases": 43
+  },
+  "resource_failure_evidence": {
+    "original_workers": 15,
+    "wrapper_termination": "global host OOM SIGKILL",
+    "classification": "The original Agent was killed by confirmed host memory exhaustion. Missing outcomes are infrastructure-interrupted and cannot be counted as no-preload quality failures."
+  },
+  "quality_blind_selection": {
+    "include": "Every canonical-panel instance absent from the frozen 457-case progress map.",
+    "exclude": "All 456 Submitted outcomes and the one audited fixed-call-limit Agent error.",
+    "selected_count": 43
+  },
+  "recovery_run": {
+    "agent_workers": 6,
+    "changed_parameter": "Execution concurrency only: agent_workers 15 to 6 after preserved resource-danger evidence.",
+    "unchanged_quality_parameters": [
+      "GLM-5.2 high",
+      "BGE-M3 hybrid dimensions=1024 batch=64 concurrency=1 persistent-cache=readwrite",
+      "max_results=4 and max_chars=6000",
+      "XML observation codec",
+      "code_search=true",
+      "workspace_preload=false",
+      "workspace_representation=ast-structured",
+      "command_timeout=1m and case_timeout=2h",
+      "source, framework, safe cases, and public configuration provenance"
+    ],
+    "failure_policy": "Any environment, embedding, cache, OOM, process, or unexplained generation error pauses recovery before merge."
+  },
+  "deterministic_merge": {
+    "canonical_cases": 500,
+    "retain_from_original": 457,
+    "take_from_recovery": 43,
+    "required_invariants": [
+      "Exactly 500 unique canonical instance IDs.",
+      "Exactly 457 predictions sourced from the frozen original set and 43 from recovery.",
+      "No retained original prediction changes.",
+      "Every recovery replacement belongs to the quality-blind 43-case selection.",
+      "Per-instance provenance is recorded before official-harness execution."
+    ],
+    "official_harness_input": "Only the deterministically merged canonical 500-case predictions."
+  },
+  "inference_boundary": {
+    "quality": "The merged set is the comparable single-realization V8 quality panel because infrastructure-interrupted cases are recovered under the same per-case treatment.",
+    "operations": "Generation wall time, memory, retries, and operational cost span interrupted and recovery attempts and must be reported separately.",
+    "preload_comparison": "The V8 versus V6 comparison remains sequential and single-replicate; recovery does not remove backend-time, host-order, or stochastic limitations."
+  }
+}

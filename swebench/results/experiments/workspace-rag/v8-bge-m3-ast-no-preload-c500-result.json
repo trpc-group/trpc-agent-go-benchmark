@@ -1,0 +1,432 @@
+{
+  "schema_version": 1,
+  "status": "completed_with_quality_blind_host_oom_recovery",
+  "evidence_status": "complete",
+  "completed_on": "2026-07-23",
+  "result_id": "v8-bge-m3-ast-no-preload-c500",
+  "question": "Under the frozen V6 ast-structured Agent configuration, what full-panel official-harness quality and model-side cost result when initial workspace preload is disabled while the same AST index and on-demand code_search tool remain enabled?",
+  "inference_scope": {
+    "design": "single-replicate sequential paired full-panel preload ablation",
+    "new_arm": "C_ast_structured_no_preload",
+    "frozen_counterpart": "B_ast_structured_preload_v6",
+    "panel": "canonical SWE-bench Verified 500-case panel",
+    "same_panel_representation_index_tool_and_quality_configuration": true,
+    "isolated_quality_variable": "workspace_preload true to false",
+    "repeated_full_panel_evidence": false,
+    "notes": [
+      "The same AST index and code_search tool remain available; only initial workspace_context injection is disabled.",
+      "One sequential realization per arm cannot estimate run-to-run stochastic variance or exclude backend-time, host-order, and persistent-cache effects.",
+      "Generation latency, index latency, embedding work, cache hits, and memory are operational observations rather than preload-causal estimates.",
+      "The V5-R repeated order-balanced representation result and its no-expansion decision remain unchanged."
+    ]
+  },
+  "protocol": {
+    "plan": "results/experiments/workspace-rag/v8-bge-m3-ast-no-preload-c500-plan.json",
+    "amendment": "results/experiments/workspace-rag/v8-bge-m3-ast-no-preload-c500-amendment-01.json",
+    "quality_blind_generation_recovery": {
+      "selected_before_official_harness": true,
+      "selected_from_terminal_membership_only": true,
+      "selected_cases": 43,
+      "valid_original_outcomes_rerun": false,
+      "recovery_is_second_replicate": false
+    }
+  },
+  "frozen_counterpart": {
+    "result": "results/experiments/workspace-rag/v6-bge-m3-ast-b500-exploratory-result.json",
+    "representation": "ast-structured",
+    "workspace_preload": true,
+    "code_search": true,
+    "resolved": 403,
+    "resolved_rate": 0.806
+  },
+  "secondary_context": {
+    "result": "results/experiments/workspace-rag/v7-bge-m3-fixedraw-a500-completion-result.json",
+    "representation": "fixed-raw",
+    "workspace_preload": true,
+    "resolved": 396,
+    "resolved_rate": 0.792,
+    "role": "Secondary descriptive context only; not the preload-ablation counterpart."
+  },
+  "public_provenance": {
+    "benchmark_revision": "1532343d90ed0e86d9bab7365166ee060ab2a34d",
+    "source_revision": "1532343d90ed0e86d9bab7365166ee060ab2a34d",
+    "framework_revision": "9c4a839314a2f0f0b782196e52a45c733a94f213",
+    "case_list": "data/case-lists/verified-test-500.case_ids.txt",
+    "case_count": 500,
+    "case_list_sha256": "a6b0fd7c8c2969a0eef892e032250adcfa6d32362d395c246930e61b575ac9b9"
+  },
+  "fixed_parameters": {
+    "model": "GLM-5.2",
+    "reasoning_effort": "high",
+    "embedding_model": "bge-m3",
+    "retrieval_mode": "hybrid",
+    "embedding_dimensions": 1024,
+    "embedding_batch_size": 64,
+    "embedding_concurrency": 1,
+    "embedding_cache_access": "readwrite",
+    "max_results": 4,
+    "max_chars": 6000,
+    "original_agent_workers": 15,
+    "quality_blind_recovery_workers": 6,
+    "observation_codec": "xml",
+    "code_search": true,
+    "workspace_preload": false,
+    "command_timeout": "1m",
+    "case_timeout": "2h",
+    "workspace_representation": "ast-structured",
+    "workspace_representation_schema": "workspace-representation/v1;reader=python-ast;tests=include;hidden=include;paths=stable;fallback=file;embedding=structured-code",
+    "only_changed_quality_variable_from_v6": "workspace_preload"
+  },
+  "generation_integrity": {
+    "case_count": 500,
+    "prediction_count": 500,
+    "trace_count": 500,
+    "status_counts": {
+      "Submitted": 499,
+      "Error": 1
+    },
+    "empty_patches": 1,
+    "agent_error_signatures": [
+      {
+        "error_category": "agent_error",
+        "error": "max LLM calls (250) exceeded",
+        "llm_calls": 250,
+        "tool_calls": 250,
+        "patch_nonempty": false,
+        "count": 1,
+        "rerun": false,
+        "quality_classification": "empty and unresolved"
+      }
+    ],
+    "segments": {
+      "original": {
+        "workers": 15,
+        "terminal_predictions": 457,
+        "status_counts": {
+          "Submitted": 456,
+          "Error": 1
+        },
+        "termination": "confirmed global host OOM SIGKILL",
+        "retained_unchanged": true
+      },
+      "quality_blind_recovery": {
+        "workers": 6,
+        "selected_cases": 43,
+        "terminal_predictions": 43,
+        "status_counts": {
+          "Submitted": 43
+        },
+        "termination": "completed"
+      }
+    },
+    "deterministic_merge": {
+      "original_predictions": 457,
+      "recovery_predictions": 43,
+      "unique_predictions": 500,
+      "canonical_order_matches_case_list": true,
+      "original_457_unchanged": true,
+      "per_case_provenance_complete": true
+    },
+    "fingerprints_match": true,
+    "non_agent_generation_failures_recovered": 43,
+    "unrecovered_non_agent_generation_failures": 0,
+    "valid_agent_outcomes_rerun": false
+  },
+  "official_harness": {
+    "status": "completed",
+    "implementation": "official SWE-bench local harness",
+    "target": "tag",
+    "workers": 4,
+    "verifier_mode": "calibrated",
+    "cache_level": "instance",
+    "clean": false,
+    "apply_harness_compat": true,
+    "instances_from_predictions": true,
+    "total_instances": 500,
+    "submitted_instances": 500,
+    "completed_instances": 499,
+    "resolved_instances": 389,
+    "resolved_rate": 0.778,
+    "unresolved_nonempty_instances": 110,
+    "empty_patch_instances": 1,
+    "error_instances": 0,
+    "analysis_not_resolved_instances": 111,
+    "analysis_not_resolved_rate": 0.222,
+    "verifier_exit_code": 0,
+    "unstopped_case_containers": 0,
+    "transient_http_proxy_context_canceled_lines": 2,
+    "transient_http_proxy_interpretation": "The evaluator continued completing cases and the final official error count is zero."
+  },
+  "paired_comparison": {
+    "comparison": "C_ast_no_preload_v8 minus B_ast_preload_v6",
+    "panel_cases": 500,
+    "b_ast_preload": {
+      "resolved": 403,
+      "resolved_rate": 0.806
+    },
+    "c_ast_no_preload": {
+      "resolved": 389,
+      "resolved_rate": 0.778
+    },
+    "no_preload_minus_preload": {
+      "resolved_cases": -14,
+      "resolved_rate_percentage_points": -2.8
+    },
+    "paired_cells": {
+      "both_resolved": 371,
+      "preload_only_resolved": 32,
+      "no_preload_only_resolved": 18,
+      "neither_resolved": 79,
+      "discordant": 50
+    },
+    "exact_mcnemar_two_sided_p": 0.06490864707227217,
+    "paired_difference_95_percent_interval": {
+      "method": "paired Wald interval over per-instance no-preload-minus-preload binary differences",
+      "lower_percentage_points": -5.5637366358582,
+      "upper_percentage_points": -0.03626336414179927
+    },
+    "interpretation": "The realized direction favors preload by 14 cases. The approximate paired Wald interval barely excludes zero, while the exact McNemar test is above 0.05; one sequential realization per arm is insufficient to establish a stable preload effect."
+  },
+  "model_metrics": {
+    "llm_calls": 13405,
+    "prompt_tokens": 225146096,
+    "cached_input_tokens": 219955008,
+    "uncached_input_tokens": 5191088,
+    "completion_tokens": 3565109,
+    "total_tokens": 228711205,
+    "rate_card": {
+      "cached_input_per_million": 2.0,
+      "uncached_input_per_million": 8.0,
+      "output_per_million": 28.0
+    },
+    "estimated_cost": 581.261772,
+    "cost_currency": "billing_unit",
+    "tokens_per_resolved": 587946.5424164524,
+    "cost_per_resolved": 1.4942462005141386
+  },
+  "descriptive_change_vs_preload": {
+    "total_tokens": {
+      "no_preload_minus_preload": -24719081,
+      "percent": -9.753799117758167
+    },
+    "estimated_cost": {
+      "no_preload_minus_preload": -57.321327999999994,
+      "percent": -8.976330253650621
+    },
+    "llm_calls": {
+      "no_preload_minus_preload": -150,
+      "percent": -1.1066027296200664
+    },
+    "tool_calls": {
+      "no_preload_minus_preload": -111,
+      "percent": -0.7872898787148025
+    },
+    "code_search_calls": {
+      "no_preload_minus_preload": 178,
+      "percent": 219.7530864197531
+    },
+    "code_search_result_bytes": {
+      "no_preload_minus_preload": 898147,
+      "percent": 235.30180770238408
+    },
+    "tokens_per_resolved_percent": -6.505863867497541,
+    "cost_per_resolved_percent": -5.700414118820573,
+    "interpretation": "The realized no-preload arm used fewer model tokens and billing units but made substantially more on-demand code_search calls and resolved fewer cases."
+  },
+  "operational_accounting": {
+    "canonical_terminal_artifacts": 500,
+    "discarded_partial_pre_oom_attempts": {
+      "cases_with_preserved_response_objects": 2,
+      "response_objects": 24,
+      "llm_calls": 24,
+      "tool_calls": 25,
+      "prompt_tokens": 148486,
+      "cached_input_tokens": 124224,
+      "uncached_input_tokens": 24262,
+      "completion_tokens": 3888,
+      "total_tokens": 152374,
+      "estimated_cost": 0.551408
+    },
+    "known_operational_lower_bound": {
+      "llm_calls": 13429,
+      "tool_calls": 14013,
+      "prompt_tokens": 225294582,
+      "cached_input_tokens": 220079232,
+      "uncached_input_tokens": 5215350,
+      "completion_tokens": 3568997,
+      "total_tokens": 228863579,
+      "estimated_cost": 581.81318
+    },
+    "interpretation": "The lower bound adds only response objects durably preserved from unfinished pre-OOM attempts. In-flight or unflushed usage is unreconstructable, so actual operational usage may be higher."
+  },
+  "agent_metrics": {
+    "tool_calls": 13988,
+    "case_duration_ms": {
+      "aggregate": 163574838,
+      "count": 500,
+      "mean": 327149.676,
+      "median": 196601.0,
+      "p95_nearest_rank": 937244,
+      "max": 2775830
+    }
+  },
+  "retrieval_metrics": {
+    "raw_workspace_metric_preloaded_documents": 1556,
+    "raw_workspace_metric_preloaded_characters": 2513855,
+    "preload_injected_cases": 0,
+    "model_visible_preloaded_documents": 0,
+    "model_visible_preloaded_characters": 0,
+    "code_search_calls": 259,
+    "code_search_responses": 259,
+    "case_runs_with_code_search": 249,
+    "code_search_result_bytes": 1279847,
+    "metric_interpretation": "The implementation still computes the initial Top-4 retrieval candidates before the injection gate. preload_injected=false for every case, so none entered the initial model prompt."
+  },
+  "workspace_index": {
+    "successful_cases": 500,
+    "representation": "ast-structured",
+    "representation_schema": "workspace-representation/v1;reader=python-ast;tests=include;hidden=include;paths=stable;fallback=file;embedding=structured-code",
+    "retrieval_mode": "hybrid",
+    "documents": 13704528,
+    "eligible_files": 699590,
+    "indexed_files": 699544,
+    "missing_files": 46,
+    "file_coverage_min": 0.9809417040358744,
+    "file_coverage_mean": 0.9999096148323009,
+    "cases_below_full_coverage": 8,
+    "eligible_indexed_count_mismatch_cases": 8,
+    "eligible_indexed_hash_mismatch_cases": 8,
+    "all_fallback_cases": 0,
+    "fallback_documents": 18380,
+    "fallback_document_rate": 0.0013411625705022456,
+    "fallback_reasons": {
+      "no_nodes": 18096,
+      "parse_error": 284
+    },
+    "node_types": {
+      "Class": 2455870,
+      "Function": 2575672,
+      "Interface": 478,
+      "Method": 7324748,
+      "Variable": 1329380,
+      "file": 18380
+    },
+    "content_chars": 6747758849,
+    "embedding_text_chars": 11749853448,
+    "duplicate_documents": 773592,
+    "duplicate_document_rate_weighted": 0.05644791268987885,
+    "duration_ms": {
+      "aggregate": 38767805,
+      "count": 500,
+      "mean": 77535.61,
+      "median": 92589.0,
+      "p95_nearest_rank": 119665,
+      "max": 924758
+    },
+    "coverage_mismatch_diagnosis": {
+      "total_missing_files": 46,
+      "case_count": 8,
+      "classification": "frozen scanner/reader accounting difference; not runtime index loss or recovery loss"
+    }
+  },
+  "embedding": {
+    "requests": 241,
+    "batch_requests": 0,
+    "inputs": 241,
+    "errors": 0,
+    "duration_ms": 18924
+  },
+  "embedding_cache": {
+    "requests": 215143,
+    "batch_requests": 214384,
+    "inputs": 13705287,
+    "hits": 13705046,
+    "misses": 241,
+    "hit_rate": 0.9999824155451834,
+    "writes": 241,
+    "errors": 0,
+    "corruptions": 0,
+    "bytes_read": 55549026304,
+    "bytes_written": 987136,
+    "read_duration_ms": 3312356,
+    "write_duration_ms": 272,
+    "post_oom_quick_check": "ok"
+  },
+  "transport": {
+    "embedding_retry_attempt_1_of_3": 0,
+    "embedding_retry_attempt_2_of_3": 0,
+    "embedding_retry_attempt_3_of_3": 0,
+    "http_502_log_lines": 0,
+    "final_embedding_errors": 0,
+    "fatal_log_lines": 0,
+    "panic_log_lines": 0,
+    "interpretation": "No embedding retry or final transport failure occurred in either retained generation segment."
+  },
+  "resource_events": {
+    "original_generation": {
+      "workers": 15,
+      "terminal_outcomes": 457,
+      "termination": "confirmed global host OOM SIGKILL"
+    },
+    "quality_blind_recovery": {
+      "workers": 6,
+      "terminal_outcomes": 43,
+      "termination": "completed"
+    },
+    "global_oom_classification": "Host infrastructure failure rather than Agent quality; all unfinished cases were recovered quality-blind and all terminal original outcomes were preserved.",
+    "metric_classification": "Resource and timing metrics are observational because V6 and V8 were sequential and had different cache and host histories."
+  },
+  "controlled_context": {
+    "v5r_panel_cases": 54,
+    "v5r_outcomes_per_arm": 108,
+    "v5r_ast_minus_fixed_raw_resolved_outcomes": 0,
+    "v5r_decision": "no expansion and no default promotion",
+    "unchanged_by_v8": true,
+    "scope_note": "V5-R tests representation with preload enabled in both arms. V8 instead tests initial preload within ast-structured."
+  },
+  "validation": {
+    "prediction_count_matches_panel": true,
+    "all_generation_errors_agent_outcomes": true,
+    "all_non_agent_generation_failures_recovered": true,
+    "all_recovery_cases_submitted": true,
+    "original_457_preserved_unchanged": true,
+    "canonical_fingerprints_match": true,
+    "official_harness_exit_zero": true,
+    "official_harness_error_zero": true,
+    "binary_quality_outcome_available_for_all_500": true,
+    "embedding_errors_zero": true,
+    "cache_errors_zero": true,
+    "cache_corruptions_zero": true,
+    "post_oom_cache_quick_check": "ok",
+    "usage_matches_import": true,
+    "llm_calls_match_import_api_calls": true,
+    "code_search_calls_match_responses": true,
+    "json_parse": true,
+    "metric_consistency_assertions": true,
+    "case_list_sha256_verified": true
+  },
+  "decision": {
+    "absolute_no_preload_full_panel_complete": true,
+    "realized_full_panel_direction": "no-preload -14 resolved cases and -2.8 percentage points",
+    "evidence_of_stable_preload_effect": false,
+    "recommend_change_default_preload": false,
+    "revise_v5r_no_expansion": false,
+    "reasons": [
+      "No-preload resolved 389/500 (77.8%) and frozen preload resolved 403/500 (80.6%).",
+      "The paired cells are 371 both, 32 preload-only, 18 no-preload-only, and 79 neither; exact McNemar p=0.0649, while the approximate paired Wald interval is -5.56 to -0.04 percentage points.",
+      "No-preload used 9.75% fewer canonical model tokens and 8.98% less estimated model cost, but code_search calls rose from 81 to 259.",
+      "One sequential realization per arm cannot estimate stochastic run variance or exclude backend-time and persistent-cache effects.",
+      "All 43 outcomes missing at the host OOM boundary were recovered quality-blind, with all 457 terminal original outcomes unchanged."
+    ],
+    "conclusion": "Record the 77.8% no-preload absolute profile and the realized quality/cost/retrieval tradeoff. Do not claim a stable preload effect or automatically change the default from one sequential full-panel replicate."
+  },
+  "limitations": [
+    "One stochastic realization per full-panel arm; no run-to-run variance estimate.",
+    "Sequential V6 then V8 execution; backend-time, host-order, and persistent-cache histories differ.",
+    "The approximate paired Wald interval barely excludes zero, while the exact McNemar p-value is above 0.05.",
+    "One genuine generation call-limit failure is retained as empty and unresolved.",
+    "The original segment ended in global host OOM; 43 unfinished cases were recovered at six workers under a pre-registered quality-blind rule.",
+    "Canonical model usage excludes unfinished pre-OOM work; a preserved-response lower bound is reported, but actual operational usage may be higher.",
+    "Latency, cache, embedding, memory, disk, and initial candidate-retrieval metrics are operational observations rather than preload-causal estimates."
+  ]
+}

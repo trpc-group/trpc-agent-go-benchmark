@@ -1326,3 +1326,114 @@ The repeated-timeout classification and report-integrity rule are in
 Sanitized aggregate metrics, paired estimands, validation, limitations, and
 the decision are in
 [`v7-bge-m3-fixedraw-a500-completion-result.json`](./v7-bge-m3-fixedraw-a500-completion-result.json).
+
+## AST initial-preload ablation full-500
+
+V8 runs `ast-structured` once with `workspace_preload=false` while retaining
+the same implementation, 500-case panel, AST representation and index,
+BGE-M3 hybrid retrieval, model configuration, prompt/tool contract, and
+on-demand `code_search` tool as frozen V6. This is a single-replicate
+sequential comparison. It isolates the recorded preload setting, but it does
+not estimate run-to-run variance or exclude backend-time, host-order, and
+persistent-cache effects.
+
+### No-preload absolute result
+
+The original 15-worker generation segment was killed by confirmed global host
+OOM after freezing 457 terminal outcomes. Before official-harness inspection,
+the 43 unfinished cases were selected from terminal membership alone and
+recovered at six workers under a pre-registered quality-blind amendment. The
+canonical merge retains all 457 original outcomes unchanged and adds exactly
+the 43 recovery outcomes; the recovery is part of the same experiment, not a
+second replicate.
+
+The resulting 500 predictions contain 499 `Submitted` outcomes and one genuine
+`max LLM calls (250) exceeded` Agent failure with an empty patch. The official
+calibrated local harness reported:
+
+| Submitted | Completed patches | Resolved | Non-empty unresolved | Empty | Harness errors |
+|---:|---:|---:|---:|---:|---:|
+| 500 | 499 | **389 (77.8%)** | 110 | 1 | 0 |
+
+Canonical model accounting covers the selected 500 terminal artifacts. Two
+unfinished pre-OOM attempts preserved 24 additional response objects, so the
+known operational lower bound is 228,863,579 tokens and 581.813180 billing
+units; in-flight or unflushed usage is not reconstructable and actual
+operational usage may be higher.
+
+### V8 no-preload minus V6 preload paired outcome
+
+| Paired cell | Cases |
+|---|---:|
+| Both resolved | 371 |
+| Preload only | 32 |
+| No-preload only | 18 |
+| Neither resolved | 79 |
+
+Frozen V6 preload resolved 403/500 (80.6%), versus 389/500 (77.8%) for V8
+no-preload. The realized no-preload-minus-preload difference is **-14 cases /
+-2.8 percentage points**. The exact two-sided McNemar p-value is 0.0649. A
+paired Wald interval over the 500 per-instance binary differences is -5.56 to
+-0.04 percentage points at 95%. The approximate interval barely excludes
+zero while the exact test is above 0.05; together with one sequential
+realization per arm, this does not establish a stable preload effect.
+
+### Model and retrieval profile
+
+| Metric | V6 AST preload | V8 AST no-preload | No-preload change |
+|---|---:|---:|---:|
+| Resolved | 403 (80.6%) | 389 (77.8%) | -14 / -2.8pp |
+| Total tokens | 253,430,286 | 228,711,205 | -9.75% |
+| Estimated billing units | 638.583100 | 581.261772 | -8.98% |
+| Tokens per resolved | 628,859.27 | 587,946.54 | -6.51% |
+| Billing units per resolved | 1.584573 | 1.494246 | -5.70% |
+| LLM / tool calls | 13,555 / 14,099 | 13,405 / 13,988 | -150 / -111 |
+| `code_search` calls / cases | 81 / 80 | 259 / 249 | +178 calls |
+| `code_search` result bytes | 381,700 | 1,279,847 | +235.30% |
+| Initial preload injected cases | 500 | 0 | -500 |
+
+The frozen implementation still computes and records the same initial Top-4
+candidate set before the injection gate: both V6 and V8 report 1,556 candidate
+documents and 2,513,855 candidate characters. In V8,
+`preload_injected=false` for all 500 cases, so none of those candidates entered
+the initial model prompt. The Agent then used on-demand `code_search` much more
+often. Thus the realized tradeoff is lower model-side usage, more dynamic
+retrieval, and lower resolved quality.
+
+### Index, embedding, and cache profile
+
+| Metric | V6 AST preload | V8 AST no-preload |
+|---|---:|---:|
+| AST documents | 13,704,528 | 13,704,528 |
+| Eligible / indexed files | 699,590 / 699,544 | 699,590 / 699,544 |
+| Fallback documents | 18,380 | 18,380 |
+| Weighted duplicate rate | 5.6448% | 5.6448% |
+| Aggregate index duration | 70,726,517 ms | 38,767,805 ms |
+| Embedding inputs | 253,371 | 241 |
+| Cache hits / misses | 13,450,459 / 254,650 | 13,705,046 / 241 |
+| Cache hit rate | 98.1419% | 99.9982% |
+
+The identical document, fallback, node-type, content-character, and duplicate
+totals confirm that V8 retained the V6 AST index. The much warmer cache explains
+the sharply lower embedding work and contributes to the index-time difference;
+neither metric is a preload-causal estimate. The same 46 missing-file counts
+across eight cases remain the previously diagnosed frozen scanner/reader
+accounting differences, not runtime index loss.
+
+### Decision
+
+Record `ast-structured` without initial preload as a 77.8% absolute full-panel
+profile and record the realized quality/cost/retrieval tradeoff. Do **not**
+automatically change the default preload setting or call the -14-case direction
+a stable effect: this is one sequential realization, the exact discordance
+test is above 0.05, and operational histories differ. V5-R tested
+representation rather than preload, so its historical no-expansion decision is
+unchanged.
+
+The pre-registered design and quality-blind OOM recovery are in
+[`v8-bge-m3-ast-no-preload-c500-plan.json`](./v8-bge-m3-ast-no-preload-c500-plan.json)
+and
+[`v8-bge-m3-ast-no-preload-c500-amendment-01.json`](./v8-bge-m3-ast-no-preload-c500-amendment-01.json).
+Sanitized aggregate metrics, canonical and operational accounting, paired
+estimands, validation, limitations, and the decision are in
+[`v8-bge-m3-ast-no-preload-c500-result.json`](./v8-bge-m3-ast-no-preload-c500-result.json).
