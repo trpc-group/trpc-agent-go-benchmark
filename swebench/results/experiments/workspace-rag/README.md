@@ -40,11 +40,12 @@ All variants are framework-generic and use the same opt-in `--code-search`
 path. V3 additionally requires `--embedding-config`; an invocation without the
 flag remains the unchanged baseline.
 
-The runner defaults to `--workspace-preload=true`. A controlled preload
-ablation may pass `--workspace-preload=false`; this still builds the identical
+The current runner defaults to `--workspace-preload=false`: it still builds the
 workspace index and keeps `code_search` available, but does not append
-`workspace_context` to the initial prompt. The manifest records
-`workspace_preload`, and each case records `workspace_index.preload_injected`.
+`workspace_context` to the initial prompt. Pass `--workspace-preload=true`
+only for a controlled legacy preload run. Historical experiments below retain
+their recorded setting. The manifest records `workspace_preload`, and each case
+records `workspace_index.preload_injected`.
 
 ## First evaluation pool
 

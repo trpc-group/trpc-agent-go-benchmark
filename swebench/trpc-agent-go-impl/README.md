@@ -40,10 +40,11 @@ them. `--billing-tag` and `--experiment-id` must be provided together.
 with `--filter`. Its path and SHA-256, a canonical selected-case-set SHA-256,
 the environment-config SHA-256, and an optional `--framework-revision` are
 recorded in the runner manifest.
-Workspace retrieval preloads context by default when `--code-search` is set.
-Use `--workspace-preload=false` to keep the same index and `code_search` tool
-while withholding retrieved context from the initial prompt for a controlled
-ablation.
+Workspace retrieval is on-demand by default when `--code-search` is set: the
+runner builds the task-start index but does not append retrieved context to the
+initial prompt. Pass `--workspace-preload=true` only for a controlled legacy
+preload run; this keeps the same index and `code_search` tool while also
+injecting initial `workspace_context`.
 
 `--workspace-representation` selects the Python indexing representation:
 

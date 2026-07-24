@@ -10,6 +10,7 @@
 package tagagent
 
 import (
+	"encoding/json"
 	"sync"
 
 	"trpc.group/trpc-go/trpc-agent-go/model"
@@ -17,21 +18,33 @@ import (
 
 // State captures one case's terminal value and model accounting.
 type State struct {
-	mu                    sync.Mutex
-	submission            string
-	submitted             bool
-	llmCalls              int
-	toolCalls             int
-	codeSearchCalls       int
-	codeSearchResultBytes int
-	usage                 model.Usage
-	responses             []*model.Response
+	mu                         sync.Mutex
+	submission                 string
+	submitted                  bool
+	llmCalls                   int
+	toolCalls                  int
+	codeSearchCalls            int
+	codeSearchResultBytes      int
+	codeSearchObservationBytes int
+	codeSearchRawResults       []json.RawMessage
+	usage                      model.Usage
+	responses                  []*model.Response
 }
 
-func (s *State) recordCodeSearchResultBytes(size int) {
+func (s *State) recordCodeSearchResult(payload []byte) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.codeSearchResultBytes += size
+	s.codeSearchResultBytes += len(payload)
+	s.codeSearchRawResults = append(
+		s.codeSearchRawResults,
+		append(json.RawMessage(nil), payload...),
+	)
+}
+
+func (s *State) recordCodeSearchObservationBytes(size int) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.codeSearchObservationBytes += size
 }
 
 func (s *State) setSubmission(patch string) {
@@ -81,26 +94,34 @@ func (s *State) Snapshot() Snapshot {
 	for i, response := range s.responses {
 		responses[i] = response.Clone()
 	}
+	rawResults := make([]json.RawMessage, len(s.codeSearchRawResults))
+	for i, raw := range s.codeSearchRawResults {
+		rawResults[i] = append(json.RawMessage(nil), raw...)
+	}
 	return Snapshot{
-		Submission:            s.submission,
-		Submitted:             s.submitted,
-		LLMCalls:              s.llmCalls,
-		ToolCalls:             s.toolCalls,
-		CodeSearchCalls:       s.codeSearchCalls,
-		CodeSearchResultBytes: s.codeSearchResultBytes,
-		Usage:                 s.usage,
-		Responses:             responses,
+		Submission:                 s.submission,
+		Submitted:                  s.submitted,
+		LLMCalls:                   s.llmCalls,
+		ToolCalls:                  s.toolCalls,
+		CodeSearchCalls:            s.codeSearchCalls,
+		CodeSearchResultBytes:      s.codeSearchResultBytes,
+		CodeSearchObservationBytes: s.codeSearchObservationBytes,
+		CodeSearchRawResults:       rawResults,
+		Usage:                      s.usage,
+		Responses:                  responses,
 	}
 }
 
 // Snapshot is the immutable case state consumed by the runner.
 type Snapshot struct {
-	Submission            string
-	Submitted             bool
-	LLMCalls              int
-	ToolCalls             int
-	CodeSearchCalls       int
-	CodeSearchResultBytes int
-	Usage                 model.Usage
-	Responses             []*model.Response
+	Submission                 string
+	Submitted                  bool
+	LLMCalls                   int
+	ToolCalls                  int
+	CodeSearchCalls            int
+	CodeSearchResultBytes      int
+	CodeSearchObservationBytes int
+	CodeSearchRawResults       []json.RawMessage
+	Usage                      model.Usage
+	Responses                  []*model.Response
 }

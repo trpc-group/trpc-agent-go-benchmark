@@ -82,15 +82,27 @@ func TestResolveBillingAgentName(t *testing.T) {
 	}
 }
 
-func TestWorkspacePreloadOptOutRequiresCodeSearch(t *testing.T) {
+func TestWorkspacePreloadRequiresCodeSearch(t *testing.T) {
 	err := Run([]string{
 		"trpc-agent-go-impl",
 		"-run-id=test",
 		"-model-config=unused",
-		"-workspace-preload=false",
+		"-workspace-preload=true",
 	})
 	if err == nil || !strings.Contains(err.Error(), "requires -code-search") {
 		t.Fatalf("error = %v, want code-search requirement", err)
+	}
+}
+
+func TestWorkspacePreloadDefaultsOffWithoutCodeSearch(t *testing.T) {
+	err := Run([]string{
+		"trpc-agent-go-impl",
+		"-run-id=test",
+		"-model-config=unused",
+		"-cases=" + filepath.Join(t.TempDir(), "missing.jsonl"),
+	})
+	if err == nil || !strings.Contains(err.Error(), "hash cases") {
+		t.Fatalf("error = %v, want validation to pass through to cases loading", err)
 	}
 }
 

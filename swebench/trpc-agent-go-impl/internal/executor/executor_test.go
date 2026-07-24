@@ -12,6 +12,8 @@ package executor
 import (
 	"context"
 	"encoding/json"
+	"os"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"sync"
@@ -85,6 +87,14 @@ func (e *fakeEnvironment) Close(context.Context) error {
 	return nil
 }
 
+func (e *fakeEnvironment) SnapshotWorkspace(_ context.Context, destination string) error {
+	return os.WriteFile(filepath.Join(destination, "users.py"), []byte(`
+class UserStore:
+    def find_user_by_email(self, email):
+        return self.users.get(email)
+`), 0o600)
+}
+
 func assistantResponse(content string, calls ...model.ToolCall) *model.Response {
 	usage := &model.Usage{PromptTokens: 10, CompletionTokens: 2, TotalTokens: 12}
 	return &model.Response{
@@ -100,6 +110,14 @@ func bashCall(id, command string) model.ToolCall {
 	return model.ToolCall{
 		ID: id, Type: "function",
 		Function: model.FunctionDefinitionParam{Name: "bash", Arguments: arguments},
+	}
+}
+
+func codeSearchCall(id, query string) model.ToolCall {
+	arguments, _ := json.Marshal(map[string]string{"query": query})
+	return model.ToolCall{
+		ID: id, Type: "function",
+		Function: model.FunctionDefinitionParam{Name: "code_search", Arguments: arguments},
 	}
 }
 
@@ -209,6 +227,9 @@ func TestSubmissionSkipSummarizationDoesNotCallModelAgain(t *testing.T) {
 	if len(modelImpl.requests) != 1 || result.LLMCalls != 1 || result.ToolCalls != 1 {
 		t.Fatalf("calls = requests %d, llm %d, tool %d", len(modelImpl.requests), result.LLMCalls, result.ToolCalls)
 	}
+	if modelImpl.requests[0].ToolOrder != nil {
+		t.Fatalf("native tool order = %#v, want nil", modelImpl.requests[0].ToolOrder)
+	}
 	if !environment.closed {
 		t.Fatal("environment was not closed")
 	}
@@ -233,13 +254,122 @@ func TestEmptyPatchSubmissionIsSubmitted(t *testing.T) {
 	}
 }
 
-func TestWorkspacePreloadOptOutKeepsPromptUnchanged(t *testing.T) {
-	preloaded := "retrieved code"
-	if got := workspaceContextForPrompt(preloaded, false); got != preloaded {
-		t.Fatalf("enabled workspace context = %q, want %q", got, preloaded)
+func TestCodeSearchWithoutPreloadSkipsInitialRetrieval(t *testing.T) {
+	modelImpl := &scriptedModel{responses: []*model.Response{
+		assistantResponse("done", bashCall("submit", "submit")),
+	}}
+	environment := &fakeEnvironment{results: []sweenv.CommandResult{{
+		Output: minicompat.SubmissionMarker + "\npatch\n",
+	}}}
+	exec := newTestExecutor(modelImpl, environment, minicompat.ObservationCodecXML)
+	exec.EnableCodeSearch = true
+
+	result := exec.Execute(context.Background(), contract.Case{
+		InstanceID: "case-a",
+		// BuildContext rejects an empty query. A successful run therefore proves
+		// that no initial retrieval occurred on the no-preload path.
+		ProblemStatement: "",
+	})
+
+	if result.Info.ExitStatus != "Submitted" {
+		t.Fatalf("result = %+v", result)
 	}
-	if got := workspaceContextForPrompt(preloaded, true); got != "" {
-		t.Fatalf("disabled workspace context = %q, want empty", got)
+	if result.WorkspaceIndex.Documents == 0 {
+		t.Fatalf("workspace index was not built: %+v", result.WorkspaceIndex)
+	}
+	if result.WorkspaceIndex.PreloadedDocuments != 0 ||
+		result.WorkspaceIndex.PreloadedChars != 0 ||
+		result.WorkspaceIndex.PreloadInjected {
+		t.Fatalf("no-preload run retrieved initial context: %+v", result.WorkspaceIndex)
+	}
+	if len(modelImpl.requests) != 1 || len(modelImpl.requests[0].Messages) < 2 {
+		t.Fatalf("model requests = %#v", modelImpl.requests)
+	}
+	taskPrompt := modelImpl.requests[0].Messages[1].Content
+	if !strings.Contains(taskPrompt, "Use code_search") {
+		t.Fatalf("task prompt did not select the code-search protocol: %q", taskPrompt)
+	}
+	if strings.Contains(taskPrompt, "<workspace_context>") {
+		t.Fatalf("no-preload prompt contains workspace context: %q", taskPrompt)
+	}
+}
+
+func TestCodeSearchWithExplicitPreloadInjectsInitialContext(t *testing.T) {
+	modelImpl := &scriptedModel{responses: []*model.Response{
+		assistantResponse("done", bashCall("submit", "submit")),
+	}}
+	environment := &fakeEnvironment{results: []sweenv.CommandResult{{
+		Output: minicompat.SubmissionMarker + "\npatch\n",
+	}}}
+	exec := newTestExecutor(modelImpl, environment, minicompat.ObservationCodecXML)
+	exec.EnableCodeSearch = true
+	exec.EnableWorkspacePreload = true
+
+	result := exec.Execute(context.Background(), contract.Case{
+		InstanceID: "case-a", ProblemStatement: "find_user_by_email",
+	})
+
+	if result.Info.ExitStatus != "Submitted" {
+		t.Fatalf("result = %+v", result)
+	}
+	if !result.WorkspaceIndex.PreloadInjected ||
+		result.WorkspaceIndex.PreloadedDocuments == 0 ||
+		result.WorkspaceIndex.PreloadedChars == 0 {
+		t.Fatalf("preload stats = %+v", result.WorkspaceIndex)
+	}
+	if len(modelImpl.requests) != 1 || len(modelImpl.requests[0].Messages) < 2 {
+		t.Fatalf("model requests = %#v", modelImpl.requests)
+	}
+	taskPrompt := modelImpl.requests[0].Messages[1].Content
+	if !strings.Contains(taskPrompt, "<workspace_context>") ||
+		!strings.Contains(taskPrompt, "find_user_by_email") {
+		t.Fatalf("preloaded prompt = %q", taskPrompt)
+	}
+}
+
+func TestCodeSearchOnlyTurnReturnsXMLBeforeBashSubmission(t *testing.T) {
+	modelImpl := &scriptedModel{responses: []*model.Response{
+		assistantResponse("locate the implementation", codeSearchCall("search-1", "find_user_by_email")),
+		assistantResponse("done", bashCall("submit", "submit")),
+	}}
+	environment := &fakeEnvironment{results: []sweenv.CommandResult{{
+		Output: minicompat.SubmissionMarker + "\npatch\n",
+	}}}
+	exec := newTestExecutor(modelImpl, environment, minicompat.ObservationCodecXML)
+	exec.EnableCodeSearch = true
+
+	result := exec.Execute(context.Background(), contract.Case{
+		InstanceID: "case-a", ProblemStatement: "Fix user lookup.",
+	})
+	if result.Info.ExitStatus != "Submitted" || result.CodeSearchCalls != 1 ||
+		result.CodeSearchResultBytes == 0 || result.CodeSearchObservationBytes == 0 ||
+		len(result.CodeSearchRawResults) != 1 {
+		t.Fatalf("result = %+v", result)
+	}
+	var rawResult map[string]any
+	if err := json.Unmarshal(result.CodeSearchRawResults[0], &rawResult); err != nil {
+		t.Fatalf("unmarshal raw code-search result: %v", err)
+	}
+	if _, ok := rawResult["documents"]; !ok {
+		t.Fatalf("raw code-search result = %#v", rawResult)
+	}
+	if len(modelImpl.requests) != 2 {
+		t.Fatalf("model requests = %d, want 2", len(modelImpl.requests))
+	}
+	if got := modelImpl.requests[0].ToolOrder; !reflect.DeepEqual(got, []string{"code_search", "bash"}) {
+		t.Fatalf("tool order = %#v, want code_search before bash", got)
+	}
+	var searchObservation string
+	for _, message := range modelImpl.requests[1].Messages {
+		if message.Role == model.RoleTool && message.ToolName == "code_search" {
+			searchObservation = message.Content
+			break
+		}
+	}
+	if !strings.HasPrefix(searchObservation, `<code_search_results snapshot="task_start">`) ||
+		!strings.Contains(searchObservation, `<result path="users.py"`) ||
+		strings.Contains(searchObservation, `"documents"`) {
+		t.Fatalf("code_search observation = %q", searchObservation)
 	}
 }
 
@@ -269,6 +399,20 @@ func TestValidateRequiresStoreForEnabledEmbeddingCache(t *testing.T) {
 	if err := exec.Validate(); err == nil ||
 		!strings.Contains(err.Error(), "no cache store") {
 		t.Fatalf("Validate() error = %v, want missing cache store", err)
+	}
+}
+
+func TestValidateRequiresCodeSearchForWorkspacePreload(t *testing.T) {
+	exec := newTestExecutor(
+		&scriptedModel{},
+		&fakeEnvironment{},
+		minicompat.ObservationCodecXML,
+	)
+	exec.EnableWorkspacePreload = true
+
+	if err := exec.Validate(); err == nil ||
+		!strings.Contains(err.Error(), "preload requires code search") {
+		t.Fatalf("Validate() error = %v, want code-search requirement", err)
 	}
 }
 

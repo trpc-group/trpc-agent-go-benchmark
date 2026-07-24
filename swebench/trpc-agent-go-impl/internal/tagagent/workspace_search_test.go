@@ -39,6 +39,35 @@ class UserStore:
 `), 0o600)
 }
 
+func TestWorkspaceIndexDoesNotPreloadOnCreation(t *testing.T) {
+	index, stats, err := NewWorkspaceIndexFromEnvironment(
+		context.Background(), snapshotEnvironment{}, "repo__repo-1", nil,
+	)
+	if err != nil {
+		t.Fatalf("NewWorkspaceIndexFromEnvironment() error = %v", err)
+	}
+	defer func() { _ = index.Close() }()
+
+	if stats.PreloadedDocuments != 0 || stats.PreloadedChars != 0 || stats.PreloadInjected {
+		t.Fatalf("workspace creation unexpectedly preloaded context: %+v", stats)
+	}
+	callable, ok := index.Tool().(frameworktool.CallableTool)
+	if !ok {
+		t.Fatalf("search tool type = %T, want CallableTool", index.Tool())
+	}
+	if declaration := index.Tool().Declaration(); declaration == nil ||
+		declaration.Description != workspaceCodeSearchDescription {
+		t.Fatalf("code_search declaration = %#v", declaration)
+	}
+	result, err := callable.Call(context.Background(), []byte(`{"query":"find_user_by_email"}`))
+	if err != nil {
+		t.Fatalf("code_search error = %v", err)
+	}
+	if result == nil {
+		t.Fatal("expected code search result")
+	}
+}
+
 func TestWorkspaceCodeSearchIndexesAndRetrievesPython(t *testing.T) {
 	search, closeSearch, stats, preloaded, err := NewWorkspaceCodeSearch(
 		context.Background(), snapshotEnvironment{}, "repo__repo-1", "find user by email", nil,
@@ -50,7 +79,8 @@ func TestWorkspaceCodeSearchIndexesAndRetrievesPython(t *testing.T) {
 	if stats.Documents == 0 {
 		t.Fatalf("workspace stats = %+v", stats)
 	}
-	if stats.PreloadedDocuments == 0 || stats.PreloadedChars == 0 || preloaded == "" {
+	if !stats.PreloadInjected || stats.PreloadedDocuments == 0 ||
+		stats.PreloadedChars == 0 || preloaded == "" {
 		t.Fatalf("preloaded context = %q, stats = %+v", preloaded, stats)
 	}
 	callable, ok := search.(frameworktool.CallableTool)
@@ -119,7 +149,8 @@ func TestWorkspaceCodeSearchSupportsHybridBatchEmbedding(t *testing.T) {
 		t.Fatalf("NewWorkspaceCodeSearch() error = %v", err)
 	}
 	defer func() { _ = closeSearch() }()
-	if stats.RetrievalMode != "hybrid" || stats.PreloadedDocuments == 0 || preloaded == "" {
+	if stats.RetrievalMode != "hybrid" || !stats.PreloadInjected ||
+		stats.PreloadedDocuments == 0 || preloaded == "" {
 		t.Fatalf("stats = %+v, preloaded = %q", stats, preloaded)
 	}
 }
