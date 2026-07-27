@@ -30,11 +30,11 @@ func New(
 	extraTools ...tool.Tool,
 ) *llmagent.LLMAgent {
 	bash := &bashTool{environment: environment}
-	tools := []tool.Tool{bash}
-	tools = append(tools, extraTools...)
+	tools := append([]tool.Tool(nil), extraTools...)
+	tools = append(tools, bash)
 	instruction := minicompat.SystemPrompt
 	if len(extraTools) > 0 {
-		instruction += " The initial task may include automatically retrieved workspace context; use it as a lead and verify it in the shell. Use code_search for additional focused discovery before broad shell searches."
+		instruction = minicompat.SystemPromptWithCodeSearch
 	}
 	return llmagent.New(
 		"tag-swe-agent",
@@ -47,7 +47,7 @@ func New(
 		llmagent.WithPreserveSameBranch(true),
 		llmagent.WithEnablePostToolPrompt(false),
 		llmagent.WithEnableCodeExecutionResponseProcessor(false),
-		llmagent.WithModelCallbacks(modelCallbacks(state)),
+		llmagent.WithModelCallbacks(modelCallbacks(state, len(extraTools) > 0)),
 		llmagent.WithToolCallbacks(toolCallbacks(state, codec)),
 	)
 }

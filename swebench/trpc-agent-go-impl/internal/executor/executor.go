@@ -12,6 +12,7 @@ package executor
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -41,20 +42,22 @@ type CaseInfo struct {
 
 // CaseResult is the TAG-native result artifact for one instance.
 type CaseResult struct {
-	InstanceID            string                       `json:"instance_id"`
-	Info                  CaseInfo                     `json:"info"`
-	ModelPatch            string                       `json:"model_patch,omitempty"`
-	DurationMS            int64                        `json:"duration_ms"`
-	LLMCalls              int                          `json:"llm_calls"`
-	ToolCalls             int                          `json:"tool_calls"`
-	CodeSearchCalls       int                          `json:"code_search_calls,omitempty"`
-	CodeSearchResultBytes int                          `json:"code_search_result_bytes,omitempty"`
-	WorkspaceIndex        tagagent.WorkspaceIndexStats `json:"workspace_index,omitempty"`
-	Embedding             *embeddingconfig.Metrics     `json:"embedding,omitempty"`
-	EmbeddingCache        *embeddingcache.Metrics      `json:"embedding_cache,omitempty"`
-	Usage                 model.Usage                  `json:"usage"`
-	Events                []*event.Event               `json:"events,omitempty"`
-	Responses             []*model.Response            `json:"-"`
+	InstanceID                 string                       `json:"instance_id"`
+	Info                       CaseInfo                     `json:"info"`
+	ModelPatch                 string                       `json:"model_patch,omitempty"`
+	DurationMS                 int64                        `json:"duration_ms"`
+	LLMCalls                   int                          `json:"llm_calls"`
+	ToolCalls                  int                          `json:"tool_calls"`
+	CodeSearchCalls            int                          `json:"code_search_calls,omitempty"`
+	CodeSearchResultBytes      int                          `json:"code_search_result_bytes,omitempty"`
+	CodeSearchObservationBytes int                          `json:"code_search_observation_bytes,omitempty"`
+	CodeSearchRawResults       []json.RawMessage            `json:"code_search_raw_results,omitempty"`
+	WorkspaceIndex             tagagent.WorkspaceIndexStats `json:"workspace_index,omitempty"`
+	Embedding                  *embeddingconfig.Metrics     `json:"embedding,omitempty"`
+	EmbeddingCache             *embeddingcache.Metrics      `json:"embedding_cache,omitempty"`
+	Usage                      model.Usage                  `json:"usage"`
+	Events                     []*event.Event               `json:"events,omitempty"`
+	Responses                  []*model.Response            `json:"-"`
 }
 
 // Executor owns the per-case TAG model and environment lifecycle.
@@ -65,7 +68,7 @@ type Executor struct {
 	CaseTimeout             time.Duration
 	ModelFactory            func(modelconfig.EnvConfig) model.Model
 	EnableCodeSearch        bool
-	DisableWorkspacePreload bool
+	EnableWorkspacePreload  bool
 	WorkspaceRepresentation tagagent.WorkspaceRepresentation
 	EmbeddingConfig         *embeddingconfig.Config
 	EmbeddingCache          *embeddingcache.Store
@@ -157,25 +160,38 @@ func (e Executor) Execute(ctx context.Context, c contract.Case) (result CaseResu
 				RepositoryName: c.Repo,
 			}
 		}
-		codeSearch, closeSearch, indexStats, preloaded, searchErr := tagagent.NewWorkspaceCodeSearch(
-			caseCtx, environment, c.InstanceID, c.ProblemStatement, workspaceSearchConfig,
+		workspaceIndex, indexStats, searchErr := tagagent.NewWorkspaceIndexFromEnvironment(
+			caseCtx, environment, c.InstanceID, workspaceSearchConfig,
 		)
 		if searchErr != nil {
 			result.Info.Error = searchErr.Error()
 			result.Info.ErrorCategory = minicompat.ErrorCategoryEnvironment
 			return result
 		}
-		defer func() { _ = closeSearch() }()
-		extraTools = append(extraTools, codeSearch)
-		indexStats.PreloadInjected = !e.DisableWorkspacePreload
+		defer func() { _ = workspaceIndex.Close() }()
+		extraTools = append(extraTools, workspaceIndex.Tool())
+		if e.EnableWorkspacePreload {
+			preloaded, preloadErr := workspaceIndex.BuildContext(caseCtx, c.ProblemStatement)
+			if preloadErr != nil {
+				result.Info.Error = fmt.Sprintf("preload workspace context: %v", preloadErr)
+				result.Info.ErrorCategory = minicompat.ErrorCategoryEnvironment
+				return result
+			}
+			indexStats.PreloadedDocuments = preloaded.Documents
+			indexStats.PreloadedChars = preloaded.Chars
+			indexStats.PreloadInjected = true
+			workspaceContext = preloaded.Text
+		}
 		result.WorkspaceIndex = indexStats
-		workspaceContext = workspaceContextForPrompt(preloaded, e.DisableWorkspacePreload)
 	}
 	agentImpl := tagagent.New(modelImpl, environment, e.ObservationCodec, generationConfig(e.ModelConfig), state, extraTools...)
 	run := tagrunner.NewRunner("tag-swebench", agentImpl)
 	defer run.Close()
 
 	taskPrompt := minicompat.PromptForTask(c.ProblemStatement)
+	if e.EnableCodeSearch {
+		taskPrompt = minicompat.PromptForTaskWithCodeSearch(c.ProblemStatement)
+	}
 	if workspaceContext != "" {
 		taskPrompt += "\n\n<workspace_context>\n" + workspaceContext + "\n</workspace_context>"
 	}
@@ -208,6 +224,8 @@ func (e Executor) Execute(ctx context.Context, c contract.Case) (result CaseResu
 	result.ToolCalls = snapshot.ToolCalls
 	result.CodeSearchCalls = snapshot.CodeSearchCalls
 	result.CodeSearchResultBytes = snapshot.CodeSearchResultBytes
+	result.CodeSearchObservationBytes = snapshot.CodeSearchObservationBytes
+	result.CodeSearchRawResults = snapshot.CodeSearchRawResults
 	result.Usage = snapshot.Usage
 	result.Responses = snapshot.Responses
 	switch {
@@ -228,13 +246,6 @@ func (e Executor) Execute(ctx context.Context, c contract.Case) (result CaseResu
 	return result
 }
 
-func workspaceContextForPrompt(preloaded string, disabled bool) string {
-	if disabled {
-		return ""
-	}
-	return preloaded
-}
-
 // Validate checks the executor's required dependencies before workers start.
 func (e Executor) Validate() error {
 	if e.Factory == nil {
@@ -249,6 +260,9 @@ func (e Executor) Validate() error {
 	}
 	if !e.EnableCodeSearch && representation != tagagent.WorkspaceRepresentationCurrentFixed {
 		return fmt.Errorf("workspace representation %q requires code search", representation)
+	}
+	if e.EnableWorkspacePreload && !e.EnableCodeSearch {
+		return fmt.Errorf("workspace preload requires code search")
 	}
 	if e.EmbeddingConfig != nil {
 		if !e.EnableCodeSearch {

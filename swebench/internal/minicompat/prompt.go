@@ -15,6 +15,24 @@ import "strings"
 // SystemPrompt is rendered from v2.1.0 config/benchmarks/swebench.yaml.
 const SystemPrompt = "You are a helpful assistant that can interact with a computer shell to solve programming tasks."
 
+// SystemPromptWithCodeSearch adapts the source-aligned system prompt for an
+// agent that can also search a task-start workspace index.
+const SystemPromptWithCodeSearch = SystemPrompt + " You can also use code_search to search a static task-start snapshot of the workspace."
+
+const codeSearchRouting = `Use code_search to locate relevant code when the implementation location is unclear. Query with identifiers, error text, paths, or expected behavior.
+Use Bash to inspect current files, edit, test, and submit.
+code_search uses a static snapshot captured at task start and is not updated after edits.
+If the results are weak, refine the query or continue with targeted Bash exploration.`
+
+const codeSearchExample = `Example of a CORRECT code_search response:
+<example_response>
+I need to locate the Builder validation implementation.
+
+[Makes a code_search tool call: {"query": "Builder validation and construction flow"}]
+</example_response>
+
+`
+
 const instancePrompt = `<pr_description>
 Consider the following PR description:
 {{task}}
@@ -123,7 +141,44 @@ If the command fails (nonzero exit status), it will not submit.
 </CRITICAL>
 </instructions>`
 
+var codeSearchPromptReplacer = strings.NewReplacer(
+	"You're a software engineer interacting continuously with a computer by submitting commands.",
+	"You're a software engineer interacting continuously with a computer by using tools.",
+	"<IMPORTANT>This is an interactive process where you will think and issue AT LEAST ONE command, see the result, then think and issue your next command(s).</important>",
+	"<IMPORTANT>This is an interactive process where you will think and issue AT LEAST ONE tool call, see the result, then think and issue your next tool call(s).</important>",
+	"2. Provide one or more bash tool calls to execute",
+	"2. Provide one or more tool calls to execute",
+	"## Recommended Workflow\n\n",
+	"## Recommended Workflow\n\n"+codeSearchRouting+"\n\n",
+	"## Command Execution Rules",
+	"## Tool Execution Rules",
+	"1. You issue at least one command",
+	"1. You issue at least one tool call",
+	"3. The system executes the command(s) in a subshell",
+	"3. The system executes the tool call(s); Bash commands run in a subshell",
+	"2. At least one tool call with your command",
+	"2. At least one tool call",
+	"- Your response MUST include AT LEAST ONE bash tool call. You can make MULTIPLE tool calls in a single response when the commands are independent (e.g., searching multiple files, reading different parts of the codebase).",
+	"- Your response MUST include AT LEAST ONE tool call. You can make MULTIPLE tool calls in a single response when the calls are independent (e.g., searching multiple files, reading different parts of the codebase).",
+	"- Directory or environment variable changes are not persistent. Every action is executed in a new subshell.",
+	"- Directory or environment variable changes are not persistent. Every Bash action is executed in a new subshell.",
+	"- However, you can prefix any action with [[BACKTICK]]MY_ENV_VAR=MY_VALUE cd /path/to/working/dir && ...[[BACKTICK]] or write/load environment variables from files",
+	"- However, you can prefix any Bash action with [[BACKTICK]]MY_ENV_VAR=MY_VALUE cd /path/to/working/dir && ...[[BACKTICK]] or write/load environment variables from files",
+	"Example of a CORRECT response:\n",
+	codeSearchExample+"Example of a CORRECT response:\n",
+)
+
 // PromptForTask renders the source-aligned instance prompt.
 func PromptForTask(task string) string {
-	return strings.NewReplacer("{{task}}", task, "[[BACKTICK]]", "`").Replace(instancePrompt)
+	return renderPrompt(instancePrompt, task)
+}
+
+// PromptForTaskWithCodeSearch renders the source-aligned instance prompt with
+// the minimum protocol changes needed to make code_search a first-class tool.
+func PromptForTaskWithCodeSearch(task string) string {
+	return renderPrompt(codeSearchPromptReplacer.Replace(instancePrompt), task)
+}
+
+func renderPrompt(prompt, task string) string {
+	return strings.NewReplacer("{{task}}", task, "[[BACKTICK]]", "`").Replace(prompt)
 }

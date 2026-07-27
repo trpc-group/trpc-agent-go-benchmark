@@ -140,7 +140,7 @@ func Run(args []string) error {
 	experimentID := fs.String("experiment-id", "", "experiment identifier recorded with billing-tag")
 	frameworkRevision := fs.String("framework-revision", "", "framework source revision recorded in the manifest")
 	codeSearch := fs.Bool("code-search", false, "enable local workspace code retrieval")
-	workspacePreload := fs.Bool("workspace-preload", true, "inject retrieved workspace context into the initial prompt")
+	workspacePreload := fs.Bool("workspace-preload", false, "inject retrieved workspace context into the initial prompt")
 	workspaceRepresentationValue := fs.String(
 		"workspace-representation",
 		string(tagagent.WorkspaceRepresentationCurrentFixed),
@@ -164,8 +164,8 @@ func Run(args []string) error {
 	if strings.TrimSpace(*embeddingConfigPath) != "" && !*codeSearch {
 		return fmt.Errorf("-embedding-config requires -code-search")
 	}
-	if !*workspacePreload && !*codeSearch {
-		return fmt.Errorf("-workspace-preload=false requires -code-search")
+	if *workspacePreload && !*codeSearch {
+		return fmt.Errorf("-workspace-preload=true requires -code-search")
 	}
 	workspaceRepresentation, err := tagagent.ParseWorkspaceRepresentation(*workspaceRepresentationValue)
 	if err != nil {
@@ -279,7 +279,7 @@ func Run(args []string) error {
 	}
 	exec := executor.Executor{
 		Factory: factory, ModelConfig: modelCfg, ObservationCodec: codec, CaseTimeout: *caseTimeout,
-		EnableCodeSearch: *codeSearch, DisableWorkspacePreload: !*workspacePreload, EmbeddingConfig: embeddingCfg,
+		EnableCodeSearch: *codeSearch, EnableWorkspacePreload: *workspacePreload, EmbeddingConfig: embeddingCfg,
 		EmbeddingCache: embeddingCache, WorkspaceRepresentation: workspaceRepresentation,
 	}
 	if err := exec.Validate(); err != nil {

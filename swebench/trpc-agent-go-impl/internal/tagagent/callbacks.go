@@ -21,10 +21,15 @@ import (
 	"trpc.group/trpc-go/trpc-agent-go/tool"
 )
 
-func modelCallbacks(state *State) *model.Callbacks {
+func modelCallbacks(state *State, allowCodeSearch bool) *model.Callbacks {
 	callbacks := model.NewCallbacks()
-	callbacks.RegisterBeforeModel(func(context.Context, *model.BeforeModelArgs) (*model.BeforeModelResult, error) {
+	callbacks.RegisterBeforeModel(func(_ context.Context, args *model.BeforeModelArgs) (*model.BeforeModelResult, error) {
 		state.recordModelCall()
+		if allowCodeSearch && args != nil && args.Request != nil {
+			if _, ok := args.Request.Tools["code_search"]; ok {
+				args.Request.ToolOrder = []string{"code_search", "bash"}
+			}
+		}
 		return nil, nil
 	})
 	callbacks.RegisterAfterModel(func(_ context.Context, args *model.AfterModelArgs) (*model.AfterModelResult, error) {
@@ -39,7 +44,7 @@ func modelCallbacks(state *State) *model.Callbacks {
 		if len(response.Choices) == 0 {
 			return nil, errors.New("model response contains no choices")
 		}
-		_, err := parseBashActions(response.Choices[0].Message.ToolCalls)
+		_, err := parseToolActions(response.Choices[0].Message.ToolCalls, allowCodeSearch)
 		if err == nil {
 			return nil, nil
 		}
@@ -56,19 +61,24 @@ func modelCallbacks(state *State) *model.Callbacks {
 	return callbacks
 }
 
-func parseBashActions(toolCalls []model.ToolCall) ([]minicompat.Action, error) {
+func parseToolActions(toolCalls []model.ToolCall, allowCodeSearch bool) ([]minicompat.Action, error) {
 	bashCalls := make([]model.ToolCall, 0, len(toolCalls))
+	hasCodeSearch := false
 	for _, call := range toolCalls {
-		if call.Function.Name == "bash" {
+		switch call.Function.Name {
+		case "bash":
 			bashCalls = append(bashCalls, call)
+		case "code_search":
+			hasCodeSearch = true
 		}
 	}
-	if len(bashCalls) == 0 {
-		// Preserve the mini-SWE protocol requirement and its exact feedback for
-		// responses that contain no bash call, including code_search-only turns.
-		return minicompat.ParseActions(nil)
+	if len(bashCalls) > 0 {
+		return minicompat.ParseActions(bashCalls)
 	}
-	return minicompat.ParseActions(bashCalls)
+	if allowCodeSearch && hasCodeSearch {
+		return nil, nil
+	}
+	return minicompat.ParseActions(nil)
 }
 
 func toolCallbacks(state *State, codec minicompat.ObservationCodec) *tool.Callbacks {
@@ -83,7 +93,7 @@ func toolCallbacks(state *State, codec minicompat.ObservationCodec) *tool.Callba
 		if args.ToolName != "bash" {
 			if args.ToolName == "code_search" {
 				if payload, err := json.Marshal(args.Result); err == nil {
-					state.recordCodeSearchResultBytes(len(payload))
+					state.recordCodeSearchResult(payload)
 				}
 			}
 			return nil, nil
@@ -103,7 +113,16 @@ func toolCallbacks(state *State, codec minicompat.ObservationCodec) *tool.Callba
 		if input == nil {
 			return nil, errors.New("nil tool result input")
 		}
-		if input.ToolName != "bash" {
+		switch input.ToolName {
+		case "code_search":
+			observation, err := formatCodeSearchXMLLike(input.Result)
+			if err != nil {
+				return nil, err
+			}
+			state.recordCodeSearchObservationBytes(len([]byte(observation)))
+			return model.NewToolMessage(input.ToolCallID, "code_search", observation), nil
+		case "bash":
+		default:
 			return nil, nil
 		}
 		result, ok := input.Result.(sweenv.CommandResult)

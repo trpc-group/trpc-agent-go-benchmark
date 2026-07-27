@@ -140,6 +140,8 @@ type WorkspaceIndex struct {
 	config    *WorkspaceSearchConfig
 }
 
+const workspaceCodeSearchDescription = "Search the static task-start workspace index and return relevant source excerpts with paths, line ranges, and symbols. Results may reflect code before your edits."
+
 // Search retrieves raw documents for offline replay and diagnostics.
 func (i *WorkspaceIndex) Search(
 	ctx context.Context,
@@ -180,6 +182,7 @@ func (i *WorkspaceIndex) BuildContext(
 func (i *WorkspaceIndex) Tool() tool.Tool {
 	return knowledgetool.NewCompactCodeSearchTool(
 		i.knowledge,
+		knowledgetool.WithCodeSearchToolDescription(workspaceCodeSearchDescription),
 		knowledgetool.WithCodeSearchMode(i.config.SearchMode),
 		knowledgetool.WithCodeSearchMaxResults(6),
 		knowledgetool.WithCodeSearchMinScore(0),
@@ -197,8 +200,9 @@ func (i *WorkspaceIndex) Close() error {
 	return i.knowledge.Close()
 }
 
-// NewWorkspaceCodeSearch snapshots and indexes one environment, returning a
-// compact code-search tool and a cleanup function.
+// NewWorkspaceCodeSearch snapshots and indexes one environment, then performs
+// an explicit initial retrieval. On-demand-only callers should use
+// NewWorkspaceIndexFromEnvironment and Tool directly.
 func NewWorkspaceCodeSearch(
 	ctx context.Context,
 	environment sweenv.Environment,
@@ -222,6 +226,7 @@ func NewWorkspaceCodeSearch(
 	}
 	stats.PreloadedDocuments = preloaded.Documents
 	stats.PreloadedChars = preloaded.Chars
+	stats.PreloadInjected = true
 	return index.Tool(), index.Close, stats, preloaded.Text, nil
 }
 
