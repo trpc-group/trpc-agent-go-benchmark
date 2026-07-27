@@ -72,7 +72,12 @@ func (f DockerFactory) Start(ctx context.Context, instanceID string) (Environmen
 		name = name[:maxBase]
 	}
 	name += suffix
-	args := []string{"run", "-d", "--rm", "--name", name}
+	args := []string{
+		"run", "-d", "--rm",
+		"--pull=never",
+		"--network=none",
+		"--name", name,
+	}
 	labelKeys := make([]string, 0, len(f.Labels))
 	for key := range f.Labels {
 		labelKeys = append(labelKeys, key)

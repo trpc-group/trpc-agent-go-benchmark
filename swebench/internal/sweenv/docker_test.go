@@ -80,7 +80,9 @@ func TestDockerFactoryLifecycle(t *testing.T) {
 		t.Fatalf("commands = %d, want 4", len(commander.commands))
 	}
 	start := strings.Join(commander.commands[0].args, " ")
-	if !strings.Contains(start, "--label tag-swebench.run_id=run-1") || !strings.Contains(start, "-w /testbed") || !strings.Contains(start, ImageForInstance("repo__repo-1")) {
+	if !strings.Contains(start, "--pull=never") || !strings.Contains(start, "--network=none") ||
+		!strings.Contains(start, "--label tag-swebench.run_id=run-1") || !strings.Contains(start, "-w /testbed") ||
+		!strings.Contains(start, ImageForInstance("repo__repo-1")) {
 		t.Fatalf("start command = %q", start)
 	}
 	execute := strings.Join(commander.commands[1].args, " ")

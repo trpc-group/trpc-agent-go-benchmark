@@ -15,9 +15,21 @@ import "strings"
 // SystemPrompt is rendered from v2.1.0 config/benchmarks/swebench.yaml.
 const SystemPrompt = "You are a helpful assistant that can interact with a computer shell to solve programming tasks."
 
+const offlineGuidance = "The shell has no public internet access; only declared local services are reachable. " +
+	"Use the PR description, repository and local history, local tests, and locally available tools and dependencies. " +
+	"If an optional dependency is absent, continue with the available evidence."
+
+// OfflineSystemPrompt adapts the source-aligned system prompt for an isolated
+// generation environment.
+const OfflineSystemPrompt = SystemPrompt + " " + offlineGuidance
+
 // SystemPromptWithCodeSearch adapts the source-aligned system prompt for an
 // agent that can also search a task-start workspace index.
 const SystemPromptWithCodeSearch = SystemPrompt + " You can also use code_search to search a static task-start snapshot of the workspace."
+
+// OfflineSystemPromptWithCodeSearch combines the isolated environment
+// guidance with the code-search capability description.
+const OfflineSystemPromptWithCodeSearch = OfflineSystemPrompt + " You can also use code_search to search a static task-start snapshot of the workspace."
 
 const codeSearchRouting = `Use code_search to locate relevant code when the implementation location is unclear. Query with identifiers, error text, paths, or expected behavior.
 Use Bash to inspect current files, edit, test, and submit.
@@ -168,15 +180,33 @@ var codeSearchPromptReplacer = strings.NewReplacer(
 	codeSearchExample+"Example of a CORRECT response:\n",
 )
 
+var offlinePromptReplacer = strings.NewReplacer(
+	"\n- If a tool isn't available, you can also install it\n",
+	"\n",
+)
+
 // PromptForTask renders the source-aligned instance prompt.
 func PromptForTask(task string) string {
 	return renderPrompt(instancePrompt, task)
+}
+
+// PromptForTaskOffline renders the instance prompt for an isolated generation
+// environment while preserving PromptForTask as the upstream-compatible form.
+func PromptForTaskOffline(task string) string {
+	return renderPrompt(offlinePromptReplacer.Replace(instancePrompt), task)
 }
 
 // PromptForTaskWithCodeSearch renders the source-aligned instance prompt with
 // the minimum protocol changes needed to make code_search a first-class tool.
 func PromptForTaskWithCodeSearch(task string) string {
 	return renderPrompt(codeSearchPromptReplacer.Replace(instancePrompt), task)
+}
+
+// PromptForTaskWithCodeSearchOffline renders the code-search protocol for an
+// isolated generation environment.
+func PromptForTaskWithCodeSearchOffline(task string) string {
+	prompt := codeSearchPromptReplacer.Replace(instancePrompt)
+	return renderPrompt(offlinePromptReplacer.Replace(prompt), task)
 }
 
 func renderPrompt(prompt, task string) string {

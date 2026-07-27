@@ -15,9 +15,26 @@ import (
 )
 
 func TestCodeSearchSystemPrompt(t *testing.T) {
-	const want = "You are a helpful assistant that can interact with a computer shell to solve programming tasks. You can also use code_search to search a static task-start snapshot of the workspace."
-	if SystemPromptWithCodeSearch != want {
-		t.Fatalf("SystemPromptWithCodeSearch = %q, want %q", SystemPromptWithCodeSearch, want)
+	const want = "You are a helpful assistant that can interact with a computer shell to solve programming tasks. " +
+		"The shell has no public internet access; only declared local services are reachable. " +
+		"Use the PR description, repository and local history, local tests, and locally available tools and dependencies. " +
+		"If an optional dependency is absent, continue with the available evidence. " +
+		"You can also use code_search to search a static task-start snapshot of the workspace."
+	if OfflineSystemPromptWithCodeSearch != want {
+		t.Fatalf("OfflineSystemPromptWithCodeSearch = %q, want %q", OfflineSystemPromptWithCodeSearch, want)
+	}
+}
+
+func TestPromptUsesOfflineEnvironmentGuidance(t *testing.T) {
+	for name, prompt := range map[string]string{
+		"native":      PromptForTaskOffline("Fix it."),
+		"code-search": PromptForTaskWithCodeSearchOffline("Fix it."),
+	} {
+		t.Run(name, func(t *testing.T) {
+			if strings.Contains(prompt, "you can also install it") {
+				t.Fatal("prompt encourages installing unavailable tools")
+			}
+		})
 	}
 }
 

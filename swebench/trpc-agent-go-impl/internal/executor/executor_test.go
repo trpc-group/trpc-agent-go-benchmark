@@ -230,6 +230,7 @@ func TestSubmissionSkipSummarizationDoesNotCallModelAgain(t *testing.T) {
 	if modelImpl.requests[0].ToolOrder != nil {
 		t.Fatalf("native tool order = %#v, want nil", modelImpl.requests[0].ToolOrder)
 	}
+	assertOfflineRequestPrompts(t, modelImpl.requests[0], false)
 	if !environment.closed {
 		t.Fatal("environment was not closed")
 	}
@@ -285,12 +286,30 @@ func TestCodeSearchWithoutPreloadSkipsInitialRetrieval(t *testing.T) {
 	if len(modelImpl.requests) != 1 || len(modelImpl.requests[0].Messages) < 2 {
 		t.Fatalf("model requests = %#v", modelImpl.requests)
 	}
+	assertOfflineRequestPrompts(t, modelImpl.requests[0], true)
 	taskPrompt := modelImpl.requests[0].Messages[1].Content
 	if !strings.Contains(taskPrompt, "Use code_search") {
 		t.Fatalf("task prompt did not select the code-search protocol: %q", taskPrompt)
 	}
 	if strings.Contains(taskPrompt, "<workspace_context>") {
 		t.Fatalf("no-preload prompt contains workspace context: %q", taskPrompt)
+	}
+}
+
+func assertOfflineRequestPrompts(t *testing.T, request *model.Request, codeSearch bool) {
+	t.Helper()
+	if len(request.Messages) < 2 {
+		t.Fatalf("request messages = %#v", request.Messages)
+	}
+	wantSystem := minicompat.OfflineSystemPrompt
+	if codeSearch {
+		wantSystem = minicompat.OfflineSystemPromptWithCodeSearch
+	}
+	if request.Messages[0].Role != model.RoleSystem || request.Messages[0].Content != wantSystem {
+		t.Fatalf("system message = %#v, want %q", request.Messages[0], wantSystem)
+	}
+	if strings.Contains(request.Messages[1].Content, "you can also install it") {
+		t.Fatalf("user prompt encourages installing unavailable tools: %q", request.Messages[1].Content)
 	}
 }
 

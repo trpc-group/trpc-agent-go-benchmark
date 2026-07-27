@@ -32,9 +32,9 @@ func New(
 	bash := &bashTool{environment: environment}
 	tools := append([]tool.Tool(nil), extraTools...)
 	tools = append(tools, bash)
-	instruction := minicompat.SystemPrompt
+	instruction := minicompat.OfflineSystemPrompt
 	if len(extraTools) > 0 {
-		instruction = minicompat.SystemPromptWithCodeSearch
+		instruction = minicompat.OfflineSystemPromptWithCodeSearch
 	}
 	return llmagent.New(
 		"tag-swe-agent",

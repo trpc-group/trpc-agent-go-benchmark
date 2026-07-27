@@ -188,9 +188,9 @@ func (e Executor) Execute(ctx context.Context, c contract.Case) (result CaseResu
 	run := tagrunner.NewRunner("tag-swebench", agentImpl)
 	defer run.Close()
 
-	taskPrompt := minicompat.PromptForTask(c.ProblemStatement)
+	taskPrompt := minicompat.PromptForTaskOffline(c.ProblemStatement)
 	if e.EnableCodeSearch {
-		taskPrompt = minicompat.PromptForTaskWithCodeSearch(c.ProblemStatement)
+		taskPrompt = minicompat.PromptForTaskWithCodeSearchOffline(c.ProblemStatement)
 	}
 	if workspaceContext != "" {
 		taskPrompt += "\n\n<workspace_context>\n" + workspaceContext + "\n</workspace_context>"
