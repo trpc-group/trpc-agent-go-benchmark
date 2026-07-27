@@ -47,6 +47,7 @@ type DockerFactory struct {
 	CaseTimeout    time.Duration
 	Commander      Commander
 	Labels         map[string]string
+	HTTPBinCerts   *OfflineHTTPBinCerts
 }
 
 // ImageForInstance returns the official SWE-Bench image name.
@@ -78,6 +79,10 @@ func (f DockerFactory) Start(ctx context.Context, instanceID string) (Environmen
 		"--network=none",
 		"--name", name,
 	}
+	useHTTPBin := usesOfflineHTTPBin(instanceID)
+	if useHTTPBin {
+		args = append(args, "--add-host", offlineHTTPBinHost+":127.0.0.1")
+	}
 	labelKeys := make([]string, 0, len(f.Labels))
 	for key := range f.Labels {
 		labelKeys = append(labelKeys, key)
@@ -91,13 +96,20 @@ func (f DockerFactory) Start(ctx context.Context, instanceID string) (Environmen
 	if err != nil {
 		return nil, fmt.Errorf("start Docker testbed: %w: %s", err, strings.TrimSpace(string(out)))
 	}
-	return &dockerEnvironment{
+	environment := &dockerEnvironment{
 		name:           name,
 		config:         f.Config,
 		dockerHost:     f.DockerHost,
 		commandTimeout: f.CommandTimeout,
 		commander:      commander,
-	}, nil
+	}
+	if useHTTPBin {
+		if err := f.startOfflineHTTPBin(ctx, environment); err != nil {
+			_ = environment.Close(context.Background())
+			return nil, err
+		}
+	}
+	return environment, nil
 }
 
 type dockerEnvironment struct {
@@ -106,6 +118,8 @@ type dockerEnvironment struct {
 	dockerHost     string
 	commandTimeout time.Duration
 	commander      Commander
+	sidecars       []string
+	extraEnv       map[string]string
 }
 
 func (e *dockerEnvironment) Execute(ctx context.Context, command string) CommandResult {
@@ -116,7 +130,20 @@ func (e *dockerEnvironment) Execute(ctx context.Context, command string) Command
 	commandCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 	args := []string{"exec", "-w", "/testbed"}
+	environment := make(map[string]string, len(e.config.Environment.Env)+len(e.extraEnv))
 	for key, value := range e.config.Environment.Env {
+		environment[key] = value
+	}
+	for key, value := range e.extraEnv {
+		environment[key] = value
+	}
+	keys := make([]string, 0, len(environment))
+	for key := range environment {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	for _, key := range keys {
+		value := environment[key]
 		args = append(args, "-e", key+"="+value)
 	}
 	args = append(args, e.name)
@@ -162,11 +189,15 @@ func (e *dockerEnvironment) SnapshotWorkspace(ctx context.Context, destination s
 }
 
 func (e *dockerEnvironment) Close(ctx context.Context) error {
-	out, err := e.commander.Run(ctx, dockerEnv(e.dockerHost), "docker", "rm", "-f", e.name)
-	if err != nil {
-		return fmt.Errorf("remove Docker testbed: %w: %s", err, strings.TrimSpace(string(out)))
+	containers := append(append([]string(nil), e.sidecars...), e.name)
+	var closeErrs []error
+	for _, name := range containers {
+		out, err := e.commander.Run(ctx, dockerEnv(e.dockerHost), "docker", "rm", "-f", name)
+		if err != nil {
+			closeErrs = append(closeErrs, fmt.Errorf("remove Docker container %s: %w: %s", name, err, strings.TrimSpace(string(out))))
+		}
 	}
-	return nil
+	return errors.Join(closeErrs...)
 }
 
 func dockerEnv(host string) []string {

@@ -11,6 +11,8 @@ package sweenv
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -111,5 +113,99 @@ func TestDockerCommandTimeout(t *testing.T) {
 	result := environment.Execute(context.Background(), "sleep 10")
 	if result.ReturnCode != -1 || !result.TimedOut || result.Output != "partial" || !strings.HasPrefix(result.ExceptionInfo, "An error occurred while executing the command:") {
 		t.Fatalf("result = %#v", result)
+	}
+}
+
+func TestDockerFactoryStartsOfflineHTTPBinForRequests(t *testing.T) {
+	certDir := t.TempDir()
+	certs := OfflineHTTPBinCerts{
+		CABundle:   filepath.Join(certDir, "ca.pem"),
+		ServerCert: filepath.Join(certDir, "server.crt"),
+		ServerKey:  filepath.Join(certDir, "server.key"),
+	}
+	for _, path := range []string{certs.CABundle, certs.ServerCert, certs.ServerKey} {
+		if err := os.WriteFile(path, []byte("test"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	commander := &fakeCommander{}
+	var cfg Config
+	cfg.Environment.Env = map[string]string{"HTTPBIN_URL": "https://public.invalid"}
+	cfg.Environment.Interpreter = []string{"bash", "-lc"}
+	factory := DockerFactory{
+		Config: cfg, CommandTimeout: time.Minute, CaseTimeout: time.Hour,
+		Commander: commander, HTTPBinCerts: &certs,
+		Labels: map[string]string{"tag-swebench.run_id": "run-requests"},
+	}
+	environment, err := factory.Start(context.Background(), "psf__requests-6028")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(commander.commands) != 8 {
+		t.Fatalf("startup commands = %d, want 8", len(commander.commands))
+	}
+	testbedStart := strings.Join(commander.commands[0].args, " ")
+	if !strings.Contains(testbedStart, "--network=none") ||
+		!strings.Contains(testbedStart, "--add-host httpbin.org:127.0.0.1") {
+		t.Fatalf("testbed start command = %q", testbedStart)
+	}
+	sidecarStart := strings.Join(commander.commands[2].args, " ")
+	if !strings.Contains(sidecarStart, "--pull=never") ||
+		!strings.Contains(sidecarStart, "--network=container:tag-swe-psf__requests-6028") ||
+		!strings.Contains(sidecarStart, "kennethreitz/httpbin") {
+		t.Fatalf("sidecar start command = %q", sidecarStart)
+	}
+	launch := strings.Join(commander.commands[5].args, " ")
+	if !strings.Contains(launch, "exec -d") || !strings.Contains(launch, "127.0.0.1:80") ||
+		!strings.Contains(launch, "127.0.0.1:443") {
+		t.Fatalf("sidecar launch command = %q", launch)
+	}
+	if result := environment.Execute(context.Background(), "pytest -q"); result.ReturnCode != 0 {
+		t.Fatalf("Execute() = %+v", result)
+	}
+	execute := strings.Join(commander.commands[8].args, " ")
+	for _, expected := range []string{
+		"-e CURL_CA_BUNDLE=" + offlineHTTPBinCACertPath,
+		"-e HTTPBIN_URL=http://httpbin.org",
+		"-e REQUESTS_CA_BUNDLE=" + offlineHTTPBinCACertPath,
+		"-e SSL_CERT_FILE=" + offlineHTTPBinCACertPath,
+	} {
+		if !strings.Contains(execute, expected) {
+			t.Fatalf("execute command %q does not contain %q", execute, expected)
+		}
+	}
+	if strings.Contains(execute, "https://public.invalid") {
+		t.Fatalf("offline service environment was overridden: %q", execute)
+	}
+	if err := environment.Close(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if len(commander.commands) != 11 {
+		t.Fatalf("lifecycle commands = %d, want 11", len(commander.commands))
+	}
+	removeSidecar := strings.Join(commander.commands[9].args, " ")
+	removeTestbed := strings.Join(commander.commands[10].args, " ")
+	if !strings.Contains(removeSidecar, "rm -f") || !strings.Contains(removeSidecar, "-httpbin") {
+		t.Fatalf("remove sidecar command = %q", removeSidecar)
+	}
+	if !strings.Contains(removeTestbed, "rm -f tag-swe-psf__requests-6028") {
+		t.Fatalf("remove testbed command = %q", removeTestbed)
+	}
+}
+
+func TestGenerateOfflineHTTPBinCerts(t *testing.T) {
+	certs, err := generateOfflineHTTPBinCerts(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := validateOfflineHTTPBinCerts(certs); err != nil {
+		t.Fatal(err)
+	}
+	caData, err := os.ReadFile(certs.CABundle)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(caData), "BEGIN CERTIFICATE") {
+		t.Fatalf("CA bundle is not PEM: %q", caData)
 	}
 }
