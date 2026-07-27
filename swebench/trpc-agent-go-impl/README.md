@@ -111,14 +111,9 @@ Recall@6 or hunk-anchor gain, then run the winning AST representation against
 panel after that Agent result preserves or improves official-harness resolve
 rate.
 
-The Python AST reader is a separate Go module. Until the benchmark pins a
-published reader revision, add it to the same Go workspace as the benchmark
-and framework root:
-
-```bash
-go work use \
-  /data/validation/trpc-agent-go/knowledge/document/reader/python
-```
+The benchmark pins both the framework and the separate Python AST reader module
+in `swebench/go.mod`, so a local framework checkout or Go workspace is not
+required to build this runner.
 
 Each output directory contains:
 

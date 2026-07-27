@@ -7,6 +7,7 @@ require (
 	github.com/openai/openai-go v1.12.0
 	gopkg.in/yaml.v3 v3.0.1
 	trpc.group/trpc-go/trpc-agent-go v1.10.1-0.20260616104537-c6c3bb29ab60
+	trpc.group/trpc-go/trpc-agent-go/knowledge/document/reader/python v0.0.0-20260724093248-358d37678488
 )
 
 require (
@@ -44,3 +45,7 @@ require (
 	google.golang.org/protobuf v1.34.2 // indirect
 	trpc.group/trpc-go/trpc-a2a-go v0.2.5 // indirect
 )
+
+replace trpc.group/trpc-go/trpc-agent-go => github.com/hr-chang/trpc-agent-go v0.0.0-20260724093248-358d37678488
+
+replace trpc.group/trpc-go/trpc-agent-go/knowledge/document/reader/python => github.com/hr-chang/trpc-agent-go/knowledge/document/reader/python v0.0.0-20260724093248-358d37678488
