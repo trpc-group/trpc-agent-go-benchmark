@@ -118,13 +118,24 @@ func (f DockerFactory) startOfflineHTTPBin(ctx context.Context, environment *doc
 	if err := waitOfflineHTTPBin(ctx, environment); err != nil {
 		return err
 	}
-	environment.extraEnv = map[string]string{
+	environment.setExtraEnv(map[string]string{
 		"CURL_CA_BUNDLE":     offlineHTTPBinCACertPath,
 		"HTTPBIN_URL":        "http://" + offlineHTTPBinHost,
+		"NO_PROXY":           "localhost,127.0.0.1,httpbin.org,10.255.255.1",
 		"REQUESTS_CA_BUNDLE": offlineHTTPBinCACertPath,
 		"SSL_CERT_FILE":      offlineHTTPBinCACertPath,
-	}
+		"no_proxy":           "localhost,127.0.0.1,httpbin.org,10.255.255.1",
+	})
 	return nil
+}
+
+func (e *dockerEnvironment) setExtraEnv(values map[string]string) {
+	if e.extraEnv == nil {
+		e.extraEnv = make(map[string]string, len(values))
+	}
+	for key, value := range values {
+		e.extraEnv[key] = value
+	}
 }
 
 func (f DockerFactory) dockerCopy(ctx context.Context, source, destination string) error {

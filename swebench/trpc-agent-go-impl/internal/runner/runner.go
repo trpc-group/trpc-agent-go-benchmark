@@ -134,6 +134,11 @@ func Run(args []string) error {
 	commandTimeout := fs.Duration("command-timeout", time.Minute, "timeout for each bash tool call")
 	caseTimeout := fs.Duration("case-timeout", 2*time.Hour, "timeout for each case")
 	dockerHost := fs.String("docker-host", "", "optional Docker daemon endpoint")
+	offlineAssetsDir := fs.String(
+		"offline-assets-dir",
+		"",
+		"host directory prepared by scripts/prepare-offline-assets.sh; required by affected requests cases",
+	)
 	redoExisting := fs.Bool("redo-existing", false, "rerun selected cases already present in preds.json")
 	codecValue := fs.String("observation-codec", string(minicompat.ObservationCodecXML), "observation codec: xml, json, or text")
 	billingTag := fs.String("billing-tag", "", "suffix appended to X-SMG-Agent-Name for billing isolation")
@@ -230,6 +235,13 @@ func Run(args []string) error {
 	if err != nil {
 		return err
 	}
+	selectedIDs := make([]string, 0, len(selected))
+	for _, selectedCase := range selected {
+		selectedIDs = append(selectedIDs, selectedCase.InstanceID)
+	}
+	if err := sweenv.ValidateOfflineAssets(*offlineAssetsDir, selectedIDs); err != nil {
+		return err
+	}
 	selectedCaseSetHash := selectedCaseSetSHA256(selected)
 	modelCfg, err := modelconfig.Load(*modelConfigPath)
 	if err != nil {
@@ -275,7 +287,8 @@ func Run(args []string) error {
 	}
 	factory := sweenv.DockerFactory{
 		Config: envCfg, DockerHost: *dockerHost, CommandTimeout: *commandTimeout, CaseTimeout: *caseTimeout,
-		Labels: map[string]string{"tag-swebench.run_id": *runID},
+		Labels: map[string]string{"tag-swebench.run_id": *runID}, EnableOfflineServices: true,
+		OfflineAssetsDir: *offlineAssetsDir,
 	}
 	exec := executor.Executor{
 		Factory: factory, ModelConfig: modelCfg, ObservationCodec: codec, CaseTimeout: *caseTimeout,

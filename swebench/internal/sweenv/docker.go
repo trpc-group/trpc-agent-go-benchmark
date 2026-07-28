@@ -41,13 +41,15 @@ func (osCommander) Run(ctx context.Context, env []string, name string, args ...s
 
 // DockerFactory creates official SWE-Bench per-instance containers.
 type DockerFactory struct {
-	Config         Config
-	DockerHost     string
-	CommandTimeout time.Duration
-	CaseTimeout    time.Duration
-	Commander      Commander
-	Labels         map[string]string
-	HTTPBinCerts   *OfflineHTTPBinCerts
+	Config                Config
+	DockerHost            string
+	CommandTimeout        time.Duration
+	CaseTimeout           time.Duration
+	Commander             Commander
+	Labels                map[string]string
+	EnableOfflineServices bool
+	OfflineAssetsDir      string
+	HTTPBinCerts          *OfflineHTTPBinCerts
 }
 
 // ImageForInstance returns the official SWE-Bench image name.
@@ -79,9 +81,16 @@ func (f DockerFactory) Start(ctx context.Context, instanceID string) (Environmen
 		"--network=none",
 		"--name", name,
 	}
-	useHTTPBin := usesOfflineHTTPBin(instanceID)
+	useHTTPBin := f.EnableOfflineServices && usesOfflineHTTPBin(instanceID)
 	if useHTTPBin {
 		args = append(args, "--add-host", offlineHTTPBinHost+":127.0.0.1")
+	}
+	if useHTTPBin && usesOfflineTarpit(instanceID) {
+		args = append(
+			args,
+			"--cap-add=NET_ADMIN",
+			"--device=/dev/net/tun:/dev/net/tun",
+		)
 	}
 	labelKeys := make([]string, 0, len(f.Labels))
 	for key := range f.Labels {
@@ -104,6 +113,10 @@ func (f DockerFactory) Start(ctx context.Context, instanceID string) (Environmen
 		commander:      commander,
 	}
 	if useHTTPBin {
+		if err := f.prepareOfflineRequestAssets(ctx, environment, instanceID); err != nil {
+			_ = environment.Close(context.Background())
+			return nil, err
+		}
 		if err := f.startOfflineHTTPBin(ctx, environment); err != nil {
 			_ = environment.Close(context.Background())
 			return nil, err

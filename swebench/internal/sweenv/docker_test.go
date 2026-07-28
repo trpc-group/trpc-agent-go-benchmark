@@ -128,34 +128,61 @@ func TestDockerFactoryStartsOfflineHTTPBinForRequests(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
+	assetDir := t.TempDir()
+	for path, contents := range map[string]string{
+		filepath.Join(assetDir, offlineTarpitBinary):                       "binary",
+		filepath.Join(assetDir, "requests-modern", "requirements.txt"):     "pytest==6.2.5\n",
+		filepath.Join(assetDir, "requests-modern", "wheels", "pytest.whl"): "wheel",
+	} {
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte(contents), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
 	commander := &fakeCommander{}
 	var cfg Config
 	cfg.Environment.Env = map[string]string{"HTTPBIN_URL": "https://public.invalid"}
 	cfg.Environment.Interpreter = []string{"bash", "-lc"}
 	factory := DockerFactory{
 		Config: cfg, CommandTimeout: time.Minute, CaseTimeout: time.Hour,
-		Commander: commander, HTTPBinCerts: &certs,
-		Labels: map[string]string{"tag-swebench.run_id": "run-requests"},
+		Commander: commander, EnableOfflineServices: true, OfflineAssetsDir: assetDir,
+		HTTPBinCerts: &certs,
+		Labels:       map[string]string{"tag-swebench.run_id": "run-requests"},
 	}
 	environment, err := factory.Start(context.Background(), "psf__requests-6028")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(commander.commands) != 8 {
-		t.Fatalf("startup commands = %d, want 8", len(commander.commands))
+	if len(commander.commands) != 14 {
+		t.Fatalf("startup commands = %d, want 14", len(commander.commands))
 	}
 	testbedStart := strings.Join(commander.commands[0].args, " ")
 	if !strings.Contains(testbedStart, "--network=none") ||
-		!strings.Contains(testbedStart, "--add-host httpbin.org:127.0.0.1") {
+		!strings.Contains(testbedStart, "--add-host httpbin.org:127.0.0.1") ||
+		!strings.Contains(testbedStart, "--cap-add=NET_ADMIN") ||
+		!strings.Contains(testbedStart, "--device=/dev/net/tun:/dev/net/tun") {
 		t.Fatalf("testbed start command = %q", testbedStart)
 	}
-	sidecarStart := strings.Join(commander.commands[2].args, " ")
+	dependencyInstall := strings.Join(commander.commands[3].args, " ")
+	if !strings.Contains(dependencyInstall, "pip install") ||
+		!strings.Contains(dependencyInstall, "--no-index") ||
+		!strings.Contains(dependencyInstall, "requests-modern") {
+		t.Fatalf("dependency install command = %q", dependencyInstall)
+	}
+	tarpitStart := strings.Join(commander.commands[5].args, " ")
+	if !strings.Contains(tarpitStart, "exec -d") ||
+		!strings.Contains(tarpitStart, offlineTarpitContainerPath) {
+		t.Fatalf("tarpit start command = %q", tarpitStart)
+	}
+	sidecarStart := strings.Join(commander.commands[8].args, " ")
 	if !strings.Contains(sidecarStart, "--pull=never") ||
 		!strings.Contains(sidecarStart, "--network=container:tag-swe-psf__requests-6028") ||
 		!strings.Contains(sidecarStart, "kennethreitz/httpbin") {
 		t.Fatalf("sidecar start command = %q", sidecarStart)
 	}
-	launch := strings.Join(commander.commands[5].args, " ")
+	launch := strings.Join(commander.commands[11].args, " ")
 	if !strings.Contains(launch, "exec -d") || !strings.Contains(launch, "127.0.0.1:80") ||
 		!strings.Contains(launch, "127.0.0.1:443") {
 		t.Fatalf("sidecar launch command = %q", launch)
@@ -163,12 +190,16 @@ func TestDockerFactoryStartsOfflineHTTPBinForRequests(t *testing.T) {
 	if result := environment.Execute(context.Background(), "pytest -q"); result.ReturnCode != 0 {
 		t.Fatalf("Execute() = %+v", result)
 	}
-	execute := strings.Join(commander.commands[8].args, " ")
+	execute := strings.Join(commander.commands[14].args, " ")
 	for _, expected := range []string{
 		"-e CURL_CA_BUNDLE=" + offlineHTTPBinCACertPath,
 		"-e HTTPBIN_URL=http://httpbin.org",
+		"-e NO_PROXY=localhost,127.0.0.1,httpbin.org,10.255.255.1",
+		"-e PIP_FIND_LINKS=" + offlineWheelhouseRoot + "/requests-modern/wheels",
+		"-e PIP_NO_INDEX=1",
 		"-e REQUESTS_CA_BUNDLE=" + offlineHTTPBinCACertPath,
 		"-e SSL_CERT_FILE=" + offlineHTTPBinCACertPath,
+		"-e no_proxy=localhost,127.0.0.1,httpbin.org,10.255.255.1",
 	} {
 		if !strings.Contains(execute, expected) {
 			t.Fatalf("execute command %q does not contain %q", execute, expected)
@@ -180,11 +211,11 @@ func TestDockerFactoryStartsOfflineHTTPBinForRequests(t *testing.T) {
 	if err := environment.Close(context.Background()); err != nil {
 		t.Fatal(err)
 	}
-	if len(commander.commands) != 11 {
-		t.Fatalf("lifecycle commands = %d, want 11", len(commander.commands))
+	if len(commander.commands) != 17 {
+		t.Fatalf("lifecycle commands = %d, want 17", len(commander.commands))
 	}
-	removeSidecar := strings.Join(commander.commands[9].args, " ")
-	removeTestbed := strings.Join(commander.commands[10].args, " ")
+	removeSidecar := strings.Join(commander.commands[15].args, " ")
+	removeTestbed := strings.Join(commander.commands[16].args, " ")
 	if !strings.Contains(removeSidecar, "rm -f") || !strings.Contains(removeSidecar, "-httpbin") {
 		t.Fatalf("remove sidecar command = %q", removeSidecar)
 	}

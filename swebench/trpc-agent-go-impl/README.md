@@ -33,6 +33,31 @@ go run ./trpc-agent-go-impl \
   --observation-codec xml
 ```
 
+## Offline generation assets
+
+Generation testbeds always start with `--pull=never --network=none`. Prepare
+the small requests-specific dependency bundle once, before generation, while
+the host is allowed to download build inputs:
+
+```bash
+./scripts/prepare-offline-assets.sh /data/validation/offline-assets/tag-swebench-v1
+```
+
+For a full-500 run, pass the resulting host directory to the runner:
+
+```bash
+go run ./trpc-agent-go-impl \
+  ... \
+  --offline-assets-dir /data/validation/offline-assets/tag-swebench-v1
+```
+
+The runner verifies `SHA256SUMS` before starting workers. The prepared bundle
+contains only two requests test-dependency wheelhouses and a static local
+TUN helper. A per-case loopback httpbin provides HTTP and HTTPS; the TUN helper
+preserves requests' `10.255.255.1` connect-timeout tests without providing an
+egress route. Cases that do not need these assets pay no setup cost, and the
+retrieval-replay command does not start these generation-only services.
+
 `--observation-codec` accepts `xml`, `json`, or `text`. Runs resume by skipping
 instance IDs already present in `preds.json`; pass `--redo-existing` to rerun
 them. `--billing-tag` and `--experiment-id` must be provided together.
