@@ -62,9 +62,43 @@ func TestParseToolActionsStillRejectsMalformedBash(t *testing.T) {
 	}
 }
 
+func TestPartialModelResponseDoesNotResetCompletedLoopBatch(t *testing.T) {
+	state := &State{}
+	tracker := newToolLoopTracker(true)
+	callbacks := modelCallbacks(state, false, tracker)
+	first := bashToolCallForTest("first", `{"command":"pwd"}`)
+	tracker.start([]model.ToolCall{first})
+	tracker.add(first.ID, first.Function.Name, first.Function.Arguments, "same")
+
+	if _, err := callbacks.RunAfterModel(context.Background(), &model.AfterModelArgs{
+		Response: &model.Response{IsPartial: true},
+	}); err != nil {
+		t.Fatalf("RunAfterModel(partial) error = %v", err)
+	}
+	second := bashToolCallForTest("second", `{"command":"pwd"}`)
+	response := &model.Response{
+		Done: true,
+		Choices: []model.Choice{{Message: model.Message{
+			Role: model.RoleAssistant, ToolCalls: []model.ToolCall{second},
+		}}},
+	}
+	if _, err := callbacks.RunAfterModel(context.Background(), &model.AfterModelArgs{
+		Response: response,
+	}); err != nil {
+		t.Fatalf("RunAfterModel(complete) error = %v", err)
+	}
+	if !tracker.add(second.ID, second.Function.Name, second.Function.Arguments, "same") {
+		t.Fatal("partial response reset the previous completed batch")
+	}
+}
+
 func TestCodeSearchToolResultUsesXMLLikeObservation(t *testing.T) {
 	state := &State{}
-	callbacks := toolCallbacks(state, minicompat.ObservationCodecXML)
+	callbacks := toolCallbacks(
+		state,
+		minicompat.ObservationCodecXML,
+		newToolLoopTracker(false),
+	)
 	searchResult := &knowledgetool.KnowledgeSearchResponse{Documents: []*knowledgetool.DocumentResult{{
 		ID:    "internal-node-1",
 		Text:  "func FindUser() {}",
@@ -125,5 +159,14 @@ func FindUser() {}
 	snapshot.CodeSearchRawResults[0][0] = 'x'
 	if state.Snapshot().CodeSearchRawResults[0][0] == 'x' {
 		t.Fatal("raw result snapshot aliases state")
+	}
+}
+
+func bashToolCallForTest(id string, arguments string) model.ToolCall {
+	return model.ToolCall{
+		ID: id,
+		Function: model.FunctionDefinitionParam{
+			Name: "bash", Arguments: []byte(arguments),
+		},
 	}
 }

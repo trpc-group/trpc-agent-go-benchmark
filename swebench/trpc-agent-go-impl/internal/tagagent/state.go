@@ -18,17 +18,19 @@ import (
 
 // State captures one case's terminal value and model accounting.
 type State struct {
-	mu                         sync.Mutex
-	submission                 string
-	submitted                  bool
-	llmCalls                   int
-	toolCalls                  int
-	codeSearchCalls            int
-	codeSearchResultBytes      int
-	codeSearchObservationBytes int
-	codeSearchRawResults       []json.RawMessage
-	usage                      model.Usage
-	responses                  []*model.Response
+	mu                          sync.Mutex
+	submission                  string
+	submitted                   bool
+	llmCalls                    int
+	toolCalls                   int
+	toolLoopWarningCount        int
+	firstToolLoopWarningLLMCall int
+	codeSearchCalls             int
+	codeSearchResultBytes       int
+	codeSearchObservationBytes  int
+	codeSearchRawResults        []json.RawMessage
+	usage                       model.Usage
+	responses                   []*model.Response
 }
 
 func (s *State) recordCodeSearchResult(payload []byte) {
@@ -52,6 +54,21 @@ func (s *State) setSubmission(patch string) {
 	defer s.mu.Unlock()
 	s.submission = patch
 	s.submitted = true
+}
+
+func (s *State) submittedValue() bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.submitted
+}
+
+func (s *State) recordToolLoopWarning() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.toolLoopWarningCount == 0 {
+		s.firstToolLoopWarningLLMCall = s.llmCalls
+	}
+	s.toolLoopWarningCount++
 }
 
 func (s *State) recordModelCall() {
@@ -99,29 +116,33 @@ func (s *State) Snapshot() Snapshot {
 		rawResults[i] = append(json.RawMessage(nil), raw...)
 	}
 	return Snapshot{
-		Submission:                 s.submission,
-		Submitted:                  s.submitted,
-		LLMCalls:                   s.llmCalls,
-		ToolCalls:                  s.toolCalls,
-		CodeSearchCalls:            s.codeSearchCalls,
-		CodeSearchResultBytes:      s.codeSearchResultBytes,
-		CodeSearchObservationBytes: s.codeSearchObservationBytes,
-		CodeSearchRawResults:       rawResults,
-		Usage:                      s.usage,
-		Responses:                  responses,
+		Submission:                  s.submission,
+		Submitted:                   s.submitted,
+		LLMCalls:                    s.llmCalls,
+		ToolCalls:                   s.toolCalls,
+		ToolLoopWarningCount:        s.toolLoopWarningCount,
+		FirstToolLoopWarningLLMCall: s.firstToolLoopWarningLLMCall,
+		CodeSearchCalls:             s.codeSearchCalls,
+		CodeSearchResultBytes:       s.codeSearchResultBytes,
+		CodeSearchObservationBytes:  s.codeSearchObservationBytes,
+		CodeSearchRawResults:        rawResults,
+		Usage:                       s.usage,
+		Responses:                   responses,
 	}
 }
 
 // Snapshot is the immutable case state consumed by the runner.
 type Snapshot struct {
-	Submission                 string
-	Submitted                  bool
-	LLMCalls                   int
-	ToolCalls                  int
-	CodeSearchCalls            int
-	CodeSearchResultBytes      int
-	CodeSearchObservationBytes int
-	CodeSearchRawResults       []json.RawMessage
-	Usage                      model.Usage
-	Responses                  []*model.Response
+	Submission                  string
+	Submitted                   bool
+	LLMCalls                    int
+	ToolCalls                   int
+	ToolLoopWarningCount        int
+	FirstToolLoopWarningLLMCall int
+	CodeSearchCalls             int
+	CodeSearchResultBytes       int
+	CodeSearchObservationBytes  int
+	CodeSearchRawResults        []json.RawMessage
+	Usage                       model.Usage
+	Responses                   []*model.Response
 }

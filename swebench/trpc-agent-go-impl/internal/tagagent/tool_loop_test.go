@@ -13,6 +13,8 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"testing"
+
+	"trpc.group/trpc-go/trpc-agent-go/model"
 )
 
 func TestToolLoopDetectorWarnsOnConsecutiveEquivalentBatch(t *testing.T) {
@@ -114,5 +116,82 @@ func TestToolLoopDetectorConfirmsBytesAfterHash(t *testing.T) {
 func TestCanonicalJSONRejectsMultipleValues(t *testing.T) {
 	if _, err := canonicalJSON([]byte(`{} {}`)); err == nil {
 		t.Fatal("canonicalJSON accepted multiple values")
+	}
+}
+
+func TestToolLoopTrackerAssociatesCompleteBatchByIDAndOrder(t *testing.T) {
+	tracker := newToolLoopTracker(true)
+	tracker.start([]model.ToolCall{
+		toolLoopCall("first-a", "bash"),
+		toolLoopCall("first-b", "code_search"),
+	})
+	if tracker.add("first-a", "bash", []byte(`{"command":"pwd"}`), "same") {
+		t.Fatal("tracker warned before the first batch was complete")
+	}
+	if tracker.add("first-b", "code_search", []byte(`{"query":"symbol"}`), "result") {
+		t.Fatal("tracker warned on the first complete batch")
+	}
+
+	tracker.start([]model.ToolCall{
+		toolLoopCall("second-a", "bash"),
+		toolLoopCall("second-b", "code_search"),
+	})
+	if tracker.add("second-a", "bash", []byte(`{ "command": "pwd" }`), "same") {
+		t.Fatal("tracker warned before the second batch was complete")
+	}
+	if !tracker.add("second-b", "code_search", []byte(`{"query":"symbol"}`), "result") {
+		t.Fatal("tracker did not warn on the repeated complete batch")
+	}
+	if !tracker.takeWarning() {
+		t.Fatal("tracker did not expose the pending warning")
+	}
+	if tracker.takeWarning() {
+		t.Fatal("tracker exposed the same pending warning twice")
+	}
+}
+
+func TestToolLoopTrackerResetsOnIncompleteOrMismatchedBatch(t *testing.T) {
+	tracker := newToolLoopTracker(true)
+	batch := []model.ToolCall{
+		toolLoopCall("a", "bash"),
+		toolLoopCall("b", "bash"),
+	}
+	tracker.start(batch)
+	if tracker.add("a", "bash", []byte(`{"command":"pwd"}`), "same") {
+		t.Fatal("tracker warned on incomplete batch")
+	}
+	tracker.start([]model.ToolCall{toolLoopCall("c", "bash")})
+	if tracker.add("c", "bash", []byte(`{"command":"pwd"}`), "same") {
+		t.Fatal("tracker compared across incomplete batch")
+	}
+
+	tracker.start([]model.ToolCall{toolLoopCall("d", "bash")})
+	if tracker.add("wrong", "bash", []byte(`{"command":"pwd"}`), "same") {
+		t.Fatal("tracker warned on mismatched tool id")
+	}
+	tracker.start([]model.ToolCall{toolLoopCall("e", "bash")})
+	if tracker.add("e", "bash", []byte(`{"command":"pwd"}`), "same") {
+		t.Fatal("tracker retained history after mismatch")
+	}
+}
+
+func TestToolLoopTrackerResetClearsPendingWarning(t *testing.T) {
+	tracker := newToolLoopTracker(true)
+	for _, id := range []string{"first", "second"} {
+		tracker.start([]model.ToolCall{toolLoopCall(id, "bash")})
+		tracker.add(id, "bash", []byte(`{"command":"pwd"}`), "same")
+	}
+	tracker.reset()
+	if tracker.takeWarning() {
+		t.Fatal("tracker retained a pending warning after reset")
+	}
+}
+
+func toolLoopCall(id string, name string) model.ToolCall {
+	return model.ToolCall{
+		ID: id,
+		Function: model.FunctionDefinitionParam{
+			Name: name,
+		},
 	}
 }

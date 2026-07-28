@@ -20,6 +20,11 @@ import (
 
 const maxLLMCalls = 250
 
+// Config controls optional runner-local agent behavior.
+type Config struct {
+	ToolLoopWarning bool
+}
+
 // New creates a TAG llmagent bound to one testbed and state holder.
 func New(
 	modelImpl model.Model,
@@ -27,11 +32,13 @@ func New(
 	codec minicompat.ObservationCodec,
 	generationConfig model.GenerationConfig,
 	state *State,
+	config Config,
 	extraTools ...tool.Tool,
 ) *llmagent.LLMAgent {
 	bash := &bashTool{environment: environment}
 	tools := append([]tool.Tool(nil), extraTools...)
 	tools = append(tools, bash)
+	loopTracker := newToolLoopTracker(config.ToolLoopWarning)
 	instruction := minicompat.OfflineSystemPrompt
 	if len(extraTools) > 0 {
 		instruction = minicompat.OfflineSystemPromptWithCodeSearch
@@ -47,7 +54,7 @@ func New(
 		llmagent.WithPreserveSameBranch(true),
 		llmagent.WithEnablePostToolPrompt(false),
 		llmagent.WithEnableCodeExecutionResponseProcessor(false),
-		llmagent.WithModelCallbacks(modelCallbacks(state, len(extraTools) > 0)),
-		llmagent.WithToolCallbacks(toolCallbacks(state, codec)),
+		llmagent.WithModelCallbacks(modelCallbacks(state, len(extraTools) > 0, loopTracker)),
+		llmagent.WithToolCallbacks(toolCallbacks(state, codec, loopTracker)),
 	)
 }

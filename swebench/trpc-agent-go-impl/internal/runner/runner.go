@@ -80,6 +80,9 @@ type manifest struct {
 	CommandTimeout                string                  `json:"command_timeout"`
 	CaseTimeout                   string                  `json:"case_timeout"`
 	CodeSearch                    bool                    `json:"code_search"`
+	ToolLoopWarning               bool                    `json:"tool_loop_warning"`
+	ToolLoopWarningCount          int                     `json:"tool_loop_warning_count"`
+	ToolLoopWarningCaseCount      int                     `json:"tool_loop_warning_case_count"`
 	WorkspacePreload              bool                    `json:"workspace_preload"`
 	WorkspaceRepresentation       string                  `json:"workspace_representation"`
 	WorkspaceRepresentationSchema string                  `json:"workspace_representation_schema"`
@@ -111,12 +114,13 @@ type progressDocument struct {
 }
 
 type progressCase struct {
-	Status        string `json:"status"`
-	ErrorCategory string `json:"error_category,omitempty"`
-	PatchBytes    int    `json:"patch_bytes"`
-	LLMCalls      int    `json:"llm_calls"`
-	ToolCalls     int    `json:"tool_calls"`
-	DurationMS    int64  `json:"duration_ms"`
+	Status               string `json:"status"`
+	ErrorCategory        string `json:"error_category,omitempty"`
+	PatchBytes           int    `json:"patch_bytes"`
+	LLMCalls             int    `json:"llm_calls"`
+	ToolCalls            int    `json:"tool_calls"`
+	ToolLoopWarningCount int    `json:"tool_loop_warning_count"`
+	DurationMS           int64  `json:"duration_ms"`
 }
 
 // Run executes the TAG SWE-Bench runner CLI.
@@ -145,6 +149,7 @@ func Run(args []string) error {
 	experimentID := fs.String("experiment-id", "", "experiment identifier recorded with billing-tag")
 	frameworkRevision := fs.String("framework-revision", "", "framework source revision recorded in the manifest")
 	codeSearch := fs.Bool("code-search", false, "enable local workspace code retrieval")
+	toolLoopWarning := fs.Bool("tool-loop-warning", false, "warn after an exact consecutive tool-use/result batch repeat")
 	workspacePreload := fs.Bool("workspace-preload", false, "inject retrieved workspace context into the initial prompt")
 	workspaceRepresentationValue := fs.String(
 		"workspace-representation",
@@ -293,7 +298,8 @@ func Run(args []string) error {
 	exec := executor.Executor{
 		Factory: factory, ModelConfig: modelCfg, ObservationCodec: codec, CaseTimeout: *caseTimeout,
 		EnableCodeSearch: *codeSearch, EnableWorkspacePreload: *workspacePreload, EmbeddingConfig: embeddingCfg,
-		EmbeddingCache: embeddingCache, WorkspaceRepresentation: workspaceRepresentation,
+		EnableToolLoopWarning: *toolLoopWarning, EmbeddingCache: embeddingCache,
+		WorkspaceRepresentation: workspaceRepresentation,
 	}
 	if err := exec.Validate(); err != nil {
 		return err
@@ -329,7 +335,8 @@ func Run(args []string) error {
 			progress.Cases[id] = progressCase{
 				Status: result.Info.ExitStatus, ErrorCategory: result.Info.ErrorCategory,
 				PatchBytes: len(result.ModelPatch), LLMCalls: result.LLMCalls,
-				ToolCalls: result.ToolCalls, DurationMS: result.DurationMS,
+				ToolCalls: result.ToolCalls, ToolLoopWarningCount: result.ToolLoopWarningCount,
+				DurationMS: result.DurationMS,
 			}
 		}
 	}
@@ -364,7 +371,8 @@ func Run(args []string) error {
 				progress.Cases[c.InstanceID] = progressCase{
 					Status: caseResult.Info.ExitStatus, ErrorCategory: caseResult.Info.ErrorCategory,
 					PatchBytes: len(caseResult.ModelPatch), LLMCalls: caseResult.LLMCalls,
-					ToolCalls: caseResult.ToolCalls, DurationMS: caseResult.DurationMS,
+					ToolCalls: caseResult.ToolCalls, ToolLoopWarningCount: caseResult.ToolLoopWarningCount,
+					DurationMS: caseResult.DurationMS,
 				}
 				progress.UpdatedAt = time.Now().UTC()
 				predErr := artifact.WriteJSONAtomic(predictionsPath, preds)
@@ -391,6 +399,7 @@ func Run(args []string) error {
 		exitCounts["ExistingPrediction"] = missingSkipped
 	}
 	var llmCalls, toolCalls int
+	var toolLoopWarningCount, toolLoopWarningCaseCount int
 	var usage usageSummary
 	var embeddingUsage embeddingconfig.Metrics
 	var embeddingCacheUsage embeddingcache.Metrics
@@ -399,6 +408,10 @@ func Run(args []string) error {
 		exitCounts[result.Info.ExitStatus]++
 		llmCalls += result.LLMCalls
 		toolCalls += result.ToolCalls
+		toolLoopWarningCount += result.ToolLoopWarningCount
+		if result.ToolLoopWarningCount > 0 {
+			toolLoopWarningCaseCount++
+		}
 		usage.PromptTokens += result.Usage.PromptTokens
 		usage.CachedTokens += result.Usage.PromptTokensDetails.CachedTokens
 		usage.CompletionTokens += result.Usage.CompletionTokens
@@ -445,7 +458,9 @@ func Run(args []string) error {
 		Predictions: artifact.AbsPath(predictionsPath), Progress: artifact.AbsPath(progressPath),
 		ModelConfig: modelconfig.RedactSecrets(modelCfg), Environment: artifact.AbsPath(*environmentConfigPath),
 		CommandTimeout: commandTimeout.String(), CaseTimeout: caseTimeout.String(),
-		CodeSearch: *codeSearch, WorkspacePreload: *codeSearch && *workspacePreload,
+		CodeSearch: *codeSearch, ToolLoopWarning: *toolLoopWarning,
+		ToolLoopWarningCount: toolLoopWarningCount, ToolLoopWarningCaseCount: toolLoopWarningCaseCount,
+		WorkspacePreload:              *codeSearch && *workspacePreload,
 		WorkspaceRepresentation:       string(workspaceRepresentation),
 		WorkspaceRepresentationSchema: tagagent.WorkspaceRepresentationSchema(workspaceRepresentation),
 		WorkspaceRepresentationSHA256: tagagent.WorkspaceRepresentationSHA256(workspaceRepresentation),

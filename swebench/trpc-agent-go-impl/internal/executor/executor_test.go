@@ -209,6 +209,167 @@ func TestToolResultsUseSelectedCodecAndExecuteSequentially(t *testing.T) {
 	}
 }
 
+func TestToolLoopWarningFollowsLastResultOfRepeatedBatch(t *testing.T) {
+	modelImpl := &scriptedModel{responses: []*model.Response{
+		assistantResponse("inspect", bashCall("first-a", "pwd"), bashCall("first-b", "git status --short")),
+		assistantResponse("inspect again", bashCall("second-a", "pwd"), bashCall("second-b", "git status --short")),
+		assistantResponse("done", bashCall("submit", "submit")),
+	}}
+	environment := &fakeEnvironment{results: []sweenv.CommandResult{
+		{Output: "/testbed\n"},
+		{Output: " M a.go\n"},
+		{Output: "/testbed\n"},
+		{Output: " M a.go\n"},
+		{Output: minicompat.SubmissionMarker + "\npatch\n"},
+	}}
+	exec := newTestExecutor(modelImpl, environment, minicompat.ObservationCodecXML)
+	exec.EnableToolLoopWarning = true
+	result := exec.Execute(
+		context.Background(),
+		contract.Case{InstanceID: "case-a", ProblemStatement: "fix it"},
+	)
+
+	if result.Info.ExitStatus != "Submitted" || result.ToolLoopWarningCount != 1 {
+		t.Fatalf("result = %+v", result)
+	}
+	if result.FirstToolLoopWarningLLMCall == nil || *result.FirstToolLoopWarningLLMCall != 3 {
+		t.Fatalf("first warning call = %v, want 3", result.FirstToolLoopWarningLLMCall)
+	}
+	if len(modelImpl.requests) != 3 {
+		t.Fatalf("requests = %d, want 3", len(modelImpl.requests))
+	}
+	messages := modelImpl.requests[2].Messages
+	warningIndex := -1
+	for i, message := range messages {
+		if message.Role == model.RoleUser && strings.HasPrefix(message.Content, "<tool_loop_detected>") {
+			warningIndex = i
+		}
+	}
+	if warningIndex < 2 || warningIndex != len(messages)-1 {
+		t.Fatalf("warning index = %d in messages %#v", warningIndex, messages)
+	}
+	if messages[warningIndex].ToolID != "" {
+		t.Fatalf("warning carries tool id: %#v", messages[warningIndex])
+	}
+	wantToolIDs := []string{"first-a", "first-b", "second-a", "second-b"}
+	var toolIDs []string
+	for _, message := range messages {
+		if message.Role == model.RoleTool {
+			toolIDs = append(toolIDs, message.ToolID)
+		}
+	}
+	if !reflect.DeepEqual(toolIDs, wantToolIDs) {
+		t.Fatalf("tool ids = %#v, want %#v", toolIDs, wantToolIDs)
+	}
+	if messages[warningIndex-1].Role != model.RoleTool || messages[warningIndex-1].ToolID != "second-b" {
+		t.Fatalf("message before warning = %#v, want final repeated tool result", messages[warningIndex-1])
+	}
+}
+
+func TestToolLoopWarningDisabledLeavesRepeatedBatchUnchanged(t *testing.T) {
+	modelImpl := &scriptedModel{responses: []*model.Response{
+		assistantResponse("inspect", bashCall("first", "pwd")),
+		assistantResponse("inspect again", bashCall("second", "pwd")),
+		assistantResponse("done", bashCall("submit", "submit")),
+	}}
+	environment := &fakeEnvironment{results: []sweenv.CommandResult{
+		{Output: "/testbed\n"},
+		{Output: "/testbed\n"},
+		{Output: minicompat.SubmissionMarker + "\npatch\n"},
+	}}
+	result := newTestExecutor(modelImpl, environment, minicompat.ObservationCodecXML).Execute(
+		context.Background(),
+		contract.Case{InstanceID: "case-a", ProblemStatement: "fix it"},
+	)
+
+	if result.ToolLoopWarningCount != 0 || result.FirstToolLoopWarningLLMCall != nil {
+		t.Fatalf("unexpected loop telemetry: %+v", result)
+	}
+	for _, message := range modelImpl.requests[2].Messages {
+		if strings.HasPrefix(message.Content, "<tool_loop_detected>") {
+			t.Fatal("disabled loop warning entered model history")
+		}
+	}
+}
+
+func TestToolLoopWarningDoesNotWarnWhenCodeSearchObservationChanges(t *testing.T) {
+	modelImpl := &scriptedModel{responses: []*model.Response{
+		assistantResponse(
+			"inspect",
+			codeSearchCall("first-search", "find_user_by_email"),
+			bashCall("first-bash", "pwd"),
+		),
+		assistantResponse(
+			"inspect again",
+			codeSearchCall("second-search", "find_user_by_email"),
+			bashCall("second-bash", "pwd"),
+		),
+		assistantResponse("done", bashCall("submit", "submit")),
+	}}
+	environment := &fakeEnvironment{results: []sweenv.CommandResult{
+		{Output: "/testbed\n"},
+		{Output: "/testbed\n"},
+		{Output: minicompat.SubmissionMarker + "\npatch\n"},
+	}}
+	exec := newTestExecutor(modelImpl, environment, minicompat.ObservationCodecXML)
+	exec.EnableCodeSearch = true
+	exec.EnableToolLoopWarning = true
+	result := exec.Execute(
+		context.Background(),
+		contract.Case{InstanceID: "case-a", ProblemStatement: "Fix user lookup."},
+	)
+
+	if result.Info.ExitStatus != "Submitted" || result.ToolLoopWarningCount != 0 {
+		t.Fatalf("result = %+v", result)
+	}
+	if result.FirstToolLoopWarningLLMCall != nil {
+		t.Fatalf("unexpected first warning call = %v", result.FirstToolLoopWarningLLMCall)
+	}
+	messages := modelImpl.requests[2].Messages
+	for _, message := range messages {
+		if strings.HasPrefix(message.Content, "<tool_loop_detected>") {
+			t.Fatalf("changed code_search result triggered loop warning: %#v", message)
+		}
+	}
+	var names []string
+	for _, message := range messages {
+		if message.Role == model.RoleTool {
+			names = append(names, message.ToolName)
+		}
+	}
+	if want := []string{"code_search", "bash", "code_search", "bash"}; !reflect.DeepEqual(names, want) {
+		t.Fatalf("tool names = %#v, want %#v", names, want)
+	}
+}
+
+func TestToolLoopWarningDoesNotCompareAcrossFormatError(t *testing.T) {
+	modelImpl := &scriptedModel{responses: []*model.Response{
+		assistantResponse("inspect", bashCall("first", "pwd")),
+		assistantResponse("not a tool call"),
+		assistantResponse("inspect", bashCall("second", "pwd")),
+		assistantResponse("inspect", bashCall("third", "pwd")),
+		assistantResponse("done", bashCall("submit", "submit")),
+	}}
+	environment := &fakeEnvironment{results: []sweenv.CommandResult{
+		{Output: "/testbed\n"},
+		{Output: "/testbed\n"},
+		{Output: "/testbed\n"},
+		{Output: minicompat.SubmissionMarker + "\npatch\n"},
+	}}
+	exec := newTestExecutor(modelImpl, environment, minicompat.ObservationCodecXML)
+	exec.EnableToolLoopWarning = true
+	result := exec.Execute(
+		context.Background(),
+		contract.Case{InstanceID: "case-a", ProblemStatement: "fix it"},
+	)
+
+	if result.ToolLoopWarningCount != 1 || result.FirstToolLoopWarningLLMCall == nil ||
+		*result.FirstToolLoopWarningLLMCall != 5 {
+		t.Fatalf("loop telemetry = count %d first %v, want 1 at call 5",
+			result.ToolLoopWarningCount, result.FirstToolLoopWarningLLMCall)
+	}
+}
+
 func TestSubmissionSkipSummarizationDoesNotCallModelAgain(t *testing.T) {
 	modelImpl := &scriptedModel{responses: []*model.Response{
 		assistantResponse("done", bashCall("submit", "submit")),

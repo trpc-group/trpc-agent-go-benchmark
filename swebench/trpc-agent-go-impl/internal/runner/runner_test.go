@@ -106,6 +106,19 @@ func TestWorkspacePreloadDefaultsOffWithoutCodeSearch(t *testing.T) {
 	}
 }
 
+func TestToolLoopWarningFlagIsOptionalAndAccepted(t *testing.T) {
+	err := Run([]string{
+		"trpc-agent-go-impl",
+		"-run-id=test",
+		"-model-config=unused",
+		"-tool-loop-warning=true",
+		"-cases=" + filepath.Join(t.TempDir(), "missing.jsonl"),
+	})
+	if err == nil || !strings.Contains(err.Error(), "hash cases") {
+		t.Fatalf("error = %v, want flag parsing to reach cases loading", err)
+	}
+}
+
 func TestASTWorkspaceRepresentationRequiresCodeSearch(t *testing.T) {
 	err := Run([]string{
 		"trpc-agent-go-impl",

@@ -42,22 +42,24 @@ type CaseInfo struct {
 
 // CaseResult is the TAG-native result artifact for one instance.
 type CaseResult struct {
-	InstanceID                 string                       `json:"instance_id"`
-	Info                       CaseInfo                     `json:"info"`
-	ModelPatch                 string                       `json:"model_patch,omitempty"`
-	DurationMS                 int64                        `json:"duration_ms"`
-	LLMCalls                   int                          `json:"llm_calls"`
-	ToolCalls                  int                          `json:"tool_calls"`
-	CodeSearchCalls            int                          `json:"code_search_calls,omitempty"`
-	CodeSearchResultBytes      int                          `json:"code_search_result_bytes,omitempty"`
-	CodeSearchObservationBytes int                          `json:"code_search_observation_bytes,omitempty"`
-	CodeSearchRawResults       []json.RawMessage            `json:"code_search_raw_results,omitempty"`
-	WorkspaceIndex             tagagent.WorkspaceIndexStats `json:"workspace_index,omitempty"`
-	Embedding                  *embeddingconfig.Metrics     `json:"embedding,omitempty"`
-	EmbeddingCache             *embeddingcache.Metrics      `json:"embedding_cache,omitempty"`
-	Usage                      model.Usage                  `json:"usage"`
-	Events                     []*event.Event               `json:"events,omitempty"`
-	Responses                  []*model.Response            `json:"-"`
+	InstanceID                  string                       `json:"instance_id"`
+	Info                        CaseInfo                     `json:"info"`
+	ModelPatch                  string                       `json:"model_patch,omitempty"`
+	DurationMS                  int64                        `json:"duration_ms"`
+	LLMCalls                    int                          `json:"llm_calls"`
+	ToolCalls                   int                          `json:"tool_calls"`
+	ToolLoopWarningCount        int                          `json:"tool_loop_warning_count"`
+	FirstToolLoopWarningLLMCall *int                         `json:"first_tool_loop_warning_llm_call"`
+	CodeSearchCalls             int                          `json:"code_search_calls,omitempty"`
+	CodeSearchResultBytes       int                          `json:"code_search_result_bytes,omitempty"`
+	CodeSearchObservationBytes  int                          `json:"code_search_observation_bytes,omitempty"`
+	CodeSearchRawResults        []json.RawMessage            `json:"code_search_raw_results,omitempty"`
+	WorkspaceIndex              tagagent.WorkspaceIndexStats `json:"workspace_index,omitempty"`
+	Embedding                   *embeddingconfig.Metrics     `json:"embedding,omitempty"`
+	EmbeddingCache              *embeddingcache.Metrics      `json:"embedding_cache,omitempty"`
+	Usage                       model.Usage                  `json:"usage"`
+	Events                      []*event.Event               `json:"events,omitempty"`
+	Responses                   []*model.Response            `json:"-"`
 }
 
 // Executor owns the per-case TAG model and environment lifecycle.
@@ -69,6 +71,7 @@ type Executor struct {
 	ModelFactory            func(modelconfig.EnvConfig) model.Model
 	EnableCodeSearch        bool
 	EnableWorkspacePreload  bool
+	EnableToolLoopWarning   bool
 	WorkspaceRepresentation tagagent.WorkspaceRepresentation
 	EmbeddingConfig         *embeddingconfig.Config
 	EmbeddingCache          *embeddingcache.Store
@@ -184,7 +187,15 @@ func (e Executor) Execute(ctx context.Context, c contract.Case) (result CaseResu
 		}
 		result.WorkspaceIndex = indexStats
 	}
-	agentImpl := tagagent.New(modelImpl, environment, e.ObservationCodec, generationConfig(e.ModelConfig), state, extraTools...)
+	agentImpl := tagagent.New(
+		modelImpl,
+		environment,
+		e.ObservationCodec,
+		generationConfig(e.ModelConfig),
+		state,
+		tagagent.Config{ToolLoopWarning: e.EnableToolLoopWarning},
+		extraTools...,
+	)
 	run := tagrunner.NewRunner("tag-swebench", agentImpl)
 	defer run.Close()
 
@@ -222,6 +233,11 @@ func (e Executor) Execute(ctx context.Context, c contract.Case) (result CaseResu
 	result.ModelPatch = snapshot.Submission
 	result.LLMCalls = snapshot.LLMCalls
 	result.ToolCalls = snapshot.ToolCalls
+	result.ToolLoopWarningCount = snapshot.ToolLoopWarningCount
+	if snapshot.ToolLoopWarningCount > 0 {
+		firstCall := snapshot.FirstToolLoopWarningLLMCall
+		result.FirstToolLoopWarningLLMCall = &firstCall
+	}
 	result.CodeSearchCalls = snapshot.CodeSearchCalls
 	result.CodeSearchResultBytes = snapshot.CodeSearchResultBytes
 	result.CodeSearchObservationBytes = snapshot.CodeSearchObservationBytes

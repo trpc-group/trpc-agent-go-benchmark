@@ -21,10 +21,25 @@ import (
 	"trpc.group/trpc-go/trpc-agent-go/tool"
 )
 
-func modelCallbacks(state *State, allowCodeSearch bool) *model.Callbacks {
+func modelCallbacks(
+	state *State,
+	allowCodeSearch bool,
+	loopTracker *toolLoopTracker,
+) *model.Callbacks {
 	callbacks := model.NewCallbacks()
 	callbacks.RegisterBeforeModel(func(_ context.Context, args *model.BeforeModelArgs) (*model.BeforeModelResult, error) {
 		state.recordModelCall()
+		// ToolResultMessages must return the protocol's Tool messages. The
+		// session projection does not retain an additional User message returned
+		// from that callback, so append the warning to the actual next request.
+		// At this point all results from the repeated batch are already present.
+		if args != nil && args.Request != nil && loopTracker.takeWarning() {
+			args.Request.Messages = append(
+				args.Request.Messages,
+				model.NewUserMessage(toolLoopWarning),
+			)
+			state.recordToolLoopWarning()
+		}
 		if allowCodeSearch && args != nil && args.Request != nil {
 			if _, ok := args.Request.Tools["code_search"]; ok {
 				args.Request.ToolOrder = []string{"code_search", "bash"}
@@ -34,20 +49,31 @@ func modelCallbacks(state *State, allowCodeSearch bool) *model.Callbacks {
 	})
 	callbacks.RegisterAfterModel(func(_ context.Context, args *model.AfterModelArgs) (*model.AfterModelResult, error) {
 		if args == nil || args.Response == nil {
+			loopTracker.reset()
 			return nil, nil
 		}
 		state.recordResponse(args.Response)
 		response := args.Response
-		if args.Error != nil || response.Error != nil || response.IsPartial || !response.Done {
+		if args.Error != nil || response.Error != nil {
+			loopTracker.reset()
+			return nil, nil
+		}
+		// A partial streaming response is not an assistant turn yet. Preserve the
+		// previous completed batch until the terminal response arrives.
+		if response.IsPartial || !response.Done {
 			return nil, nil
 		}
 		if len(response.Choices) == 0 {
+			loopTracker.reset()
 			return nil, errors.New("model response contains no choices")
 		}
-		_, err := parseToolActions(response.Choices[0].Message.ToolCalls, allowCodeSearch)
+		toolCalls := response.Choices[0].Message.ToolCalls
+		_, err := parseToolActions(toolCalls, allowCodeSearch)
 		if err == nil {
+			loopTracker.start(toolCalls)
 			return nil, nil
 		}
+		loopTracker.reset()
 		var formatErr minicompat.FormatError
 		if !errors.As(err, &formatErr) {
 			return nil, err
@@ -81,7 +107,11 @@ func parseToolActions(toolCalls []model.ToolCall, allowCodeSearch bool) ([]minic
 	return minicompat.ParseActions(nil)
 }
 
-func toolCallbacks(state *State, codec minicompat.ObservationCodec) *tool.Callbacks {
+func toolCallbacks(
+	state *State,
+	codec minicompat.ObservationCodec,
+	loopTracker *toolLoopTracker,
+) *tool.Callbacks {
 	callbacks := tool.NewCallbacks()
 	callbacks.RegisterAfterTool(func(_ context.Context, args *tool.AfterToolArgs) (*tool.AfterToolResult, error) {
 		if args != nil {
@@ -120,7 +150,8 @@ func toolCallbacks(state *State, codec minicompat.ObservationCodec) *tool.Callba
 				return nil, err
 			}
 			state.recordCodeSearchObservationBytes(len([]byte(observation)))
-			return model.NewToolMessage(input.ToolCallID, "code_search", observation), nil
+			message := model.NewToolMessage(input.ToolCallID, "code_search", observation)
+			return toolResultMessagesWithLoopWarning(state, loopTracker, input, message), nil
 		case "bash":
 		default:
 			return nil, nil
@@ -133,7 +164,27 @@ func toolCallbacks(state *State, codec minicompat.ObservationCodec) *tool.Callba
 		if err != nil {
 			return nil, err
 		}
-		return model.NewToolMessage(input.ToolCallID, "bash", observation), nil
+		message := model.NewToolMessage(input.ToolCallID, "bash", observation)
+		return toolResultMessagesWithLoopWarning(state, loopTracker, input, message), nil
 	})
 	return callbacks
+}
+
+func toolResultMessagesWithLoopWarning(
+	state *State,
+	loopTracker *toolLoopTracker,
+	input *tool.ToolResultMessagesInput,
+	toolMessage model.Message,
+) any {
+	if state.submittedValue() {
+		loopTracker.reset()
+		return toolMessage
+	}
+	loopTracker.add(
+		input.ToolCallID,
+		input.ToolName,
+		input.Arguments,
+		toolMessage.Content,
+	)
+	return toolMessage
 }
