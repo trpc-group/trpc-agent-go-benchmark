@@ -64,6 +64,21 @@ all of its legitimate ancestors while removing remotes, tags, extra refs, and
 unreachable future objects. The worktree and ordinary `git diff`, `git log`,
 and `git blame` behavior remain available.
 
+Validate selected images, Git sanitation, public DNS/raw-IP isolation, local
+services, and cleanup without invoking a model:
+
+```bash
+go run ./trpc-agent-go-impl/cmd/offline-preflight \
+  --cases data/generated/cases.jsonl \
+  --case-list data/case-lists/offline-smoke.case_ids.txt \
+  --environment-config config/environments/swebench-testbed.yaml \
+  --offline-assets-dir /data/validation/offline-assets/tag-swebench-v1 \
+  --workers 4
+```
+
+Use a small representative list before generation. The same command can later
+preflight a larger exact case list without spending LLM calls.
+
 `--observation-codec` accepts `xml`, `json`, or `text`. Runs resume by skipping
 instance IDs already present in `preds.json`; pass `--redo-existing` to rerun
 them. `--billing-tag` and `--experiment-id` must be provided together.
