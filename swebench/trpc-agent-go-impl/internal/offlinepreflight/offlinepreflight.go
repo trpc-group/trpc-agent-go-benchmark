@@ -40,6 +40,15 @@ test -z "$(git tag --list)"
 git rev-parse --verify HEAD >/dev/null
 git log -1 --oneline >/dev/null
 git diff --quiet
+git submodule foreach --quiet --recursive '
+test -z "$(git status --porcelain)"
+test "$(git for-each-ref --format="%(refname)" | wc -l)" -eq 1
+test -z "$(git remote)"
+test -z "$(git tag --list)"
+git rev-parse --verify HEAD >/dev/null
+git log -1 --oneline >/dev/null
+git diff --quiet
+'
 python - <<'PY'
 import socket
 

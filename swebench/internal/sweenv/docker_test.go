@@ -118,10 +118,13 @@ func TestDockerFactorySanitizesGitHistory(t *testing.T) {
 	sanitize := strings.Join(commander.commands[1].args, " ")
 	for _, expected := range []string{
 		"exec -w /testbed",
+		"git clean -fd",
+		"git submodule foreach --quiet --recursive",
+		"for submodule in \"${submodules[@]}\"",
 		"git clone -q --no-local --no-tags --no-checkout --single-branch",
-		"git remote remove origin",
-		"git repack -adq",
-		"git fsck --unreachable --no-reflogs",
+		"remote remove origin",
+		"repack -adq",
+		"fsck --unreachable --no-reflogs",
 	} {
 		if !strings.Contains(sanitize, expected) {
 			t.Fatalf("sanitation command %q does not contain %q", sanitize, expected)
