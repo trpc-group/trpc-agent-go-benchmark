@@ -10,10 +10,12 @@
     "quality_blinding": "Do not run or inspect either official harness until both generation arms are complete."
   },
   "frozen_inputs": {
-    "benchmark_revision": "b703b8d311a410aef699e010838c4250db7e2fdf",
+    "benchmark_revision": "a702c2f589996b96785b020a3d7f2df9438748d4",
     "framework_revision": "358d376784889fd539a764190e1970ee4f4fc5f6",
-    "runner_binary": "trpc-agent-go-impl-loopwarn-b703b8d",
-    "runner_binary_sha256": "13a04c5e0ab1bf9daa051b440bfc30b2a97ae136c9634df24f2acab7a042be6b",
+    "runner_binary": "trpc-agent-go-impl-cleanroom-a702c2f",
+    "runner_binary_sha256": "839a4f327704554697592335b1fa4a3fd9fac32ec9f8de19923a5e870806e4b8",
+    "preflight_binary": "tag-swebench-offline-preflight-a702c2f",
+    "preflight_binary_sha256": "33ab173c379b668386ef4409a9534641ee232a79d80dd03ea7ee54bea7fbf863",
     "case_count": 500,
     "cases_sha256": "4b2a050a82d356963320cbfa8e2efdf6a133af8863f31b291a973ab4dd349d07",
     "model_config_sha256": "fbfdf25e9fced3ecc51d244ccbb652c078b02ac640abbdbcca53ddbaa7af27de",
