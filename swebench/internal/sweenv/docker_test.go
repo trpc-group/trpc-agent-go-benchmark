@@ -100,6 +100,38 @@ func TestDockerFactoryLifecycle(t *testing.T) {
 	}
 }
 
+func TestDockerFactorySanitizesGitHistory(t *testing.T) {
+	commander := &fakeCommander{}
+	var cfg Config
+	cfg.Environment.Interpreter = []string{"bash", "-lc"}
+	factory := DockerFactory{
+		Config: cfg, CommandTimeout: time.Minute, CaseTimeout: time.Hour,
+		Commander: commander, SanitizeGitHistory: true,
+	}
+	environment, err := factory.Start(context.Background(), "repo__repo-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(commander.commands) != 2 {
+		t.Fatalf("startup commands = %d, want 2", len(commander.commands))
+	}
+	sanitize := strings.Join(commander.commands[1].args, " ")
+	for _, expected := range []string{
+		"exec -w /testbed",
+		"git clone -q --no-local --no-tags --no-checkout --single-branch",
+		"git remote remove origin",
+		"git repack -adq",
+		"git fsck --unreachable --no-reflogs",
+	} {
+		if !strings.Contains(sanitize, expected) {
+			t.Fatalf("sanitation command %q does not contain %q", sanitize, expected)
+		}
+	}
+	if err := environment.Close(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestDockerCommandTimeout(t *testing.T) {
 	var cfg Config
 	cfg.Environment.Interpreter = []string{"bash", "-c"}

@@ -49,6 +49,7 @@ type DockerFactory struct {
 	Labels                map[string]string
 	EnableOfflineServices bool
 	OfflineAssetsDir      string
+	SanitizeGitHistory    bool
 	HTTPBinCerts          *OfflineHTTPBinCerts
 }
 
@@ -111,6 +112,12 @@ func (f DockerFactory) Start(ctx context.Context, instanceID string) (Environmen
 		dockerHost:     f.DockerHost,
 		commandTimeout: f.CommandTimeout,
 		commander:      commander,
+	}
+	if f.SanitizeGitHistory {
+		if err := f.sanitizeGitRepository(ctx, environment); err != nil {
+			_ = environment.Close(context.Background())
+			return nil, err
+		}
 	}
 	if useHTTPBin {
 		if err := f.prepareOfflineRequestAssets(ctx, environment, instanceID); err != nil {

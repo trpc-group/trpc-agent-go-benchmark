@@ -58,6 +58,12 @@ preserves requests' `10.255.255.1` connect-timeout tests without providing an
 egress route. Cases that do not need these assets pay no setup cost, and the
 retrieval-replay command does not start these generation-only services.
 
+Before the model receives a shell, the generation runner also reconstructs
+`.git` through a no-local, single-branch clone. This retains the base commit and
+all of its legitimate ancestors while removing remotes, tags, extra refs, and
+unreachable future objects. The worktree and ordinary `git diff`, `git log`,
+and `git blame` behavior remain available.
+
 `--observation-codec` accepts `xml`, `json`, or `text`. Runs resume by skipping
 instance IDs already present in `preds.json`; pass `--redo-existing` to rerun
 them. `--billing-tag` and `--experiment-id` must be provided together.

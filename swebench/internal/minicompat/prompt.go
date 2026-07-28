@@ -16,7 +16,7 @@ import "strings"
 const SystemPrompt = "You are a helpful assistant that can interact with a computer shell to solve programming tasks."
 
 const offlineGuidance = "The shell has no public internet access; only declared local services are reachable. " +
-	"Use the PR description, repository and local history, local tests, and locally available tools and dependencies. " +
+	"Use the PR description, repository and base-or-earlier local history, local tests, and locally available tools and dependencies. " +
 	"If an optional dependency is absent, continue with the available evidence."
 
 // OfflineSystemPrompt adapts the source-aligned system prompt for an isolated

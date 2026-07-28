@@ -71,6 +71,7 @@ func testDockerFactoryOfflineHTTPBinIntegration(
 		Config: cfg, CommandTimeout: 15 * time.Second, CaseTimeout: 2 * time.Minute,
 		Labels:                map[string]string{"tag-swebench.integration": "offline-httpbin"},
 		EnableOfflineServices: true, OfflineAssetsDir: offlineAssetsDir,
+		SanitizeGitHistory: true,
 	}
 	environment, err := factory.Start(context.Background(), instanceID)
 	if err != nil {
@@ -86,9 +87,10 @@ func testDockerFactoryOfflineHTTPBinIntegration(
 	for _, command := range []string{
 		"curl -fsS --connect-timeout 5 http://httpbin.org/get",
 		"curl -fsS --connect-timeout 5 https://httpbin.org/get",
+		"test -z \"$(git status --porcelain)\" && test \"$(git for-each-ref | wc -l)\" -eq 1 && test -z \"$(git remote)\" && test -z \"$(git tag --list)\"",
 	} {
 		result := environment.Execute(context.Background(), command)
-		if result.ReturnCode != 0 || !strings.Contains(result.Output, "httpbin.org/get") {
+		if result.ReturnCode != 0 || (strings.HasPrefix(command, "curl") && !strings.Contains(result.Output, "httpbin.org/get")) {
 			t.Fatalf("%s: %+v", command, result)
 		}
 	}

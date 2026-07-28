@@ -288,7 +288,7 @@ func Run(args []string) error {
 	factory := sweenv.DockerFactory{
 		Config: envCfg, DockerHost: *dockerHost, CommandTimeout: *commandTimeout, CaseTimeout: *caseTimeout,
 		Labels: map[string]string{"tag-swebench.run_id": *runID}, EnableOfflineServices: true,
-		OfflineAssetsDir: *offlineAssetsDir,
+		OfflineAssetsDir: *offlineAssetsDir, SanitizeGitHistory: true,
 	}
 	exec := executor.Executor{
 		Factory: factory, ModelConfig: modelCfg, ObservationCodec: codec, CaseTimeout: *caseTimeout,

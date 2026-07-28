@@ -17,7 +17,7 @@ import (
 func TestCodeSearchSystemPrompt(t *testing.T) {
 	const want = "You are a helpful assistant that can interact with a computer shell to solve programming tasks. " +
 		"The shell has no public internet access; only declared local services are reachable. " +
-		"Use the PR description, repository and local history, local tests, and locally available tools and dependencies. " +
+		"Use the PR description, repository and base-or-earlier local history, local tests, and locally available tools and dependencies. " +
 		"If an optional dependency is absent, continue with the available evidence. " +
 		"You can also use code_search to search a static task-start snapshot of the workspace."
 	if OfflineSystemPromptWithCodeSearch != want {
