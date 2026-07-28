@@ -1,0 +1,97 @@
+{
+  "schema_version": 1,
+  "status": "preflight",
+  "created_at": "2026-07-28",
+  "plan_id": "v10-cleanroom-loopwarn-full500-20260728",
+  "objective": "Establish fresh clean-room full-500 Native and RAG Adapt operating baselines with the optional exact repeated-tool-batch warning enabled.",
+  "inference_boundary": {
+    "design": "Two fresh full-500 generations in fixed serial order: Native, then RAG Adapt.",
+    "bundle_warning": "Both arms add clean-room isolation and the tool-loop warning relative to historical runs. Historical differences are descriptive and cannot identify either change as a single-factor cause.",
+    "quality_blinding": "Do not run or inspect either official harness until both generation arms are complete."
+  },
+  "frozen_inputs": {
+    "benchmark_revision": "b703b8d311a410aef699e010838c4250db7e2fdf",
+    "framework_revision": "358d376784889fd539a764190e1970ee4f4fc5f6",
+    "runner_binary": "trpc-agent-go-impl-loopwarn-b703b8d",
+    "runner_binary_sha256": "13a04c5e0ab1bf9daa051b440bfc30b2a97ae136c9634df24f2acab7a042be6b",
+    "case_count": 500,
+    "cases_sha256": "4b2a050a82d356963320cbfa8e2efdf6a133af8863f31b291a973ab4dd349d07",
+    "model_config_sha256": "fbfdf25e9fced3ecc51d244ccbb652c078b02ac640abbdbcca53ddbaa7af27de",
+    "embedding_config_sha256": "2452624a6a38fbd6f414a70b0c66e48653204662fe1b96c9026350bcc6d79bd1",
+    "environment_config_sha256": "3cfa72f92f4010d242e6adb9bb507ccdf9db261ba5726163b5adecd509c140f0"
+  },
+  "common_generation": {
+    "model": "GLM-5.2",
+    "reasoning_effort": "high",
+    "observation_codec": "xml",
+    "command_timeout": "1m",
+    "case_timeout": "2h",
+    "max_llm_calls": 250,
+    "offline_generation": true,
+    "sanitized_git_history": true,
+    "tool_loop_warning": true,
+    "redo_existing": false
+  },
+  "preflight": {
+    "scope": "all 500 cases",
+    "workers": 4,
+    "requires": [
+      "local images and offline assets available",
+      "public DNS and raw-IP egress blocked",
+      "required loopback HTTP and HTTPS behavior available",
+      "sanitized Git repository retains only legitimate base history",
+      "all preflight containers cleaned"
+    ]
+  },
+  "arms": [
+    {
+      "order": 1,
+      "name": "native",
+      "run_id": "tag-cleanroom-loopwarn-native-full500-20260728-r1",
+      "workers": 15,
+      "code_search": false,
+      "workspace_preload": false,
+      "workspace_representation": "current-fixed",
+      "embedding": "disabled"
+    },
+    {
+      "order": 2,
+      "name": "rag_adapt",
+      "run_id": "tag-cleanroom-loopwarn-adapt-full500-20260728-r1",
+      "workers": 6,
+      "code_search": true,
+      "workspace_preload": false,
+      "workspace_representation": "ast-structured",
+      "embedding": "BGE-M3 hybrid 1024, batch 64, concurrency 1, cache readwrite, max_results 4, max_chars 6000"
+    }
+  ],
+  "generation_gate": {
+    "required_per_arm": [
+      "500 unique canonical terminal artifacts",
+      "predictions, progress, manifest, tags, and responses complete",
+      "responses length equals llm_calls for every case",
+      "frozen fingerprints match",
+      "no unrecovered non-Agent infrastructure failure"
+    ],
+    "recovery": "Resume only missing or non-Agent infrastructure failures under the identical arm configuration; never overwrite a valid canonical terminal artifact."
+  },
+  "official_harness": {
+    "order": ["native", "rag_adapt"],
+    "target": "tag",
+    "workers": 4,
+    "verifier_mode": "calibrated",
+    "cache_level": "instance",
+    "clean": false,
+    "apply_harness_compat": true,
+    "instances_from_predictions": true
+  },
+  "analysis": {
+    "primary": [
+      "resolved count and rate per arm",
+      "prompt, cached, completion, reasoning, and total tokens",
+      "cached-token ratio, canonical cost, llm_calls, tool_calls, duration, and errors",
+      "tool-loop warning case count, total count, first call, and post-warning next action"
+    ],
+    "historical_comparisons": "Descriptive only because clean-room isolation and loop warning are bundled changes."
+  }
+}
