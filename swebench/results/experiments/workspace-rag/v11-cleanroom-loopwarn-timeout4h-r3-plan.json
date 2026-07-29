@@ -1,0 +1,157 @@
+{
+  "schema_version": 1,
+  "status": "preflight",
+  "created_at": "2026-07-29",
+  "plan_id": "v11-cleanroom-loopwarn-timeout4h-r3-20260729",
+  "objective": "Replace the asymmetric V10 one-run comparison with three fresh full-500 generations per Native and RAG Adapt bundle under a four-hour per-case limit.",
+  "inference_boundary": {
+    "design": "Six fresh full-500 generations in a fixed counterbalanced serial order: Native R1, RAG Adapt R1, RAG Adapt R2, Native R2, Native R3, RAG Adapt R3.",
+    "authoritative_runs": "Only these six fresh runs are used for the new Native versus RAG Adapt comparison.",
+    "excluded_prior_result": "V10 remains historical evidence but is excluded because its Native canonical set selectively replaced five infrastructure-interrupted trajectories while the RAG Adapt set did not receive the same opportunity.",
+    "bundle_warning": "The arms are complete operating bundles. They differ in prompt and tool contract, code_search availability, workspace representation, embedding, and worker count; no component receives a single-factor causal interpretation.",
+    "quality_blinding": "Do not run or inspect any prospective official harness result until all six generation runs have passed the generation gate."
+  },
+  "frozen_inputs": {
+    "benchmark_revision": "a702c2f589996b96785b020a3d7f2df9438748d4",
+    "framework_revision": "358d376784889fd539a764190e1970ee4f4fc5f6",
+    "native_runner_binary": "trpc-agent-go-impl-cleanroom-a702c2f",
+    "native_runner_binary_sha256": "839a4f327704554697592335b1fa4a3fd9fac32ec9f8de19923a5e870806e4b8",
+    "rag_adapt_runner_binary": "trpc-agent-go-impl-cleanroom-a702c2f-cgo",
+    "rag_adapt_runner_binary_sha256": "5df758c43eebe7ae72b16a9408c17f140e831c8532ba9a689b76fc3d61a1439a",
+    "preflight_binary": "tag-swebench-offline-preflight-a702c2f",
+    "preflight_binary_sha256": "33ab173c379b668386ef4409a9534641ee232a79d80dd03ea7ee54bea7fbf863",
+    "case_count": 500,
+    "case_list_sha256": "a6b0fd7c8c2969a0eef892e032250adcfa6d32362d395c246930e61b575ac9b9",
+    "cases_sha256": "4b2a050a82d356963320cbfa8e2efdf6a133af8863f31b291a973ab4dd349d07",
+    "model_config_sha256": "fbfdf25e9fced3ecc51d244ccbb652c078b02ac640abbdbcca53ddbaa7af27de",
+    "embedding_config_sha256": "2452624a6a38fbd6f414a70b0c66e48653204662fe1b96c9026350bcc6d79bd1",
+    "environment_config_sha256": "3cfa72f92f4010d242e6adb9bb507ccdf9db261ba5726163b5adecd509c140f0"
+  },
+  "common_generation": {
+    "model": "GLM-5.2",
+    "reasoning_effort": "high",
+    "observation_codec": "xml",
+    "command_timeout": "1m",
+    "case_timeout": "4h",
+    "max_llm_calls": 250,
+    "offline_generation": true,
+    "sanitized_git_history": true,
+    "tool_loop_warning": true,
+    "workspace_preload": false,
+    "redo_existing": false
+  },
+  "preflight": {
+    "scope": "all 500 cases",
+    "workers": 4,
+    "requires": [
+      "local images and offline assets available",
+      "public DNS and raw-IP egress blocked",
+      "required loopback HTTP and HTTPS behavior available",
+      "sanitized Git repository retains only legitimate base history",
+      "all preflight containers cleaned"
+    ]
+  },
+  "arms": {
+    "native": {
+      "replicates": 3,
+      "workers": 15,
+      "code_search": false,
+      "workspace_representation": "current-fixed",
+      "embedding": "disabled"
+    },
+    "rag_adapt": {
+      "replicates": 3,
+      "workers": 6,
+      "code_search": true,
+      "workspace_representation": "ast-structured",
+      "embedding": "BGE-M3 hybrid 1024, batch 64, concurrency 1, cache readwrite, max_results 4, max_chars 6000"
+    }
+  },
+  "generation_order": [
+    {
+      "order": 1,
+      "arm": "native",
+      "replicate": 1,
+      "run_id": "tag-cleanroom-loopwarn-timeout4h-native-20260729-r1"
+    },
+    {
+      "order": 2,
+      "arm": "rag_adapt",
+      "replicate": 1,
+      "run_id": "tag-cleanroom-loopwarn-timeout4h-adapt-20260729-r1"
+    },
+    {
+      "order": 3,
+      "arm": "rag_adapt",
+      "replicate": 2,
+      "run_id": "tag-cleanroom-loopwarn-timeout4h-adapt-20260729-r2"
+    },
+    {
+      "order": 4,
+      "arm": "native",
+      "replicate": 2,
+      "run_id": "tag-cleanroom-loopwarn-timeout4h-native-20260729-r2"
+    },
+    {
+      "order": 5,
+      "arm": "native",
+      "replicate": 3,
+      "run_id": "tag-cleanroom-loopwarn-timeout4h-native-20260729-r3"
+    },
+    {
+      "order": 6,
+      "arm": "rag_adapt",
+      "replicate": 3,
+      "run_id": "tag-cleanroom-loopwarn-timeout4h-adapt-20260729-r3"
+    }
+  ],
+  "terminal_policy": {
+    "agent_outcomes": "Submitted patches and genuine Agent failures, including the exact 250-call limit, context-window exhaustion, and reaching the four-hour case limit, are canonical outcomes for that fresh run.",
+    "no_selective_replacement": "Never replace or rerun an individual case after observing its terminal outcome, regardless of arm or apparent effect on quality.",
+    "infrastructure_failure": "A non-Agent infrastructure failure invalidates the affected full run for this comparison. Freeze its evidence and stop before any replacement; any replacement must be a wholly fresh full-500 run under the identical arm configuration and must be designated before viewing harness quality."
+  },
+  "generation_gate": {
+    "required_per_run": [
+      "500 unique canonical terminal artifacts",
+      "predictions, progress, manifest, tags, and responses complete",
+      "frozen fingerprints and four-hour case timeout match",
+      "no non-Agent infrastructure failure",
+      "no case-level replacement or continuation"
+    ],
+    "serial_transition": "The next pre-registered generation starts only after the preceding run passes the quality-blind generation gate."
+  },
+  "official_harness": {
+    "starts_after": "all six generation runs pass the generation gate",
+    "order": [
+      "native-r1",
+      "rag_adapt-r1",
+      "rag_adapt-r2",
+      "native-r2",
+      "native-r3",
+      "rag_adapt-r3"
+    ],
+    "target": "tag",
+    "workers": 4,
+    "verifier_mode": "calibrated",
+    "cache_level": "instance",
+    "clean": false,
+    "apply_harness_compat": true,
+    "instances_from_predictions": true
+  },
+  "analysis": {
+    "primary": [
+      "resolved count and rate for each of the six runs",
+      "arm-level mean, sample standard deviation, and range across the three run-level resolved rates",
+      "prompt, cached, completion, reasoning, and total tokens per run",
+      "cached-token ratio, canonical cost, llm_calls, tool_calls, duration, and Agent failures per run",
+      "tool-loop warning case count, total count, first call, and post-warning next action per run",
+      "per-case 0-of-3 through 3-of-3 resolution frequency and pairwise run agreement and Jaccard within each arm"
+    ],
+    "prohibitions": [
+      "do not use best-of-three as the arm result",
+      "do not treat the three repeated 500-case panels as 1500 independent cases",
+      "do not pool V10 into the new comparison",
+      "do not interpret the bundle contrast as a code_search, AST, prompt, embedding, worker-count, clean-room, or loop-warning single-factor effect"
+    ]
+  }
+}
