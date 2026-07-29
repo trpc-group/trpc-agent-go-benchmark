@@ -1526,3 +1526,125 @@ The pre-registered design is in
 Sanitized aggregate quality, model accounting, paired estimands, validation,
 limitations, and the decision are in
 [`v9-glm52-native-e3-full500-result.json`](./v9-glm52-native-e3-full500-result.json).
+
+## Clean-room plus exact loop-warning full-500 baseline
+
+V10 establishes fresh Native and RAG Adapt baselines after moving generation
+into an offline, sanitized-Git clean room and enabling the default-off V1 exact
+tool-loop warning. The fixed order was Native generation, RAG Adapt generation,
+then Native and RAG Adapt official harness evaluation. Both 500-case generation
+sets were complete before either quality result was inspected.
+
+This comparison is between complete configuration bundles. Native uses the
+current-fixed Bash-first environment without workspace retrieval. RAG Adapt
+uses its adapted prompt and tool order, AST workspace representation, BGE-M3
+hybrid indexing, and on-demand `code_search`. The run does not isolate any of
+those components as a single-factor cause.
+
+### Clean-room and generation integrity
+
+The corrected offline preflight passed 500/500 cases with zero failures. It
+checked local assets and services, blocked public egress, delivered sanitized
+Git histories, and left no case containers behind.
+
+Native's original batch ended with 495 submissions, three timeouts during a
+confirmed slow-LLM period, and two endpoint connection resets. The five
+infrastructure-interrupted cases were rerun from a new clean-room environment,
+initial prompt, and empty conversation. Four submitted; the fifth,
+`django__django-11734`, reached the model context boundary after 174 calls and
+is retained as a genuine Agent failure. The canonical Native set is therefore
+499 submissions plus one Agent error.
+
+RAG Adapt contains 498 submissions, one exact 250-call Agent limit, and one
+audited long-trajectory Agent timeout. Its first CGO-disabled launch exited
+before any case or LLM request; the same frozen source was rebuilt with CGO for
+SQLite and then generated the canonical 500 cases. Neither arm has an
+unrecovered non-Agent generation failure.
+
+### Official quality and paired outcome
+
+Both calibrated local harness runs exited zero with no verifier error:
+
+| Arm | Submitted | Completed patches | Resolved | Non-empty unresolved | Empty | Harness errors |
+|---|---:|---:|---:|---:|---:|---:|
+| Native | 500 | 498 | **378 (75.6%)** | 120 | 2 | 0 |
+| RAG Adapt | 500 | 497 | **370 (74.0%)** | 127 | 3 | 0 |
+
+| Paired cell | Cases |
+|---|---:|
+| Both resolved | 351 |
+| Native only | 27 |
+| RAG Adapt only | 19 |
+| Neither resolved | 103 |
+
+The realized RAG-Adapt-minus-Native difference is **-8 cases / -1.6
+percentage points**. The exact two-sided McNemar p-value is 0.3020, and a
+paired Wald interval is -4.25 to +1.05 percentage points. This one realization
+does not establish a stable nonzero quality difference or estimate same-arm
+run variance.
+
+### Model usage and cost source
+
+| Metric | Native | RAG Adapt | Adapt change |
+|---|---:|---:|---:|
+| Total tokens | 280,960,328 | 308,631,776 | +9.85% |
+| Prompt tokens | 276,129,893 | 303,004,740 | +9.73% |
+| Cached input tokens | 269,483,520 | 297,620,352 | +10.44% |
+| Uncached input tokens | 6,646,373 | 5,384,388 | -18.99% |
+| Completion tokens | 4,830,435 | 5,627,036 | +16.49% |
+| Cached / prompt ratio | 97.5930% | 98.2230% | +0.6300pp |
+| Estimated billing units | 727.390204 | 795.872816 | +9.41% |
+| LLM / tool calls | 13,455 / 14,389 | 14,118 / 14,733 | +663 / +344 |
+| Tokens per resolved | 743,281.29 | 834,139.94 | +12.22% |
+| Billing units per resolved | 1.924313 | 2.151008 | +11.78% |
+
+The RAG Adapt increase is not a prompt-cache-hit regression: its cached ratio
+is higher and its uncached volume is lower. Of the +68.482612 billing-unit
+delta, cached input contributes +56.273664, output contributes +22.304828,
+and lower uncached input offsets -10.095880. More calls, larger average prompts,
+and more output produce additional cached-prefix replay and dominate the net
+increase.
+
+The five discarded Native infrastructure attempts consumed another 25,073,859
+tokens and 69.644288 billing units. These are reported as operational retry
+overhead and excluded from the canonical comparison; including them raises
+known Native operational accounting to 306,034,187 tokens and 797.034492
+billing units.
+
+### Retrieval and loop-warning behavior
+
+RAG Adapt invoked `code_search` 667 times across 374 cases and returned
+3,022,852 raw-result bytes. Its AST index contained 13,704,528 documents from
+699,544 indexed files, with 13,704,811 embedding-cache hits and 384 misses
+(99.9972% hit rate). No preload was injected. Native built no workspace index
+and exposed no `code_search` tool.
+
+The exact loop detector warned on 6 Native cases (13 warnings) and 7 RAG Adapt
+cases (18 warnings). The first post-warning tool-name-and-arguments batch
+changed in 12/13 arm-case observations, and 9/13 warning-affected observations
+ultimately resolved. There is no warning-disabled fresh control, so these
+numbers do not estimate warning effectiveness.
+
+The full-panel run also demonstrates V1's boundary. Native
+`django__django-11734` triggered six exact warnings but later issued 64
+parameter-drifting `git show` calls; calls 120-173 returned the same 1,661-byte
+result without matching the exact signature, and the trajectory reached the
+context boundary. RAG Adapt `django__django-13089` triggered ten warnings and
+still reached 250 calls. V1 is useful as a narrow immediate-repeat safeguard,
+but content-equivalent argument drift and longer cycles need a separate design.
+
+### Decision
+
+Record Native at **75.6%** and RAG Adapt at **74.0%** as the first fresh
+clean-room plus exact-loop-warning full-panel baselines. The realized RAG Adapt
+arm is lower by eight resolved cases and higher by 9.85% in total tokens, but
+one run per arm is insufficient for a stable quality claim. Cache-hit loss is
+rejected as the explanation for this run's usage increase; additional cached
+history replay and output are the measured sources. Retain the exact warning,
+but do not treat it as complete loop protection.
+
+The frozen design is in
+[`v10-cleanroom-loopwarn-full500-plan.json`](./v10-cleanroom-loopwarn-full500-plan.json).
+Sanitized aggregate quality, usage, retry accounting, retrieval behavior,
+loop-warning cases, artifact hashes, validation, and limitations are in
+[`v10-cleanroom-loopwarn-full500-result.json`](./v10-cleanroom-loopwarn-full500-result.json).

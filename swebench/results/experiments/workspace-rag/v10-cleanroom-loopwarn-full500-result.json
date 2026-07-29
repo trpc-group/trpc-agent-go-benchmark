@@ -1,0 +1,513 @@
+{
+  "schema_version": 1,
+  "status": "completed",
+  "evidence_status": "complete",
+  "completed_on": "2026-07-29",
+  "result_id": "v10-cleanroom-loopwarn-full500",
+  "question": "What fresh full-panel quality, model usage, and loop-warning behavior do the clean-room Native and RAG Adapt bundles exhibit when generation is offline and Git history is sanitized?",
+  "inference_scope": {
+    "design": "Two fresh full-500 generations in fixed serial order, Native then RAG Adapt, followed by fixed-order official local harness evaluation.",
+    "panel": "canonical SWE-bench Verified 500-case panel",
+    "replicates_per_arm": 1,
+    "bundle_warning": "The arms differ in the complete Native versus RAG Adapt bundles, including prompt and tool contract, code_search availability, AST workspace representation, embedding, and worker count. This run cannot identify code_search, AST representation, prompt adaptation, or any other component as a single-factor cause.",
+    "historical_warning": "Both fresh arms add clean-room isolation and the exact tool-loop warning relative to historical runs. Historical placements are descriptive only.",
+    "notes": [
+      "Generation quality remained blind until both arms had complete canonical 500-case sets.",
+      "The paired 500-case quality table describes one stochastic realization per arm and does not estimate run-to-run variance.",
+      "Model-side billing units are reported for reproducible accounting even though GLM-5.2 is self-hosted and monetary spend is not an experiment constraint.",
+      "Embedding monetary cost is out of scope; embedding and cache operations are reported separately."
+    ]
+  },
+  "protocol": {
+    "plan": "results/experiments/workspace-rag/v10-cleanroom-loopwarn-full500-plan.json",
+    "plan_sha256": "e003f9ef387bb70da8fecd3210ad3be777e9262e6ef3ea3f2a15399eafa63dfa",
+    "implementation_revision": "a702c2f589996b96785b020a3d7f2df9438748d4",
+    "plan_revision": "dd61b89f28c6cd7a3ff25d6ca9fb24ba7561be7c",
+    "preflight": {
+      "binary_sha256": "33ab173c379b668386ef4409a9534641ee232a79d80dd03ea7ee54bea7fbf863",
+      "passed": 500,
+      "failed": 0,
+      "duration_ms": 3086229,
+      "interpretation": "All 500 cases passed offline asset, network-isolation, local-service, sanitized-Git, and cleanup checks before generation."
+    },
+    "quality_blinding_respected": true,
+    "official_harness_order": [
+      "native",
+      "rag_adapt"
+    ]
+  },
+  "public_provenance": {
+    "framework_revision": "358d376784889fd539a764190e1970ee4f4fc5f6",
+    "case_list": "data/case-lists/verified-test-500.case_ids.txt",
+    "case_count": 500,
+    "case_list_sha256": "a6b0fd7c8c2969a0eef892e032250adcfa6d32362d395c246930e61b575ac9b9",
+    "cases_jsonl_sha256": "4b2a050a82d356963320cbfa8e2efdf6a133af8863f31b291a973ab4dd349d07",
+    "model_config_sha256": "fbfdf25e9fced3ecc51d244ccbb652c078b02ac640abbdbcca53ddbaa7af27de",
+    "embedding_config_sha256": "2452624a6a38fbd6f414a70b0c66e48653204662fe1b96c9026350bcc6d79bd1",
+    "environment_config_sha256": "3cfa72f92f4010d242e6adb9bb507ccdf9db261ba5726163b5adecd509c140f0"
+  },
+  "common_generation": {
+    "model": "GLM-5.2",
+    "reasoning_effort": "high",
+    "observation_codec": "xml",
+    "command_timeout": "1m",
+    "case_timeout": "2h",
+    "max_llm_calls": 250,
+    "offline_generation": true,
+    "sanitized_git_history": true,
+    "tool_loop_warning": true,
+    "redo_existing": false
+  },
+  "arms": {
+    "native": {
+      "canonical_run_id": "tag-cleanroom-loopwarn-native-full500-20260728-r1-canonical-01",
+      "runner_binary_sha256": "839a4f327704554697592335b1fa4a3fd9fac32ec9f8de19923a5e870806e4b8",
+      "workers": 15,
+      "code_search": false,
+      "workspace_preload": false,
+      "workspace_representation": "current-fixed",
+      "embedding": "disabled",
+      "generation_integrity": {
+        "canonical_cases": 500,
+        "prediction_count": 500,
+        "exit_status_counts": {
+          "Submitted": 499,
+          "Error": 1
+        },
+        "agent_failures": {
+          "context_window": [
+            "django__django-11734"
+          ]
+        },
+        "unrecovered_non_agent_failures": 0,
+        "response_count_mismatches": 0,
+        "fingerprints_match": true,
+        "imports_completed": true,
+        "run_config_completed": true
+      },
+      "official_harness": {
+        "status": "completed",
+        "total_instances": 500,
+        "submitted_instances": 500,
+        "completed_instances": 498,
+        "resolved_instances": 378,
+        "resolved_rate": 0.756,
+        "unresolved_nonempty_instances": 120,
+        "empty_patch_instances": 2,
+        "error_instances": 0,
+        "verifier_exit_code": 0,
+        "duration_ms": 4438291,
+        "unstopped_case_containers": 0
+      },
+      "model_metrics": {
+        "llm_calls": 13455,
+        "prompt_tokens": 276129893,
+        "cached_input_tokens": 269483520,
+        "uncached_input_tokens": 6646373,
+        "completion_tokens": 4830435,
+        "reasoning_tokens_reported": 0,
+        "total_tokens": 280960328,
+        "cached_over_prompt_ratio": 0.9759302662678394,
+        "cached_over_total_ratio": 0.959151499851609,
+        "prompt_tokens_per_llm_call": 20522.474396135265,
+        "completion_tokens_per_llm_call": 359.0066889632107,
+        "rate_card": {
+          "cached_input_per_million": 2.0,
+          "uncached_input_per_million": 8.0,
+          "output_per_million": 28.0
+        },
+        "estimated_cost": 727.390204,
+        "cost_currency": "billing_unit",
+        "tokens_per_resolved": 743281.291005291,
+        "cost_per_resolved": 1.9243127089947092
+      },
+      "agent_metrics": {
+        "tool_calls": 14389,
+        "canonical_case_duration_sum_hours": 76.77899444444445,
+        "canonical_case_duration_median_minutes": 4.205725,
+        "canonical_case_duration_p95_minutes": 35.390233333333335,
+        "primary_batch_wall_hours": 5.56764,
+        "five_case_recovery_wall_hours": 0.9596330555555556,
+        "generation_envelope_hours": 6.567777777777778
+      },
+      "tool_loop_warning_metrics": {
+        "warning_case_count": 6,
+        "warning_count": 13,
+        "first_warning_llm_call_min": 8,
+        "first_warning_llm_call_median": 16.5,
+        "first_warning_llm_call_max": 72,
+        "first_post_warning_exact_tool_batch_changed_cases": 5,
+        "multiple_warning_cases": 3,
+        "warning_cases_resolved": 4,
+        "case_details": [
+          {
+            "instance_id": "django__django-11734",
+            "warnings": 6,
+            "first_warning_llm_call": 72,
+            "llm_calls": 174,
+            "exit_status": "Error",
+            "resolved": false
+          },
+          {
+            "instance_id": "django__django-13786",
+            "warnings": 2,
+            "first_warning_llm_call": 8,
+            "llm_calls": 35,
+            "exit_status": "Submitted",
+            "resolved": true
+          },
+          {
+            "instance_id": "django__django-14349",
+            "warnings": 2,
+            "first_warning_llm_call": 16,
+            "llm_calls": 36,
+            "exit_status": "Submitted",
+            "resolved": true
+          },
+          {
+            "instance_id": "matplotlib__matplotlib-20676",
+            "warnings": 1,
+            "first_warning_llm_call": 15,
+            "llm_calls": 24,
+            "exit_status": "Submitted",
+            "resolved": false
+          },
+          {
+            "instance_id": "scikit-learn__scikit-learn-9288",
+            "warnings": 1,
+            "first_warning_llm_call": 17,
+            "llm_calls": 30,
+            "exit_status": "Submitted",
+            "resolved": true
+          },
+          {
+            "instance_id": "sphinx-doc__sphinx-10466",
+            "warnings": 1,
+            "first_warning_llm_call": 28,
+            "llm_calls": 33,
+            "exit_status": "Submitted",
+            "resolved": true
+          }
+        ]
+      }
+    },
+    "rag_adapt": {
+      "canonical_run_id": "tag-cleanroom-loopwarn-adapt-full500-20260728-r1-canonical-01",
+      "runner_binary_sha256": "5df758c43eebe7ae72b16a9408c17f140e831c8532ba9a689b76fc3d61a1439a",
+      "binary_execution_amendment": "The frozen source was rebuilt with CGO_ENABLED=1 after the initial CGO-disabled binary exited before any case or LLM call because go-sqlite3 requires CGO.",
+      "workers": 6,
+      "code_search": true,
+      "workspace_preload": false,
+      "workspace_representation": "ast-structured",
+      "embedding": "BGE-M3 hybrid 1024, batch 64, concurrency 1, cache readwrite, max_results 4, max_chars 6000",
+      "generation_integrity": {
+        "canonical_cases": 500,
+        "prediction_count": 500,
+        "exit_status_counts": {
+          "Submitted": 498,
+          "Error": 1,
+          "Timeout": 1
+        },
+        "agent_failures": {
+          "max_llm_calls": [
+            "django__django-13089"
+          ],
+          "audited_long_trajectory_timeout": [
+            "django__django-11734"
+          ]
+        },
+        "unrecovered_non_agent_failures": 0,
+        "response_count_mismatches": 1,
+        "response_count_mismatch_interpretation": "django__django-11734 has 172 llm_calls and 171 persisted response objects because its terminal request ended at the audited case timeout.",
+        "fingerprints_match": true,
+        "imports_completed": true,
+        "run_config_completed": true
+      },
+      "official_harness": {
+        "status": "completed",
+        "total_instances": 500,
+        "submitted_instances": 500,
+        "completed_instances": 497,
+        "resolved_instances": 370,
+        "resolved_rate": 0.74,
+        "unresolved_nonempty_instances": 127,
+        "empty_patch_instances": 3,
+        "error_instances": 0,
+        "verifier_exit_code": 0,
+        "duration_ms": 4365137,
+        "unstopped_case_containers": 0
+      },
+      "model_metrics": {
+        "llm_calls": 14118,
+        "response_objects": 14117,
+        "prompt_tokens": 303004740,
+        "cached_input_tokens": 297620352,
+        "uncached_input_tokens": 5384388,
+        "completion_tokens": 5627036,
+        "reasoning_tokens_reported": 0,
+        "total_tokens": 308631776,
+        "cached_over_prompt_ratio": 0.9822300205600744,
+        "cached_over_total_ratio": 0.9643218072270043,
+        "prompt_tokens_per_llm_call": 21462.299192520186,
+        "completion_tokens_per_llm_call": 398.57175237285736,
+        "rate_card": {
+          "cached_input_per_million": 2.0,
+          "uncached_input_per_million": 8.0,
+          "output_per_million": 28.0
+        },
+        "estimated_cost": 795.8728160000001,
+        "cost_currency": "billing_unit",
+        "tokens_per_resolved": 834139.9351351351,
+        "cost_per_resolved": 2.1510076108108107
+      },
+      "agent_metrics": {
+        "tool_calls": 14733,
+        "canonical_case_duration_sum_hours": 41.95295888888889,
+        "canonical_case_duration_median_minutes": 2.7795083333333332,
+        "canonical_case_duration_p95_minutes": 15.668766666666667,
+        "generation_wall_hours": 7.006536111111111
+      },
+      "tool_loop_warning_metrics": {
+        "warning_case_count": 7,
+        "warning_count": 18,
+        "first_warning_llm_call_min": 10,
+        "first_warning_llm_call_median": 14,
+        "first_warning_llm_call_max": 74,
+        "first_post_warning_exact_tool_batch_changed_cases": 7,
+        "multiple_warning_cases": 2,
+        "warning_cases_resolved": 5,
+        "case_details": [
+          {
+            "instance_id": "django__django-11734",
+            "warnings": 1,
+            "first_warning_llm_call": 74,
+            "llm_calls": 172,
+            "exit_status": "Timeout",
+            "resolved": false
+          },
+          {
+            "instance_id": "django__django-13089",
+            "warnings": 10,
+            "first_warning_llm_call": 11,
+            "llm_calls": 250,
+            "exit_status": "Error",
+            "resolved": false
+          },
+          {
+            "instance_id": "django__django-13786",
+            "warnings": 1,
+            "first_warning_llm_call": 13,
+            "llm_calls": 35,
+            "exit_status": "Submitted",
+            "resolved": true
+          },
+          {
+            "instance_id": "django__django-15499",
+            "warnings": 1,
+            "first_warning_llm_call": 14,
+            "llm_calls": 21,
+            "exit_status": "Submitted",
+            "resolved": true
+          },
+          {
+            "instance_id": "sphinx-doc__sphinx-8638",
+            "warnings": 1,
+            "first_warning_llm_call": 40,
+            "llm_calls": 67,
+            "exit_status": "Submitted",
+            "resolved": true
+          },
+          {
+            "instance_id": "sphinx-doc__sphinx-9367",
+            "warnings": 3,
+            "first_warning_llm_call": 10,
+            "llm_calls": 27,
+            "exit_status": "Submitted",
+            "resolved": true
+          },
+          {
+            "instance_id": "sympy__sympy-23413",
+            "warnings": 1,
+            "first_warning_llm_call": 18,
+            "llm_calls": 47,
+            "exit_status": "Submitted",
+            "resolved": true
+          }
+        ]
+      }
+    }
+  },
+  "paired_quality": {
+    "direction": "rag_adapt minus native",
+    "panel_cases": 500,
+    "both_resolved": 351,
+    "native_only_resolved": 27,
+    "rag_adapt_only_resolved": 19,
+    "neither_resolved": 103,
+    "discordant": 46,
+    "resolved_cases_difference": -8,
+    "resolved_rate_percentage_points": -1.6,
+    "exact_mcnemar_two_sided_p": 0.3019956131896606,
+    "paired_difference_95_percent_interval": {
+      "method": "paired Wald interval over per-instance RAG-Adapt-minus-Native binary differences",
+      "lower_percentage_points": -4.254971752768756,
+      "upper_percentage_points": 1.0549717527687557
+    },
+    "interpretation": "Native is numerically higher by eight resolved cases in this realization. The discordance test and paired interval do not establish a stable nonzero difference, and one run per arm cannot estimate stochastic repeat variance."
+  },
+  "descriptive_rag_adapt_minus_native": {
+    "total_tokens": 27671448,
+    "total_tokens_percent": 9.848880871181208,
+    "prompt_tokens_percent": 9.732682944254801,
+    "cached_input_tokens_percent": 10.441021402718809,
+    "uncached_input_tokens_percent": -18.98757412501525,
+    "completion_tokens_percent": 16.491289086800663,
+    "cached_over_prompt_percentage_points": 0.6299754292234961,
+    "llm_calls": 663,
+    "llm_calls_percent": 4.9275362318840665,
+    "tool_calls": 344,
+    "tool_calls_percent": 2.390715129612908,
+    "estimated_cost": 68.482612,
+    "estimated_cost_percent": 9.414838366451228,
+    "tokens_per_resolved_percent": 12.223991808936475,
+    "cost_per_resolved_percent": 11.780564601401537,
+    "estimated_cost_delta_decomposition": {
+      "cached_input": 56.273664,
+      "uncached_input": -10.09588,
+      "output": 22.304828
+    },
+    "interpretation": "The higher RAG Adapt accounting is not caused by a lower prompt-cache ratio. RAG Adapt has a 0.63-point higher cached-over-prompt ratio and 19.0% fewer uncached tokens, but more calls, a larger average prompt per call, and more completion tokens. Additional cached-prefix replay and output volume dominate the net cost delta."
+  },
+  "retrieval_profile": {
+    "native": {
+      "code_search_calls": 0,
+      "code_search_case_count": 0,
+      "workspace_documents": 0,
+      "embedding_requests": 0
+    },
+    "rag_adapt": {
+      "code_search_calls": 667,
+      "code_search_case_count": 374,
+      "code_search_case_rate": 0.748,
+      "code_search_observation_bytes": 1611827,
+      "code_search_result_bytes": 3022852,
+      "workspace_documents": 13704528,
+      "eligible_files": 699590,
+      "indexed_files": 699544,
+      "workspace_full_coverage_cases": 492,
+      "fallback_documents": 18380,
+      "duplicate_documents": 773592,
+      "aggregate_index_duration_ms": 33140552,
+      "preload_injected_cases": 0,
+      "embedding_requests": 384,
+      "embedding_inputs": 384,
+      "embedding_errors": 0,
+      "embedding_cache_hits": 13704811,
+      "embedding_cache_misses": 384,
+      "embedding_cache_hit_rate": 0.9999719814274806,
+      "embedding_cache_corruptions": 0,
+      "embedding_cache_errors": 0
+    },
+    "interpretation": "These metrics describe the complete RAG Adapt bundle. They do not isolate the causal effect of code_search presence, AST representation, retrieval content, prompt adaptation, or cache warmth."
+  },
+  "tool_loop_warning_interpretation": {
+    "first_post_warning_batch_method": "Compare the first recorded post-warning assistant tool-name-and-arguments batch with the immediately preceding assistant batch; this is narrower than the detector's full tool-plus-model-visible-result signature.",
+    "combined_arm_case_observations": 13,
+    "combined_warning_count": 31,
+    "first_post_warning_exact_tool_batch_changed": 12,
+    "warning_case_observations_resolved": 9,
+    "warning_case_observations_with_multiple_warnings": 5,
+    "known_limitations": [
+      "There is no warning-disabled fresh control arm, so this full-panel run cannot estimate the warning's causal quality or cost effect.",
+      "Native django__django-11734 triggered six exact warnings but later made 64 parameter-drifting git-show calls; calls 120-173 returned the same 1661-byte result without matching the V1 exact signature, and the trajectory ended at the context boundary.",
+      "RAG Adapt django__django-13089 triggered ten warnings and still reached the 250-call limit.",
+      "The V1 detector therefore addresses exact immediate repeats but does not cover content-equivalent argument drift or longer-period cycles."
+    ]
+  },
+  "operational_accounting": {
+    "native_canonical_terminal_artifacts": 500,
+    "native_replaced_infrastructure_attempts": 5,
+    "native_replaced_attempt_statuses": {
+      "case_timeout_during_confirmed_slow_llm_period": 3,
+      "endpoint_connection_reset": 2
+    },
+    "native_replaced_attempt_usage": {
+      "llm_calls": 371,
+      "tool_calls": 421,
+      "prompt_tokens": 24533489,
+      "cached_input_tokens": 23625664,
+      "uncached_input_tokens": 907825,
+      "completion_tokens": 540370,
+      "total_tokens": 25073859,
+      "estimated_cost": 69.644288,
+      "cost_currency": "billing_unit",
+      "case_duration_sum_ms": 25172188
+    },
+    "native_known_operational_including_replaced_attempts": {
+      "llm_calls": 13826,
+      "tool_calls": 14810,
+      "total_tokens": 306034187,
+      "estimated_cost": 797.034492,
+      "cost_currency": "billing_unit"
+    },
+    "rag_adapt_cgo_disabled_false_start": {
+      "cases_started": 0,
+      "llm_calls": 0,
+      "canonical": false
+    },
+    "official_harness_attempt_01": {
+      "cases_started": 0,
+      "exit_code": 1,
+      "error": "ambient Go workspace rejected evaluator module path"
+    },
+    "official_harness_attempt_02": {
+      "gowork": "off",
+      "native_exit_code": 0,
+      "rag_adapt_exit_code": 0
+    }
+  },
+  "artifact_hashes": {
+    "canonical_validation": "47378d23beecad08dd2455e8c397a3ed1b4b7bf7089d3292cf48ab1c7c35b992",
+    "native_predictions": "bd00cd139e10fdd134187bc257c415acc672d1eb3bcec27b3b103b4fe9a997bf",
+    "rag_adapt_predictions": "4aa070917e80b1d005e8f1a4ebf4e1211be5c0f522521392a711fa26c97afe9f",
+    "native_runner_manifest": "132155582cf1c63a018ae8865cc248dec639406b5e9fe7219ae9a44512ff1fab",
+    "rag_adapt_runner_manifest": "29e727c8ea512c29d50a48ce716cd425095ff15dd3bbd2f17beb8e8efa4bd85e",
+    "native_harness_report": "fcd2beb81884045aff4c532a99080f8b7ea16739315a804c41f430bc1d7b8824",
+    "rag_adapt_harness_report": "c38bde993f9fe701571152090a19cea24ac0e05011d425ba65141ad6f5a7c14d",
+    "native_import_summary": "870ee87db4cf5549f5f5288b3cdcfa2ff5c7efcf58f0766dfd1f7a0e30cb67df",
+    "rag_adapt_import_summary": "1e296427428aacc52f2c745a03ea57f1a5db51f225b4f6aebf395150b63b2cc5",
+    "native_run_config": "19d22bfcaf44bf280736bf54e88efbf9a0a895c43418a758c7439eb5d1c1cf79",
+    "rag_adapt_run_config": "b71e05def3b287e364cb3fdd749a6c4313f2ddb1b2ff6cb1b320574e4ebda423"
+  },
+  "validation": {
+    "preflight_500_passed": true,
+    "canonical_prediction_count_per_arm": 500,
+    "canonical_fingerprints_match": true,
+    "unrecovered_non_agent_failures_zero": true,
+    "official_harness_exit_zero": true,
+    "official_harness_error_zero": true,
+    "binary_quality_outcome_available_for_all_500_per_arm": true,
+    "usage_matches_import": true,
+    "run_configs_generated": true,
+    "case_list_sha256_verified": true,
+    "json_parse": true,
+    "metric_consistency_assertions": true
+  },
+  "decision": {
+    "fresh_cleanroom_baselines_complete": true,
+    "native_result": "378/500 (75.6%)",
+    "rag_adapt_result": "370/500 (74.0%)",
+    "stable_quality_advantage_established": false,
+    "cache_hit_loss_explains_rag_adapt_cost_growth": false,
+    "tool_loop_warning_v1_sufficient_for_all_observed_loops": false,
+    "conclusion": "Record Native at 75.6% and RAG Adapt at 74.0% as the first fresh clean-room plus exact-loop-warning full-panel baselines. In this realization RAG Adapt resolves eight fewer cases while using 9.85% more total tokens and 9.41% more model-side billing units. Its cache ratio is higher, not lower; the usage delta comes from greater cached-prefix replay and output volume. Retain the V1 warning as a narrow exact-repeat safeguard, but extend the design before relying on it against argument-drift or longer-cycle loops."
+  },
+  "limitations": [
+    "One fresh stochastic realization per arm; no same-arm repeat variance estimate.",
+    "The Native and RAG Adapt arms are complete configuration bundles with different prompts, tools, retrieval, representations, embeddings, and worker counts.",
+    "Clean-room isolation and tool-loop warning are bundled relative to historical runs, so historical changes cannot be assigned to either feature.",
+    "Generation ran sequentially during changing model-response latency; case and wall durations are operational observations, not treatment effects.",
+    "The Native canonical set replaces five confirmed infrastructure-interrupted attempts with full fresh trajectories; discarded usage is reported separately and not counted as canonical model usage.",
+    "The RAG Adapt timeout response mismatch is an audited terminal Agent trajectory rather than missing recoverable infrastructure work."
+  ]
+}
