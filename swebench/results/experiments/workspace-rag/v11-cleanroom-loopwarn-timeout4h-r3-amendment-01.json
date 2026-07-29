@@ -1,0 +1,86 @@
+{
+  "schema_version": 1,
+  "status": "active",
+  "created_at": "2026-07-29",
+  "amendment_id": "v11-cleanroom-loopwarn-timeout4h-r3-amendment-01",
+  "amends": "v11-cleanroom-loopwarn-timeout4h-r3-20260729",
+  "reason": "Reduce elapsed validation time by overlapping completed-run harness evaluation with later frozen generation runs.",
+  "decision_timing": {
+    "state": "Native R1 generation active; no V11 generation run or prospective V11 harness had completed.",
+    "prospective_harness_results_seen": false
+  },
+  "unchanged_generation_contract": {
+    "run_count": 6,
+    "order": [
+      "native-r1",
+      "rag_adapt-r1",
+      "rag_adapt-r2",
+      "native-r2",
+      "native-r3",
+      "rag_adapt-r3"
+    ],
+    "frozen": [
+      "case membership",
+      "model, prompt, tool, embedding, and environment configuration",
+      "worker counts",
+      "four-hour case timeout",
+      "terminal and whole-run infrastructure-failure policy",
+      "no case-level continuation, rerun, or replacement"
+    ],
+    "early_harness_results_must_not_change": [
+      "remaining generation order or run count",
+      "remaining generation configuration",
+      "terminal classification or whole-run replacement decisions"
+    ]
+  },
+  "harness_pipeline": {
+    "eligibility": "A run enters the harness queue only after its quality-blind 500-case generation gate passes.",
+    "queue_order": [
+      "native-r1",
+      "rag_adapt-r1",
+      "rag_adapt-r2",
+      "native-r2",
+      "native-r3",
+      "rag_adapt-r3"
+    ],
+    "serial": true,
+    "max_active_harness_runs": 1,
+    "during_generation": {
+      "workers": 1,
+      "launch_condition": "The next generation has passed its start resource gate and is active, or all generation is complete.",
+      "resource_policy": "Harness may wait for adequate host headroom; it must never stop or reconfigure generation."
+    },
+    "after_all_generation": {
+      "workers": 4,
+      "transition": "Any already-active workers=1 harness finishes unchanged. Every harness not yet started uses workers=4."
+    },
+    "fixed_options": {
+      "target": "tag",
+      "python": "/data/validation/swebench-py/bin/python",
+      "verifier_mode": "calibrated",
+      "cache_level": "instance",
+      "clean": false,
+      "apply_harness_compat": true,
+      "instances_from_predictions": true
+    },
+    "post_run_gate": "After each harness finishes successfully, create and validate that run's RR, token, cached-token ratio, cost, calls, duration, errors, and tool-loop-warning metrics summary before starting the next queued harness.",
+    "result_visibility": "Per-run harness metrics may be inspected and reported immediately under this amendment, but they cannot adapt the frozen generation contract."
+  },
+  "monitoring": {
+    "heartbeat_interval_after_pipeline_start": "10m",
+    "during_overlap": [
+      "generation and harness process trees",
+      "generation terminal and error counts",
+      "harness completion and error counts",
+      "CPU idle and load",
+      "MemAvailable, Swap, and PSI",
+      "disk utilization, await, free space, and Docker containers"
+    ],
+    "pressure_response": "Delay or stop only the harness side when material resource pressure threatens generation; preserve harness evidence and never touch active generation cases."
+  },
+  "interpretation": {
+    "protocol_change": "The original no-harness-before-all-generation blinding rule is superseded by a frozen-generation, early-harness policy.",
+    "performance_scope": "Generation wall-clock latency is not an analysis endpoint. RR, canonical model tokens, cached-token ratio, and canonical model cost remain the comparison endpoints.",
+    "residual_risk": "Concurrent harness load can matter only if it changes model-cache behavior, tool observations, timeouts, or infrastructure failures; these mediators are monitored and reported."
+  }
+}
