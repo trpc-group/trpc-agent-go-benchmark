@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "status": "active",
+  "created_at": "2026-07-29",
+  "amendment_id": "v11-cleanroom-loopwarn-timeout4h-r3-amendment-02",
+  "amends": "v11-cleanroom-loopwarn-timeout4h-r3-amendment-01",
+  "scope": "monitoring cadence clarification only",
+  "generation_impact": "none",
+  "harness_execution_impact": "none",
+  "monitoring": {
+    "normal_interval": "25m",
+    "pre_first_harness_interval": "10m",
+    "switch_to_10m_when": [
+      "Native R1 has at most 80 non-terminal cases",
+      "Native R1 is in an equivalent long-tail state with a first-harness ETA within 60 minutes",
+      "Native R1 generation gate has passed and the harness is waiting for the next generation to become active",
+      "the first harness has started before the cadence was changed"
+    ],
+    "first_harness_stability_window": "At least three consecutive 10-minute checks spanning at least 30 minutes after first-harness start.",
+    "stable_requires": [
+      "generation has no new timeout, infrastructure error, or abnormal terminal signature",
+      "CPU, memory, and I/O pressure remain below the registered resource gates",
+      "harness makes forward progress without harness errors",
+      "no Docker or shared-service conflict is observed"
+    ],
+    "return_to_25m": "After the stability window passes, or after the first harness and its metrics gate finish successfully if that occurs earlier.",
+    "remain_or_return_to_10m": "Any resource risk, generation anomaly, harness anomaly, or major transition requiring close observation."
+  },
+  "rationale": "Ten-minute monitoring is a temporary guard around first-harness overlap startup, not the steady-state cadence."
+}
