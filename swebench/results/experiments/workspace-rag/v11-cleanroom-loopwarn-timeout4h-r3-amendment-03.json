@@ -1,0 +1,67 @@
+{
+  "schema_version": 1,
+  "status": "active",
+  "created_at": "2026-07-29",
+  "amendment_id": "v11-cleanroom-loopwarn-timeout4h-r3-amendment-03",
+  "amends": "v11-cleanroom-loopwarn-timeout4h-r3-plan",
+  "scope": "Separate a single 300-second LLM HTTP attempt timeout from the four-hour case deadline and permit quality-blind case-level infrastructure recovery.",
+  "timing": {
+    "adopted_during": "Native R1 generation",
+    "prospective_harness_seen": false,
+    "active_generation_impact": "none",
+    "frozen_arm_configuration_impact": "none"
+  },
+  "terminal_policy_override": {
+    "qualifying_single_attempt_timeout": {
+      "exit_status": "Error",
+      "error_category": "endpoint_timeout",
+      "retryable": true,
+      "error_suffix": "chat/completions\": context deadline exceeded",
+      "interpretation": "The model endpoint failed to complete one HTTP request within its fixed 300-second attempt deadline. This is a recoverable infrastructure interruption, not a case-level Agent outcome."
+    },
+    "four_hour_case_timeout": {
+      "exit_status": "Timeout",
+      "error_category": "case_timeout",
+      "error": "context deadline exceeded",
+      "interpretation": "The complete Agent case exhausted its four-hour wall-clock allowance. It remains canonical and is not rerun."
+    },
+    "other_terminal_outcomes": "Submitted, the exact 250-call limit, a genuine context limit, and other audited Agent failures remain canonical. Other infrastructure signatures remain stop-and-classify events unless separately amended."
+  },
+  "endpoint_timeout_recovery": {
+    "selection_rule": "Select a case for retry solely from the exact qualifying infrastructure signature, before and without consulting official harness quality.",
+    "execution": "Rerun the complete case from its initial prompt in a newly created clean-room environment, with an empty conversation history and a new run-id and output directory. Do not resume the old session or replay its responses.",
+    "frozen_inputs": "Keep the arm binary, model and embedding configuration, environment, offline network boundary, sanitized Git policy, prompt and tool contract, XML codec, tool-loop warning, command timeout, four-hour case timeout, and max LLM calls unchanged.",
+    "prompt_cache": "Do not alter the prompt or cache policy to induce a hit. Natural server-side cache behavior is accepted.",
+    "repeat_timeout": "If the fresh retry itself ends with the same exact single-attempt endpoint_timeout signature, it remains an infrastructure attempt and may be retried again. Stop for user review after three consecutive qualifying endpoint-timeout attempts for the same case.",
+    "replacement_boundary": "The first fresh retry that reaches a non-qualifying terminal outcome becomes that run's canonical trajectory for the case. A four-hour case timeout or genuine Agent failure on the retry is canonical and is not retried.",
+    "evidence_preservation": "Preserve every displaced endpoint-timeout attempt in a separate infrastructure-attempt directory with immutable tag and responses artifacts and an index linking it to the selected canonical attempt."
+  },
+  "metrics": {
+    "canonical": "RR, tokens, cached-token ratios, cost, calls, duration, errors, and loop-warning metrics use exactly the final 500-case canonical set, including the complete fresh retry trajectory selected for each recovered case.",
+    "infrastructure_overhead": "Token, cost, calls, and duration consumed by displaced endpoint-timeout attempts are reported separately and excluded from canonical Agent metrics.",
+    "iid_boundary": "Recovery eligibility is determined only by a task-independent model-service failure signature. No retry decision may use patch content, resolved status, or effect size. The reported estimand is Agent performance conditional on a functioning model endpoint."
+  },
+  "generation_gate_override": {
+    "allowed_case_level_replacement": "A documented qualifying endpoint-timeout recovery is permitted and does not invalidate the full run.",
+    "required": [
+      "500 unique final canonical terminal artifacts",
+      "all retry attempts and selected canonical mappings recorded",
+      "canonical predictions, progress, manifest, tags, and responses complete",
+      "responses length matches llm_calls for each final canonical trajectory",
+      "no unresolved non-qualifying infrastructure failure",
+      "all frozen fingerprints and the four-hour case timeout match"
+    ]
+  },
+  "current_application": {
+    "run_id": "tag-cleanroom-loopwarn-timeout4h-native-20260729-r1",
+    "instance_id": "django__django-12663",
+    "observed_signature": {
+      "exit_status": "Error",
+      "error_category": "endpoint_timeout",
+      "retryable": true,
+      "llm_calls": 117,
+      "error": "Post \"http://03-llm.woa.com/gateway/v1/chat/completions\": context deadline exceeded"
+    },
+    "action": "After the primary 500-case generation finishes, perform a fresh Native case-level recovery before the Native R1 generation gate. Do not stop or mutate the currently active generation."
+  }
+}
