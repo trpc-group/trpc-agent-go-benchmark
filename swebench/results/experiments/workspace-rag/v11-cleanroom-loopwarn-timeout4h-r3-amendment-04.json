@@ -1,0 +1,86 @@
+{
+  "schema_version": 1,
+  "status": "active",
+  "created_at": "2026-07-30",
+  "amendment_id": "v11-cleanroom-loopwarn-timeout4h-r3-amendment-04",
+  "amends": "v11-cleanroom-loopwarn-timeout4h-r3-amendment-03",
+  "scope": "Recover from an empty endpoint-timeout scan control-plane bug without rerunning or changing any canonical case, then resume the frozen generation order and serial harness queue.",
+  "authorization": {
+    "authorized_at": "2026-07-30T01:22:49+08:00",
+    "authorized_by": "experiment owner",
+    "authorized_action": "minimal bypass recovery",
+    "boundary": "Preserve all failed-control-plane evidence, validate the existing Adapt R1 canonical 500, continue with Adapt R2, and resume the harness queue at Adapt R1. Do not rerun Adapt R1 or alter any frozen experimental input."
+  },
+  "timing": {
+    "adopted_after": [
+      "Native R1 canonical generation gate",
+      "Native R1 official harness metrics gate",
+      "Adapt R1 primary 500-case generation"
+    ],
+    "adopted_before": [
+      "Adapt R1 official harness start",
+      "Adapt R2 generation start"
+    ],
+    "quality_information_available": "Native R1 harness metrics existed. No Adapt R1 or later-arm harness result existed.",
+    "selection_effect": "none; the six-run order, arm membership, case membership, configurations, and replicate count remain frozen"
+  },
+  "incident": {
+    "run_id": "tag-cleanroom-loopwarn-timeout4h-adapt-20260729-r1",
+    "primary_generation_completed_at": "2026-07-30T00:31:00+08:00",
+    "primary_terminal_counts": {
+      "Submitted": 499,
+      "Error": 1,
+      "Timeout": 0
+    },
+    "endpoint_timeout_scan": [],
+    "cause": "The amendment-03 controller printed a newline for an empty JSON scan. Bash mapfile interpreted that newline as one empty instance id and invoked a retry with an empty case list.",
+    "failed_control_attempt": {
+      "attempt": 1,
+      "instance_id": "",
+      "case_list_bytes": 1,
+      "runner_exit": 1,
+      "runner_error": "case list is empty",
+      "elapsed_seconds": 0.3,
+      "model_calls": 0,
+      "canonical_artifacts_changed": false
+    },
+    "controller_effect": "The generation controller exited before writing Adapt R1 validation, generation audit, or completed-at markers. The harness queue then exited because the generation controller was inactive.",
+    "quality_effect": "none; Adapt R1 official harness never started and no prediction was added, removed, replaced, or inspected for quality"
+  },
+  "recovery": {
+    "empty_scan_fix": "Emit zero bytes, not one newline, for an empty endpoint-timeout list and reject every empty instance id before any retry is launched.",
+    "adapt_r1_gate": [
+      "Require exactly 500 tag artifacts, 500 response artifacts, complete predictions, progress, and runner manifest.",
+      "Require the persisted and freshly recomputed endpoint-timeout scans both to be empty.",
+      "Require and hash the failed empty-case-list attempt evidence.",
+      "Hash the complete canonical tag/response tree and canonical metadata before validation.",
+      "Run the frozen validator and require a passing 500-case generation audit.",
+      "Recompute the canonical hashes and require byte identity before writing completion markers."
+    ],
+    "continuation": "After the recovered Adapt R1 generation gate, start Adapt R2 and continue Native R2, Native R3, and Adapt R3 in the previously frozen order. Resume the serial official harness queue at Adapt R1 after mechanically verifying the completed Native R1 metrics gate.",
+    "preservation": "Retain the amendment-03 logs, stale PID files, empty retry directory, scan, case list, exit status, and timing output. Never overwrite the failed attempt or Adapt R1 canonical artifacts.",
+    "quality_adaptive": false
+  },
+  "frozen_configuration_impact": {
+    "generation": "none",
+    "harness": "none",
+    "case_membership": "none",
+    "run_order": "none",
+    "replicate_count": "none",
+    "retry_policy": "none beyond correcting the empty-list representation to implement amendment-03 as written"
+  },
+  "implementation": {
+    "base_controller_sha256": "0137b007870103b4af0c9840d41d9933188f6ba7733b750bf4970f0a9848f769",
+    "recovery_controller_sha256": "ab8cbd216741475dfd20a4cd425b9054fa8cefd415318d49c22e9e44a4eedda0",
+    "base_harness_queue_sha256": "079ffdc568776e0738acdee6bfa30ec224375b135e660b5b63af4adbe2f6c3d4",
+    "harness_resume_sha256": "48dad91659428334177ad5067b71b7a033654a3f2f3d297fa272f546cb3ce919",
+    "validator_sha256": "4296c53120124962b0a358f90203605f0e4445a1fbb22040f104a2aa6d399972",
+    "endpoint_retry_helper_sha256": "4fc02177ce6e96fc93cfa738dee0461c7705ac5306e9b097eedd123c78df415b",
+    "harness_metrics_helper_sha256": "5f698de46f36f82ba9e4408bf8b5b8855b93dff3b05b665c650cbdbe97e0674f"
+  },
+  "reporting": {
+    "canonical_metrics": "unchanged; use only the six final canonical runs",
+    "control_plane_failure": "Report separately as infrastructure overhead with zero model calls, zero model tokens, zero model cost, and no canonical case replacement.",
+    "causal_boundary": "This amendment repairs orchestration semantics only and supplies no evidence for a Native-versus-Adapt quality effect."
+  }
+}
