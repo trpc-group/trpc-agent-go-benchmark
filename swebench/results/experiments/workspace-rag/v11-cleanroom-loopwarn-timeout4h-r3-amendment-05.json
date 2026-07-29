@@ -1,0 +1,53 @@
+{
+  "schema_version": 1,
+  "status": "active",
+  "created_at": "2026-07-30",
+  "amendment_id": "v11-cleanroom-loopwarn-timeout4h-r3-amendment-05",
+  "amends": "v11-cleanroom-loopwarn-timeout4h-r3-amendment-04",
+  "scope": "Correct one Bash nounset declaration-order bug in the amendment-04 recovery controller after its zero-side-effect startup failure.",
+  "authorization": {
+    "source": "The experiment owner's 2026-07-30T01:22:49+08:00 authorization for minimal bypass recovery.",
+    "boundary": "Continue the already authorized mechanical recovery only; do not change or rerun a canonical case, generation configuration, harness configuration, case membership, run order, or replicate count."
+  },
+  "timing": {
+    "failure_observed_at": "2026-07-30T01:36:13+08:00",
+    "adapt_r1_validation_seen": false,
+    "adapt_r1_harness_seen": false,
+    "adapt_r2_started": false,
+    "quality_adaptive": false
+  },
+  "incident": {
+    "controller": "v11-cleanroom-loopwarn-timeout4h-r3-amendment-04-controller",
+    "controller_sha256": "ab8cbd216741475dfd20a4cd425b9054fa8cefd415318d49c22e9e44a4eedda0",
+    "logical_pid": 336450,
+    "elapsed_seconds": 0.31,
+    "exit_status": 1,
+    "error": "line 125: run_dir: unbound variable",
+    "cause": "A single Bash local declaration assigned run_dir and expanded it for output in the same command while nounset was active.",
+    "side_effect_boundary": {
+      "model_calls": 0,
+      "canonical_artifacts_changed": false,
+      "generation_audit_written": false,
+      "generation_completion_marker_written": false,
+      "adapt_r2_directory_created": false,
+      "harness_started": false
+    }
+  },
+  "fix": {
+    "change": "Split run_dir and output into two sequential local declarations before executing the unchanged amendment-04 recovery gate.",
+    "source_reuse": "Verify the published amendment-04 controller SHA, source only its declaration/function section, replace exactly its line 125 declaration, and never replay its top-level execution.",
+    "failed_attempt_gate": "Require the amendment-04 stale PID, exact nounset error, exit status 1, absence of Adapt R1 audit/completion, and absence of Adapt R2 before continuing.",
+    "recovery_semantics": "unchanged from amendment-04",
+    "harness_resume": "unchanged amendment-04 harness resume script; it was deployed but never executed"
+  },
+  "implementation": {
+    "amendment_04_sha256": "f668cb4d7d06582ad06074e02964c927738ca506b6dd3ae5199d9209af606949",
+    "recovery_controller_05_sha256": "27e6868a65209ba27d12fcf3d2903b731655af6ffabe6f6804ecb22fc76e320f",
+    "harness_resume_04_sha256": "48dad91659428334177ad5067b71b7a033654a3f2f3d297fa272f546cb3ce919"
+  },
+  "reporting": {
+    "canonical_metrics": "unchanged; use only the six final canonical runs",
+    "controller_startup_failure": "Report as a separate control-plane infrastructure event with zero model calls, tokens, and cost.",
+    "causal_boundary": "This amendment is orchestration-only and supplies no quality evidence."
+  }
+}
