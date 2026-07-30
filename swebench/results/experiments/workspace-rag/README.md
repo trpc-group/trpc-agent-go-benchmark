@@ -1648,3 +1648,115 @@ The frozen design is in
 Sanitized aggregate quality, usage, retry accounting, retrieval behavior,
 loop-warning cases, artifact hashes, validation, and limitations are in
 [`v10-cleanroom-loopwarn-full500-result.json`](./v10-cleanroom-loopwarn-full500-result.json).
+
+## V11: three fresh clean-room repetitions per bundle
+
+V11 replaces the asymmetric one-run V10 comparison with six fresh full-panel
+generations: three Native runs and three RAG Adapt runs over the same 500
+SWE-bench Verified cases. Every case first passed the fresh offline preflight
+(500/500, zero failures). Generation used GLM-5.2 high reasoning, XML
+observations, a one-minute command timeout, a four-hour case timeout, a
+250-call limit, no network, sanitized Git history, the exact tool-loop warning,
+and no workspace preload.
+
+The fixed generation order was Native R1, Adapt R1, Adapt R2, Native R2,
+Native R3, Adapt R3. Amendment 01 prospectively allowed the serial official
+harness queue to overlap later frozen generations; visible harness results did
+not change the remaining order, configuration, case membership, or replicate
+count. The first five harness runs used one worker while generation was active;
+the final Adapt R3 harness used four after all generation completed. All six
+generation gates and all six harness metrics gates passed, with zero harness
+errors.
+
+### Canonical run results
+
+RR always uses the full 500-case panel as its denominator. Empty patches are
+not sent to the harness, so the nonempty harness count can be lower than 500.
+`Error` below means the exact canonical 250-call Agent limit; the two Native R1
+`Timeout` outcomes are exact four-hour case deadlines. Duration is the sum of
+canonical case durations, not generation wall time.
+
+| Arm | Run | Generation terminals | Harness | Resolved / 500 | Total tokens | Cached / total | Billing units | LLM / tool calls | Case-hours | Loop-warning cases / events |
+|---|---:|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| Native | R1 | 497 Submitted, 1 Error, 2 Timeout | 496/496, error 0 | 369 (73.8%) | 321,768,920 | 91.5159% | 914.575524 | 14,088 / 15,093 | 104.251 | 4 / 4 |
+| Native | R2 | 500 Submitted | 499/499, error 0 | 369 (73.8%) | 239,048,494 | 96.0402% | 624.002436 | 13,336 / 14,190 | 56.806 | 8 / 18 |
+| Native | R3 | 499 Submitted, 1 Error | 499/499, error 0 | 367 (73.4%) | 289,499,788 | 94.0044% | 781.312328 | 13,766 / 14,709 | 107.963 | 3 / 7 |
+| RAG Adapt | R1 | 499 Submitted, 1 Error | 498/498, error 0 | 374 (74.8%) | 262,896,970 | 96.1917% | 679.635636 | 13,262 / 13,854 | 36.617 | 8 / 19 |
+| RAG Adapt | R2 | 498 Submitted, 2 Error | 498/498, error 0 | 376 (75.2%) | 282,066,410 | 96.3741% | 727.093176 | 13,440 / 14,080 | 36.944 | 4 / 4 |
+| RAG Adapt | R3 | 500 Submitted | 499/499, error 0 | 365 (73.0%) | 299,776,563 | 96.4592% | 768.853480 | 13,712 / 14,297 | 56.863 | 5 / 25 |
+
+### Run-level distributions
+
+The values below are the mean, sample standard deviation, and range across the
+three complete 500-case runs in each arm. The run, not an individual case-run,
+is the repetition unit.
+
+| Arm | RR | Total tokens | Cached / total | Billing units | Canonical case-hours |
+|---|---:|---:|---:|---:|---:|
+| Native | 73.667% ± 0.231pp [73.4%, 73.8%] | 283,439,067 ± 41,691,923 [239,048,494, 321,768,920] | 93.8535% ± 2.2659pp [91.5159%, 96.0402%] | 773.296763 ± 145.452284 [624.002436, 914.575524] | 89.673 ± 28.524 [56.806, 107.963] |
+| RAG Adapt | 74.333% ± 1.172pp [73.0%, 75.2%] | 281,579,981 ± 18,444,608 [262,896,970, 299,776,563] | 96.3417% ± 0.1366pp [96.1917%, 96.4592%] | 725.194097 ± 44.639229 [679.635636, 768.853480] | 43.475 ± 11.596 [36.617, 56.863] |
+
+The descriptive RAG-Adapt-minus-Native difference between run means is +3.33
+resolved cases, or +0.667 percentage points. RAG Adapt's mean total tokens are
+0.656% lower and mean billing units are 6.220% lower. With only three
+run-level observations per bundle and overlapping RR ranges, this is not a
+stable nonzero-effect claim.
+
+### Per-case repeatability
+
+The 0/3 through 3/3 counts describe how often each of the same 500 cases
+resolved within an arm. They are not 1,500 independent observations.
+
+| Arm | 0/3 | 1/3 | 2/3 | 3/3 | Mean pairwise agreement | Mean resolved-set Jaccard |
+|---|---:|---:|---:|---:|---:|---:|
+| Native | 104 | 24 | 35 | 337 | 92.13% | 89.86% |
+| RAG Adapt | 99 | 31 | 26 | 344 | 92.40% | 90.28% |
+
+| Arm | Pair | Both resolved | First only | Second only | Neither | Agreement | Jaccard |
+|---|---|---:|---:|---:|---:|---:|---:|
+| Native | R1/R2 | 350 | 19 | 19 | 112 | 92.4% | 90.21% |
+| Native | R1/R3 | 348 | 21 | 19 | 112 | 92.0% | 89.69% |
+| Native | R2/R3 | 348 | 21 | 19 | 112 | 92.0% | 89.69% |
+| RAG Adapt | R1/R2 | 360 | 14 | 16 | 110 | 94.0% | 92.31% |
+| RAG Adapt | R1/R3 | 350 | 24 | 15 | 111 | 92.2% | 89.97% |
+| RAG Adapt | R2/R3 | 348 | 28 | 17 | 107 | 91.0% | 88.55% |
+
+### Loop warnings and infrastructure attempts
+
+For each warning case, V11 records the first warning call and whether the next
+tool-name-and-canonical-arguments batch changed relative to the preceding
+batch. First-warning call min/median/max and changed-case counts were Native R1
+18/19/33 and 4/4, Native R2 9/16/116 and 7/8, Native R3 13/19/112 and 3/3,
+Adapt R1 6/21/57 and 6/8, Adapt R2 9/12/17 and 3/4, and Adapt R3 10/19/112
+and 4/5. There is no warning-disabled fresh control, so warning frequency,
+next actions, and resolved outcomes do not estimate warning effectiveness.
+
+Infrastructure attempts are separate from canonical metrics:
+
+- Native R1 `django__django-12663` had one qualifying 300-second model HTTP
+  attempt timeout. The displaced attempt used 117 LLM calls, 118 tool calls,
+  4,424,899 tokens, 10.892268 billing units, and 5,421,179 ms. A quality-blind
+  full-case fresh recovery became the canonical trajectory before the
+  generation gate; only that selected recovery is included in Native R1.
+- Adapt R1's empty endpoint scan was incorrectly represented as one empty
+  instance and launched a 0.30-second empty-case-list pseudo-retry. It exited
+  before any model call and did not change canonical artifacts.
+- The first amendment-04 recovery controller then exited in 0.31 seconds on
+  `run_dir: unbound variable`, before validation, later generation, or harness
+  execution. It also used zero model calls and changed no canonical artifact.
+
+### Decision and limits
+
+Record the full three-run Native distribution (73.4%-73.8%) and RAG Adapt
+distribution (73.0%-75.2%). Do not select the best repetition, pool V10, or
+treat each arm as 1,500 independent cases. The arms are complete operating
+bundles that also differ in prompt/tool contract, `code_search`, workspace
+representation, embedding, and worker count; V11 does not identify any of
+those components as a single-factor cause. Generation wall time is likewise
+not a comparison endpoint because registered harness work overlapped later
+generation.
+
+The frozen plan and five amendments are adjacent to this section. Sanitized
+per-run metrics, run-level distributions, repeatability tables, warning-case
+details, infrastructure accounting, artifact hashes, and validation checks are
+in [`v11-cleanroom-loopwarn-timeout4h-r3-result.json`](./v11-cleanroom-loopwarn-timeout4h-r3-result.json).

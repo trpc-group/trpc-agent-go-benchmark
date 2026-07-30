@@ -1,0 +1,1441 @@
+{
+  "schema_version": 1,
+  "status": "completed",
+  "evidence_status": "complete",
+  "completed_on": "2026-07-31",
+  "result_id": "v11-cleanroom-loopwarn-timeout4h-r3",
+  "question": "Across three fresh full-500 repetitions per arm, what quality, usage, cost, duration, failure, repeatability, and exact tool-loop-warning behavior do the clean-room Native and RAG Adapt operating bundles exhibit under a four-hour per-case limit?",
+  "inference_scope": {
+    "design": "Six fresh full-500 generations in fixed counterbalanced serial order, with three run-level repetitions per Native and RAG Adapt arm.",
+    "panel": "canonical SWE-bench Verified 500-case panel repeated in each run",
+    "experimental_unit": "the fresh 500-case run; each arm has n=3 run-level observations",
+    "authoritative_runs": [
+      "tag-cleanroom-loopwarn-timeout4h-native-20260729-r1",
+      "tag-cleanroom-loopwarn-timeout4h-adapt-20260729-r1",
+      "tag-cleanroom-loopwarn-timeout4h-adapt-20260729-r2",
+      "tag-cleanroom-loopwarn-timeout4h-native-20260729-r2",
+      "tag-cleanroom-loopwarn-timeout4h-native-20260729-r3",
+      "tag-cleanroom-loopwarn-timeout4h-adapt-20260729-r3"
+    ],
+    "excluded_prior_result": "V10 is historical only and is not pooled into V11.",
+    "bundle_warning": "The arms are complete operating bundles. They differ in prompt and tool contract, code_search availability, workspace representation, embedding, and generation worker count; the contrast is not a single-factor causal estimate.",
+    "anti_selection": [
+      "No best-of-three result is used.",
+      "The three repeated panels are not treated as 1500 independent cases per arm.",
+      "Early harness results did not change the frozen generation order, configuration, case membership, or replicate count."
+    ]
+  },
+  "protocol": {
+    "artifacts": [
+      {
+        "role": "plan",
+        "path": "results/experiments/workspace-rag/v11-cleanroom-loopwarn-timeout4h-r3-plan.json",
+        "sha256": "23deef6cb328a5c98557cd6c99496d03aada1d4cb3ba97e4b71eb079694f3f0c",
+        "commit": "3b85321"
+      },
+      {
+        "role": "amendment_01",
+        "path": "results/experiments/workspace-rag/v11-cleanroom-loopwarn-timeout4h-r3-amendment-01.json",
+        "sha256": "3635981520871e6c0c9d3f51bd351eae6d86a0e761875056ffa341805796b620",
+        "commit": "2ab8292"
+      },
+      {
+        "role": "amendment_02",
+        "path": "results/experiments/workspace-rag/v11-cleanroom-loopwarn-timeout4h-r3-amendment-02.json",
+        "sha256": "9f5c1c47e511fe8ccf308d5214bd4c47556884fbf31158abfb8a86f06ba3b412",
+        "commit": "bf26a8f"
+      },
+      {
+        "role": "amendment_03",
+        "path": "results/experiments/workspace-rag/v11-cleanroom-loopwarn-timeout4h-r3-amendment-03.json",
+        "sha256": "62ae3012d2896785e3c7f89489748e73ea48e78133bce542d449dfb81a1b7167",
+        "commit": "69538a1"
+      },
+      {
+        "role": "amendment_04",
+        "path": "results/experiments/workspace-rag/v11-cleanroom-loopwarn-timeout4h-r3-amendment-04.json",
+        "sha256": "f668cb4d7d06582ad06074e02964c927738ca506b6dd3ae5199d9209af606949",
+        "commit": "1ef656e"
+      },
+      {
+        "role": "amendment_05",
+        "path": "results/experiments/workspace-rag/v11-cleanroom-loopwarn-timeout4h-r3-amendment-05.json",
+        "sha256": "d8196d3c5d4e3880bc2c3923d712144dcb17d666f4d45feec6e02b810ae64453",
+        "commit": "3682805"
+      }
+    ],
+    "benchmark_revision": "a702c2f589996b96785b020a3d7f2df9438748d4",
+    "framework_revision": "358d376784889fd539a764190e1970ee4f4fc5f6",
+    "preflight": {
+      "scope_cases": 500,
+      "passed": 500,
+      "failed": 0,
+      "duration_ms": 3095836,
+      "interpretation": "Every case passed the fresh offline asset, network-isolation, local-service, sanitized-Git, and cleanup checks before generation."
+    },
+    "generation_order": [
+      "tag-cleanroom-loopwarn-timeout4h-native-20260729-r1",
+      "tag-cleanroom-loopwarn-timeout4h-adapt-20260729-r1",
+      "tag-cleanroom-loopwarn-timeout4h-adapt-20260729-r2",
+      "tag-cleanroom-loopwarn-timeout4h-native-20260729-r2",
+      "tag-cleanroom-loopwarn-timeout4h-native-20260729-r3",
+      "tag-cleanroom-loopwarn-timeout4h-adapt-20260729-r3"
+    ],
+    "all_generation_completed_at": "2026-07-31T04:47:51+08:00",
+    "generation_gates_passed": 6,
+    "harness_pipeline": {
+      "order": [
+        "tag-cleanroom-loopwarn-timeout4h-native-20260729-r1",
+        "tag-cleanroom-loopwarn-timeout4h-adapt-20260729-r1",
+        "tag-cleanroom-loopwarn-timeout4h-adapt-20260729-r2",
+        "tag-cleanroom-loopwarn-timeout4h-native-20260729-r2",
+        "tag-cleanroom-loopwarn-timeout4h-native-20260729-r3",
+        "tag-cleanroom-loopwarn-timeout4h-adapt-20260729-r3"
+      ],
+      "serial": true,
+      "max_active_runs": 1,
+      "workers_during_generation": 1,
+      "workers_for_not_yet_started_after_generation": 4,
+      "target": "tag",
+      "verifier_mode": "calibrated",
+      "cache_level": "instance",
+      "clean": false,
+      "apply_harness_compat": true,
+      "instances_from_predictions": true
+    },
+    "all_harness_metrics_completed_at": "2026-07-31T06:01:56+08:00",
+    "harness_metrics_gates_passed": 6,
+    "harness_errors": 0,
+    "blinding_amendment": "The original no-harness-before-all-generation rule was prospectively superseded by amendment-01. Remaining generation stayed frozen and was not adapted to visible harness results."
+  },
+  "public_provenance": {
+    "case_list": "data/case-lists/verified-test-500.case_ids.txt",
+    "case_count": 500,
+    "case_list_sha256": "a6b0fd7c8c2969a0eef892e032250adcfa6d32362d395c246930e61b575ac9b9",
+    "cases_jsonl_sha256": "4b2a050a82d356963320cbfa8e2efdf6a133af8863f31b291a973ab4dd349d07",
+    "model_config_sha256": "fbfdf25e9fced3ecc51d244ccbb652c078b02ac640abbdbcca53ddbaa7af27de",
+    "embedding_config_sha256": "2452624a6a38fbd6f414a70b0c66e48653204662fe1b96c9026350bcc6d79bd1",
+    "environment_config_sha256": "3cfa72f92f4010d242e6adb9bb507ccdf9db261ba5726163b5adecd509c140f0"
+  },
+  "common_generation": {
+    "model": "GLM-5.2",
+    "reasoning_effort": "high",
+    "observation_codec": "xml",
+    "command_timeout": "1m",
+    "case_timeout": "4h",
+    "single_llm_http_attempt_timeout": "300s",
+    "max_llm_calls": 250,
+    "offline_generation": true,
+    "sanitized_git_history": true,
+    "tool_loop_warning": true,
+    "workspace_preload": false,
+    "redo_existing": false
+  },
+  "arms": {
+    "native": {
+      "runner_binary_sha256": "839a4f327704554697592335b1fa4a3fd9fac32ec9f8de19923a5e870806e4b8",
+      "workers": 15,
+      "code_search": false,
+      "workspace_preload": false,
+      "workspace_representation": "current-fixed",
+      "embedding": "disabled",
+      "runs": [
+        {
+          "run_id": "tag-cleanroom-loopwarn-timeout4h-native-20260729-r1",
+          "replicate": 1,
+          "generation_integrity": {
+            "canonical_cases": 500,
+            "prediction_count": 500,
+            "terminal_counts": {
+              "Error": 1,
+              "Submitted": 497,
+              "Timeout": 2
+            },
+            "canonical_agent_failure_categories": {
+              "agent_error": 1,
+              "case_timeout": 2
+            },
+            "canonical_agent_failure_details": [
+              {
+                "classification": "exact_call_limit",
+                "instance_id": "django__django-14007"
+              },
+              {
+                "classification": "four_hour_case_timeout",
+                "duration_ms": 14428938,
+                "instance_id": "django__django-15503",
+                "llm_calls": 151,
+                "responses": 150
+              },
+              {
+                "classification": "four_hour_case_timeout",
+                "duration_ms": 14431046,
+                "instance_id": "django__django-15629",
+                "llm_calls": 134,
+                "responses": 133
+              }
+            ],
+            "generation_audit_issues": [],
+            "unrecovered_non_agent_failures": 0
+          },
+          "official_harness": {
+            "status": "completed",
+            "panel_instances": 500,
+            "nonempty_patch_instances": 496,
+            "resolved_instances": 369,
+            "resolved_rate": 0.738,
+            "unresolved_nonempty_instances": 127,
+            "empty_patch_instances": 4,
+            "error_instances": 0,
+            "workers": 1,
+            "rate_denominator": 500
+          },
+          "model_metrics": {
+            "llm_calls": 14088,
+            "prompt_tokens": 316406803,
+            "cached_input_tokens": 294469696,
+            "uncached_input_tokens": 21937107,
+            "completion_tokens": 5362117,
+            "reasoning_tokens_reported": 0,
+            "total_tokens": 321768920,
+            "cached_over_prompt_ratio": 0.9306680299159055,
+            "cached_over_total_ratio": 0.9151589159077266,
+            "rate_card": {
+              "cached_input_per_million": 2,
+              "uncached_input_per_million": 8,
+              "output_per_million": 28
+            },
+            "canonical_cost": 914.575524,
+            "cost_currency": "billing_unit"
+          },
+          "agent_metrics": {
+            "tool_calls": 15093,
+            "canonical_case_duration_sum_ms": 375302432,
+            "canonical_case_duration_sum_hours": 104.25067555555556
+          },
+          "tool_loop_warning_metrics": {
+            "case_details": [
+              {
+                "exit_status": "Submitted",
+                "first_warning_llm_call": 18,
+                "instance_id": "astropy__astropy-14182",
+                "llm_calls": 38,
+                "post_first_warning_action": "tool_batch",
+                "post_first_warning_exact_name_args_batch_changed": true,
+                "post_first_warning_tool_names": [
+                  "bash"
+                ],
+                "resolved": true,
+                "warnings": 1
+              },
+              {
+                "exit_status": "Submitted",
+                "first_warning_llm_call": 19,
+                "instance_id": "matplotlib__matplotlib-24870",
+                "llm_calls": 41,
+                "post_first_warning_action": "tool_batch",
+                "post_first_warning_exact_name_args_batch_changed": true,
+                "post_first_warning_tool_names": [
+                  "bash"
+                ],
+                "resolved": false,
+                "warnings": 1
+              },
+              {
+                "exit_status": "Submitted",
+                "first_warning_llm_call": 19,
+                "instance_id": "scikit-learn__scikit-learn-15100",
+                "llm_calls": 33,
+                "post_first_warning_action": "tool_batch",
+                "post_first_warning_exact_name_args_batch_changed": true,
+                "post_first_warning_tool_names": [
+                  "bash"
+                ],
+                "resolved": true,
+                "warnings": 1
+              },
+              {
+                "exit_status": "Submitted",
+                "first_warning_llm_call": 33,
+                "instance_id": "sphinx-doc__sphinx-8593",
+                "llm_calls": 55,
+                "post_first_warning_action": "tool_batch",
+                "post_first_warning_exact_name_args_batch_changed": true,
+                "post_first_warning_tool_names": [
+                  "bash"
+                ],
+                "resolved": true,
+                "warnings": 1
+              }
+            ],
+            "first_post_warning_exact_name_args_batch_changed_cases": 4,
+            "first_warning_llm_call_max": 33,
+            "first_warning_llm_call_median": 19,
+            "first_warning_llm_call_min": 18,
+            "multiple_warning_cases": 0,
+            "warning_case_count": 4,
+            "warning_cases_resolved": 3,
+            "warning_count": 4
+          }
+        },
+        {
+          "run_id": "tag-cleanroom-loopwarn-timeout4h-native-20260729-r2",
+          "replicate": 2,
+          "generation_integrity": {
+            "canonical_cases": 500,
+            "prediction_count": 500,
+            "terminal_counts": {
+              "Submitted": 500
+            },
+            "canonical_agent_failure_categories": {},
+            "canonical_agent_failure_details": [],
+            "generation_audit_issues": [],
+            "unrecovered_non_agent_failures": 0
+          },
+          "official_harness": {
+            "status": "completed",
+            "panel_instances": 500,
+            "nonempty_patch_instances": 499,
+            "resolved_instances": 369,
+            "resolved_rate": 0.738,
+            "unresolved_nonempty_instances": 130,
+            "empty_patch_instances": 1,
+            "error_instances": 0,
+            "workers": 1,
+            "rate_denominator": 500
+          },
+          "model_metrics": {
+            "llm_calls": 13336,
+            "prompt_tokens": 234592973,
+            "cached_input_tokens": 229582656,
+            "uncached_input_tokens": 5010317,
+            "completion_tokens": 4455521,
+            "reasoning_tokens_reported": 0,
+            "total_tokens": 239048494,
+            "cached_over_prompt_ratio": 0.9786425103193521,
+            "cached_over_total_ratio": 0.9604020178432917,
+            "rate_card": {
+              "cached_input_per_million": 2,
+              "uncached_input_per_million": 8,
+              "output_per_million": 28
+            },
+            "canonical_cost": 624.002436,
+            "cost_currency": "billing_unit"
+          },
+          "agent_metrics": {
+            "tool_calls": 14190,
+            "canonical_case_duration_sum_ms": 204500183,
+            "canonical_case_duration_sum_hours": 56.80560638888889
+          },
+          "tool_loop_warning_metrics": {
+            "case_details": [
+              {
+                "exit_status": "Submitted",
+                "first_warning_llm_call": 116,
+                "instance_id": "django__django-10554",
+                "llm_calls": 141,
+                "post_first_warning_action": "tool_batch",
+                "post_first_warning_exact_name_args_batch_changed": true,
+                "post_first_warning_tool_names": [
+                  "bash"
+                ],
+                "resolved": false,
+                "warnings": 1
+              },
+              {
+                "exit_status": "Submitted",
+                "first_warning_llm_call": 75,
+                "instance_id": "django__django-12663",
+                "llm_calls": 136,
+                "post_first_warning_action": "tool_batch",
+                "post_first_warning_exact_name_args_batch_changed": true,
+                "post_first_warning_tool_names": [
+                  "bash"
+                ],
+                "resolved": true,
+                "warnings": 1
+              },
+              {
+                "exit_status": "Submitted",
+                "first_warning_llm_call": 12,
+                "instance_id": "django__django-13089",
+                "llm_calls": 37,
+                "post_first_warning_action": "tool_batch",
+                "post_first_warning_exact_name_args_batch_changed": true,
+                "post_first_warning_tool_names": [
+                  "bash"
+                ],
+                "resolved": true,
+                "warnings": 3
+              },
+              {
+                "exit_status": "Submitted",
+                "first_warning_llm_call": 16,
+                "instance_id": "django__django-14007",
+                "llm_calls": 70,
+                "post_first_warning_action": "tool_batch",
+                "post_first_warning_exact_name_args_batch_changed": false,
+                "post_first_warning_tool_names": [
+                  "bash"
+                ],
+                "resolved": true,
+                "warnings": 1
+              },
+              {
+                "exit_status": "Submitted",
+                "first_warning_llm_call": 16,
+                "instance_id": "django__django-14349",
+                "llm_calls": 51,
+                "post_first_warning_action": "tool_batch",
+                "post_first_warning_exact_name_args_batch_changed": true,
+                "post_first_warning_tool_names": [
+                  "bash"
+                ],
+                "resolved": true,
+                "warnings": 9
+              },
+              {
+                "exit_status": "Submitted",
+                "first_warning_llm_call": 26,
+                "instance_id": "sphinx-doc__sphinx-11445",
+                "llm_calls": 50,
+                "post_first_warning_action": "tool_batch",
+                "post_first_warning_exact_name_args_batch_changed": true,
+                "post_first_warning_tool_names": [
+                  "bash"
+                ],
+                "resolved": true,
+                "warnings": 1
+              },
+              {
+                "exit_status": "Submitted",
+                "first_warning_llm_call": 13,
+                "instance_id": "sphinx-doc__sphinx-9367",
+                "llm_calls": 19,
+                "post_first_warning_action": "tool_batch",
+                "post_first_warning_exact_name_args_batch_changed": true,
+                "post_first_warning_tool_names": [
+                  "bash"
+                ],
+                "resolved": true,
+                "warnings": 1
+              },
+              {
+                "exit_status": "Submitted",
+                "first_warning_llm_call": 9,
+                "instance_id": "sympy__sympy-24443",
+                "llm_calls": 33,
+                "post_first_warning_action": "tool_batch",
+                "post_first_warning_exact_name_args_batch_changed": true,
+                "post_first_warning_tool_names": [
+                  "bash"
+                ],
+                "resolved": true,
+                "warnings": 1
+              }
+            ],
+            "first_post_warning_exact_name_args_batch_changed_cases": 7,
+            "first_warning_llm_call_max": 116,
+            "first_warning_llm_call_median": 16,
+            "first_warning_llm_call_min": 9,
+            "multiple_warning_cases": 2,
+            "warning_case_count": 8,
+            "warning_cases_resolved": 7,
+            "warning_count": 18
+          }
+        },
+        {
+          "run_id": "tag-cleanroom-loopwarn-timeout4h-native-20260729-r3",
+          "replicate": 3,
+          "generation_integrity": {
+            "canonical_cases": 500,
+            "prediction_count": 500,
+            "terminal_counts": {
+              "Error": 1,
+              "Submitted": 499
+            },
+            "canonical_agent_failure_categories": {
+              "agent_error": 1
+            },
+            "canonical_agent_failure_details": [
+              {
+                "classification": "exact_call_limit",
+                "instance_id": "django__django-10554"
+              }
+            ],
+            "generation_audit_issues": [],
+            "unrecovered_non_agent_failures": 0
+          },
+          "official_harness": {
+            "status": "completed",
+            "panel_instances": 500,
+            "nonempty_patch_instances": 499,
+            "resolved_instances": 367,
+            "resolved_rate": 0.734,
+            "unresolved_nonempty_instances": 132,
+            "empty_patch_instances": 1,
+            "error_instances": 0,
+            "workers": 1,
+            "rate_denominator": 500
+          },
+          "model_metrics": {
+            "llm_calls": 13766,
+            "prompt_tokens": 284591290,
+            "cached_input_tokens": 272142656,
+            "uncached_input_tokens": 12448634,
+            "completion_tokens": 4908498,
+            "reasoning_tokens_reported": 0,
+            "total_tokens": 289499788,
+            "cached_over_prompt_ratio": 0.9562578531479301,
+            "cached_over_total_ratio": 0.9400444051447803,
+            "rate_card": {
+              "cached_input_per_million": 2,
+              "uncached_input_per_million": 8,
+              "output_per_million": 28
+            },
+            "canonical_cost": 781.312328,
+            "cost_currency": "billing_unit"
+          },
+          "agent_metrics": {
+            "tool_calls": 14709,
+            "canonical_case_duration_sum_ms": 388665436,
+            "canonical_case_duration_sum_hours": 107.9626211111111
+          },
+          "tool_loop_warning_metrics": {
+            "case_details": [
+              {
+                "exit_status": "Error",
+                "first_warning_llm_call": 112,
+                "instance_id": "django__django-10554",
+                "llm_calls": 250,
+                "post_first_warning_action": "tool_batch",
+                "post_first_warning_exact_name_args_batch_changed": true,
+                "post_first_warning_tool_names": [
+                  "bash"
+                ],
+                "resolved": false,
+                "warnings": 3
+              },
+              {
+                "exit_status": "Submitted",
+                "first_warning_llm_call": 13,
+                "instance_id": "django__django-13089",
+                "llm_calls": 42,
+                "post_first_warning_action": "tool_batch",
+                "post_first_warning_exact_name_args_batch_changed": true,
+                "post_first_warning_tool_names": [
+                  "bash"
+                ],
+                "resolved": true,
+                "warnings": 3
+              },
+              {
+                "exit_status": "Submitted",
+                "first_warning_llm_call": 19,
+                "instance_id": "django__django-16560",
+                "llm_calls": 82,
+                "post_first_warning_action": "tool_batch",
+                "post_first_warning_exact_name_args_batch_changed": true,
+                "post_first_warning_tool_names": [
+                  "bash"
+                ],
+                "resolved": true,
+                "warnings": 1
+              }
+            ],
+            "first_post_warning_exact_name_args_batch_changed_cases": 3,
+            "first_warning_llm_call_max": 112,
+            "first_warning_llm_call_median": 19,
+            "first_warning_llm_call_min": 13,
+            "multiple_warning_cases": 2,
+            "warning_case_count": 3,
+            "warning_cases_resolved": 2,
+            "warning_count": 7
+          }
+        }
+      ],
+      "run_level_summary": {
+        "replicates": 3,
+        "run_level_statistics": {
+          "cached_input_tokens": {
+            "max": 294469696,
+            "mean": 265398336,
+            "min": 229582656,
+            "range_width": 64887040,
+            "sample_sd": 32965078.176567394
+          },
+          "cached_over_prompt_ratio": {
+            "max": 0.9786425103193521,
+            "mean": 0.9551894644610626,
+            "min": 0.9306680299159055,
+            "range_width": 0.04797448040344665,
+            "sample_sd": 0.024005078281164625
+          },
+          "cached_over_total_ratio": {
+            "max": 0.9604020178432917,
+            "mean": 0.9385351129652661,
+            "min": 0.9151589159077266,
+            "range_width": 0.04524310193556513,
+            "sample_sd": 0.022659281549738976
+          },
+          "canonical_agent_failures": {
+            "max": 3,
+            "mean": 1.3333333333333333,
+            "min": 0,
+            "range_width": 3,
+            "sample_sd": 1.5275252316519468
+          },
+          "canonical_cost": {
+            "max": 914.575524,
+            "mean": 773.2967626666666,
+            "min": 624.002436,
+            "range_width": 290.573088,
+            "sample_sd": 145.45228369872243
+          },
+          "case_duration_sum_ms": {
+            "max": 388665436,
+            "mean": 322822683.6666667,
+            "min": 204500183,
+            "range_width": 184165253,
+            "sample_sd": 102687891.65225862
+          },
+          "completion_tokens": {
+            "max": 5362117,
+            "mean": 4908712,
+            "min": 4455521,
+            "range_width": 906596,
+            "sample_sd": 453298.03788567183
+          },
+          "llm_calls": {
+            "max": 14088,
+            "mean": 13730,
+            "min": 13336,
+            "range_width": 752,
+            "sample_sd": 377.2903391288995
+          },
+          "prompt_tokens": {
+            "max": 316406803,
+            "mean": 278530355.3333333,
+            "min": 234592973,
+            "range_width": 81813830,
+            "sample_sd": 41242294.93605352
+          },
+          "reasoning_tokens": {
+            "max": 0,
+            "mean": 0,
+            "min": 0,
+            "range_width": 0,
+            "sample_sd": 0.0
+          },
+          "resolved_instances": {
+            "max": 369,
+            "mean": 368.3333333333333,
+            "min": 367,
+            "range_width": 2,
+            "sample_sd": 1.1547005383792515
+          },
+          "resolved_rate": {
+            "max": 0.738,
+            "mean": 0.7366666666666667,
+            "min": 0.734,
+            "range_width": 0.0040000000000000036,
+            "sample_sd": 0.0023094010767585054
+          },
+          "tool_calls": {
+            "max": 15093,
+            "mean": 14664,
+            "min": 14190,
+            "range_width": 903,
+            "sample_sd": 453.1787726714481
+          },
+          "tool_loop_warning_case_count": {
+            "max": 8,
+            "mean": 5,
+            "min": 3,
+            "range_width": 5,
+            "sample_sd": 2.6457513110645907
+          },
+          "tool_loop_warning_count": {
+            "max": 18,
+            "mean": 9.666666666666666,
+            "min": 4,
+            "range_width": 14,
+            "sample_sd": 7.371114795831994
+          },
+          "total_tokens": {
+            "max": 321768920,
+            "mean": 283439067.3333333,
+            "min": 239048494,
+            "range_width": 82720426,
+            "sample_sd": 41691923.32640567
+          }
+        }
+      },
+      "within_arm_repeatability": {
+        "pairwise": [
+          {
+            "agreement": 0.924,
+            "both_resolved": 350,
+            "first_only_resolved": 19,
+            "first_replicate": 1,
+            "neither_resolved": 112,
+            "resolved_set_jaccard": 0.9020618556701031,
+            "second_only_resolved": 19,
+            "second_replicate": 2
+          },
+          {
+            "agreement": 0.92,
+            "both_resolved": 348,
+            "first_only_resolved": 21,
+            "first_replicate": 1,
+            "neither_resolved": 112,
+            "resolved_set_jaccard": 0.8969072164948454,
+            "second_only_resolved": 19,
+            "second_replicate": 3
+          },
+          {
+            "agreement": 0.92,
+            "both_resolved": 348,
+            "first_only_resolved": 21,
+            "first_replicate": 2,
+            "neither_resolved": 112,
+            "resolved_set_jaccard": 0.8969072164948454,
+            "second_only_resolved": 19,
+            "second_replicate": 3
+          }
+        ],
+        "pairwise_agreement_mean": 0.9213333333333333,
+        "pairwise_resolved_set_jaccard_mean": 0.8986254295532646,
+        "resolution_frequency_histogram": {
+          "one_of_three": 24,
+          "three_of_three": 337,
+          "two_of_three": 35,
+          "zero_of_three": 104
+        }
+      }
+    },
+    "rag_adapt": {
+      "runner_binary_sha256": "5df758c43eebe7ae72b16a9408c17f140e831c8532ba9a689b76fc3d61a1439a",
+      "workers": 6,
+      "code_search": true,
+      "workspace_preload": false,
+      "workspace_representation": "ast-structured",
+      "embedding": "BGE-M3 hybrid 1024, batch 64, concurrency 1, cache readwrite, max_results 4, max_chars 6000",
+      "runs": [
+        {
+          "run_id": "tag-cleanroom-loopwarn-timeout4h-adapt-20260729-r1",
+          "replicate": 1,
+          "generation_integrity": {
+            "canonical_cases": 500,
+            "prediction_count": 500,
+            "terminal_counts": {
+              "Error": 1,
+              "Submitted": 499
+            },
+            "canonical_agent_failure_categories": {
+              "agent_error": 1
+            },
+            "canonical_agent_failure_details": [
+              {
+                "classification": "exact_call_limit",
+                "instance_id": "pylint-dev__pylint-4551"
+              }
+            ],
+            "generation_audit_issues": [],
+            "unrecovered_non_agent_failures": 0
+          },
+          "official_harness": {
+            "status": "completed",
+            "panel_instances": 500,
+            "nonempty_patch_instances": 498,
+            "resolved_instances": 374,
+            "resolved_rate": 0.748,
+            "unresolved_nonempty_instances": 124,
+            "empty_patch_instances": 2,
+            "error_instances": 0,
+            "workers": 1,
+            "rate_denominator": 500
+          },
+          "model_metrics": {
+            "llm_calls": 13262,
+            "prompt_tokens": 258208421,
+            "cached_input_tokens": 252885184,
+            "uncached_input_tokens": 5323237,
+            "completion_tokens": 4688549,
+            "reasoning_tokens_reported": 0,
+            "total_tokens": 262896970,
+            "cached_over_prompt_ratio": 0.9793839527797585,
+            "cached_over_total_ratio": 0.9619174538223092,
+            "rate_card": {
+              "cached_input_per_million": 2,
+              "uncached_input_per_million": 8,
+              "output_per_million": 28
+            },
+            "canonical_cost": 679.635636,
+            "cost_currency": "billing_unit"
+          },
+          "agent_metrics": {
+            "tool_calls": 13854,
+            "canonical_case_duration_sum_ms": 131821680,
+            "canonical_case_duration_sum_hours": 36.617133333333335
+          },
+          "tool_loop_warning_metrics": {
+            "case_details": [
+              {
+                "exit_status": "Submitted",
+                "first_warning_llm_call": 25,
+                "instance_id": "django__django-11133",
+                "llm_calls": 56,
+                "post_first_warning_action": "tool_batch",
+                "post_first_warning_exact_name_args_batch_changed": false,
+                "post_first_warning_tool_names": [
+                  "bash"
+                ],
+                "resolved": true,
+                "warnings": 10
+              },
+              {
+                "exit_status": "Submitted",
+                "first_warning_llm_call": 57,
+                "instance_id": "django__django-11734",
+                "llm_calls": 149,
+                "post_first_warning_action": "tool_batch",
+                "post_first_warning_exact_name_args_batch_changed": true,
+                "post_first_warning_tool_names": [
+                  "bash"
+                ],
+                "resolved": true,
+                "warnings": 1
+              },
+              {
+                "exit_status": "Submitted",
+                "first_warning_llm_call": 17,
+                "instance_id": "django__django-15499",
+                "llm_calls": 21,
+                "post_first_warning_action": "tool_batch",
+                "post_first_warning_exact_name_args_batch_changed": true,
+                "post_first_warning_tool_names": [
+                  "bash"
+                ],
+                "resolved": true,
+                "warnings": 1
+              },
+              {
+                "exit_status": "Submitted",
+                "first_warning_llm_call": 6,
+                "instance_id": "django__django-16493",
+                "llm_calls": 19,
+                "post_first_warning_action": "tool_batch",
+                "post_first_warning_exact_name_args_batch_changed": true,
+                "post_first_warning_tool_names": [
+                  "bash"
+                ],
+                "resolved": true,
+                "warnings": 1
+              },
+              {
+                "exit_status": "Submitted",
+                "first_warning_llm_call": 23,
+                "instance_id": "django__django-16901",
+                "llm_calls": 27,
+                "post_first_warning_action": "tool_batch",
+                "post_first_warning_exact_name_args_batch_changed": true,
+                "post_first_warning_tool_names": [
+                  "bash"
+                ],
+                "resolved": true,
+                "warnings": 1
+              },
+              {
+                "exit_status": "Submitted",
+                "first_warning_llm_call": 22,
+                "instance_id": "matplotlib__matplotlib-24870",
+                "llm_calls": 64,
+                "post_first_warning_action": "tool_batch",
+                "post_first_warning_exact_name_args_batch_changed": false,
+                "post_first_warning_tool_names": [
+                  "bash"
+                ],
+                "resolved": false,
+                "warnings": 3
+              },
+              {
+                "exit_status": "Submitted",
+                "first_warning_llm_call": 19,
+                "instance_id": "pylint-dev__pylint-4604",
+                "llm_calls": 27,
+                "post_first_warning_action": "tool_batch",
+                "post_first_warning_exact_name_args_batch_changed": true,
+                "post_first_warning_tool_names": [
+                  "bash"
+                ],
+                "resolved": false,
+                "warnings": 1
+              },
+              {
+                "exit_status": "Submitted",
+                "first_warning_llm_call": 20,
+                "instance_id": "sphinx-doc__sphinx-7910",
+                "llm_calls": 32,
+                "post_first_warning_action": "tool_batch",
+                "post_first_warning_exact_name_args_batch_changed": true,
+                "post_first_warning_tool_names": [
+                  "bash"
+                ],
+                "resolved": true,
+                "warnings": 1
+              }
+            ],
+            "first_post_warning_exact_name_args_batch_changed_cases": 6,
+            "first_warning_llm_call_max": 57,
+            "first_warning_llm_call_median": 21,
+            "first_warning_llm_call_min": 6,
+            "multiple_warning_cases": 2,
+            "warning_case_count": 8,
+            "warning_cases_resolved": 6,
+            "warning_count": 19
+          }
+        },
+        {
+          "run_id": "tag-cleanroom-loopwarn-timeout4h-adapt-20260729-r2",
+          "replicate": 2,
+          "generation_integrity": {
+            "canonical_cases": 500,
+            "prediction_count": 500,
+            "terminal_counts": {
+              "Error": 2,
+              "Submitted": 498
+            },
+            "canonical_agent_failure_categories": {
+              "agent_error": 2
+            },
+            "canonical_agent_failure_details": [
+              {
+                "classification": "exact_call_limit",
+                "instance_id": "scikit-learn__scikit-learn-14629"
+              },
+              {
+                "classification": "exact_call_limit",
+                "instance_id": "scikit-learn__scikit-learn-15100"
+              }
+            ],
+            "generation_audit_issues": [],
+            "unrecovered_non_agent_failures": 0
+          },
+          "official_harness": {
+            "status": "completed",
+            "panel_instances": 500,
+            "nonempty_patch_instances": 498,
+            "resolved_instances": 376,
+            "resolved_rate": 0.752,
+            "unresolved_nonempty_instances": 122,
+            "empty_patch_instances": 2,
+            "error_instances": 0,
+            "workers": 1,
+            "rate_denominator": 500
+          },
+          "model_metrics": {
+            "llm_calls": 13440,
+            "prompt_tokens": 276986584,
+            "cached_input_tokens": 271839104,
+            "uncached_input_tokens": 5147480,
+            "completion_tokens": 5079826,
+            "reasoning_tokens_reported": 0,
+            "total_tokens": 282066410,
+            "cached_over_prompt_ratio": 0.981416139635124,
+            "cached_over_total_ratio": 0.9637414961958781,
+            "rate_card": {
+              "cached_input_per_million": 2,
+              "uncached_input_per_million": 8,
+              "output_per_million": 28
+            },
+            "canonical_cost": 727.093176,
+            "cost_currency": "billing_unit"
+          },
+          "agent_metrics": {
+            "tool_calls": 14080,
+            "canonical_case_duration_sum_ms": 132997412,
+            "canonical_case_duration_sum_hours": 36.94372555555555
+          },
+          "tool_loop_warning_metrics": {
+            "case_details": [
+              {
+                "exit_status": "Submitted",
+                "first_warning_llm_call": 9,
+                "instance_id": "django__django-12050",
+                "llm_calls": 12,
+                "post_first_warning_action": "tool_batch",
+                "post_first_warning_exact_name_args_batch_changed": true,
+                "post_first_warning_tool_names": [
+                  "bash"
+                ],
+                "resolved": true,
+                "warnings": 1
+              },
+              {
+                "exit_status": "Submitted",
+                "first_warning_llm_call": 14,
+                "instance_id": "django__django-16662",
+                "llm_calls": 19,
+                "post_first_warning_action": "tool_batch",
+                "post_first_warning_exact_name_args_batch_changed": true,
+                "post_first_warning_tool_names": [
+                  "bash"
+                ],
+                "resolved": true,
+                "warnings": 1
+              },
+              {
+                "exit_status": "Submitted",
+                "first_warning_llm_call": 17,
+                "instance_id": "pylint-dev__pylint-4604",
+                "llm_calls": 28,
+                "post_first_warning_action": "tool_batch",
+                "post_first_warning_exact_name_args_batch_changed": true,
+                "post_first_warning_tool_names": [
+                  "bash"
+                ],
+                "resolved": false,
+                "warnings": 1
+              },
+              {
+                "exit_status": "Submitted",
+                "first_warning_llm_call": 10,
+                "instance_id": "sphinx-doc__sphinx-9711",
+                "llm_calls": 29,
+                "post_first_warning_action": "tool_batch",
+                "post_first_warning_exact_name_args_batch_changed": false,
+                "post_first_warning_tool_names": [
+                  "bash"
+                ],
+                "resolved": true,
+                "warnings": 1
+              }
+            ],
+            "first_post_warning_exact_name_args_batch_changed_cases": 3,
+            "first_warning_llm_call_max": 17,
+            "first_warning_llm_call_median": 12,
+            "first_warning_llm_call_min": 9,
+            "multiple_warning_cases": 0,
+            "warning_case_count": 4,
+            "warning_cases_resolved": 3,
+            "warning_count": 4
+          }
+        },
+        {
+          "run_id": "tag-cleanroom-loopwarn-timeout4h-adapt-20260729-r3",
+          "replicate": 3,
+          "generation_integrity": {
+            "canonical_cases": 500,
+            "prediction_count": 500,
+            "terminal_counts": {
+              "Submitted": 500
+            },
+            "canonical_agent_failure_categories": {},
+            "canonical_agent_failure_details": [],
+            "generation_audit_issues": [],
+            "unrecovered_non_agent_failures": 0
+          },
+          "official_harness": {
+            "status": "completed",
+            "panel_instances": 500,
+            "nonempty_patch_instances": 499,
+            "resolved_instances": 365,
+            "resolved_rate": 0.73,
+            "unresolved_nonempty_instances": 134,
+            "empty_patch_instances": 1,
+            "error_instances": 0,
+            "workers": 4,
+            "rate_denominator": 500
+          },
+          "model_metrics": {
+            "llm_calls": 13712,
+            "prompt_tokens": 294495919,
+            "cached_input_tokens": 289161984,
+            "uncached_input_tokens": 5333935,
+            "completion_tokens": 5280644,
+            "reasoning_tokens_reported": 0,
+            "total_tokens": 299776563,
+            "cached_over_prompt_ratio": 0.9818879153975645,
+            "cached_over_total_ratio": 0.9645916982509403,
+            "rate_card": {
+              "cached_input_per_million": 2,
+              "uncached_input_per_million": 8,
+              "output_per_million": 28
+            },
+            "canonical_cost": 768.85348,
+            "cost_currency": "billing_unit"
+          },
+          "agent_metrics": {
+            "tool_calls": 14297,
+            "canonical_case_duration_sum_ms": 204707458,
+            "canonical_case_duration_sum_hours": 56.86318277777778
+          },
+          "tool_loop_warning_metrics": {
+            "case_details": [
+              {
+                "exit_status": "Submitted",
+                "first_warning_llm_call": 112,
+                "instance_id": "django__django-12663",
+                "llm_calls": 221,
+                "post_first_warning_action": "tool_batch",
+                "post_first_warning_exact_name_args_batch_changed": true,
+                "post_first_warning_tool_names": [
+                  "bash"
+                ],
+                "resolved": true,
+                "warnings": 1
+              },
+              {
+                "exit_status": "Submitted",
+                "first_warning_llm_call": 10,
+                "instance_id": "django__django-13089",
+                "llm_calls": 76,
+                "post_first_warning_action": "tool_batch",
+                "post_first_warning_exact_name_args_batch_changed": false,
+                "post_first_warning_tool_names": [
+                  "bash"
+                ],
+                "resolved": true,
+                "warnings": 21
+              },
+              {
+                "exit_status": "Submitted",
+                "first_warning_llm_call": 10,
+                "instance_id": "django__django-13343",
+                "llm_calls": 47,
+                "post_first_warning_action": "tool_batch",
+                "post_first_warning_exact_name_args_batch_changed": true,
+                "post_first_warning_tool_names": [
+                  "bash"
+                ],
+                "resolved": true,
+                "warnings": 1
+              },
+              {
+                "exit_status": "Submitted",
+                "first_warning_llm_call": 108,
+                "instance_id": "django__django-15252",
+                "llm_calls": 131,
+                "post_first_warning_action": "tool_batch",
+                "post_first_warning_exact_name_args_batch_changed": true,
+                "post_first_warning_tool_names": [
+                  "bash"
+                ],
+                "resolved": false,
+                "warnings": 1
+              },
+              {
+                "exit_status": "Submitted",
+                "first_warning_llm_call": 19,
+                "instance_id": "django__django-16333",
+                "llm_calls": 26,
+                "post_first_warning_action": "tool_batch",
+                "post_first_warning_exact_name_args_batch_changed": true,
+                "post_first_warning_tool_names": [
+                  "bash"
+                ],
+                "resolved": true,
+                "warnings": 1
+              }
+            ],
+            "first_post_warning_exact_name_args_batch_changed_cases": 4,
+            "first_warning_llm_call_max": 112,
+            "first_warning_llm_call_median": 19,
+            "first_warning_llm_call_min": 10,
+            "multiple_warning_cases": 1,
+            "warning_case_count": 5,
+            "warning_cases_resolved": 4,
+            "warning_count": 25
+          }
+        }
+      ],
+      "run_level_summary": {
+        "replicates": 3,
+        "run_level_statistics": {
+          "cached_input_tokens": {
+            "max": 289161984,
+            "mean": 271295424,
+            "min": 252885184,
+            "range_width": 36276800,
+            "sample_sd": 18144510.06549364
+          },
+          "cached_over_prompt_ratio": {
+            "max": 0.9818879153975645,
+            "mean": 0.980896002604149,
+            "min": 0.9793839527797585,
+            "range_width": 0.0025039626178059438,
+            "sample_sd": 0.0013305502982172439
+          },
+          "cached_over_total_ratio": {
+            "max": 0.9645916982509403,
+            "mean": 0.9634168827563758,
+            "min": 0.9619174538223092,
+            "range_width": 0.0026742444286310674,
+            "sample_sd": 0.0013663550892228534
+          },
+          "canonical_agent_failures": {
+            "max": 2,
+            "mean": 1,
+            "min": 0,
+            "range_width": 2,
+            "sample_sd": 1.0
+          },
+          "canonical_cost": {
+            "max": 768.85348,
+            "mean": 725.1940973333333,
+            "min": 679.635636,
+            "range_width": 89.21784400000001,
+            "sample_sd": 44.63922934862032
+          },
+          "case_duration_sum_ms": {
+            "max": 204707458,
+            "mean": 156508850,
+            "min": 131821680,
+            "range_width": 72885778,
+            "sample_sd": 41745358.38015053
+          },
+          "completion_tokens": {
+            "max": 5280644,
+            "mean": 5016339.666666667,
+            "min": 4688549,
+            "range_width": 592095,
+            "sample_sd": 301109.62811961584
+          },
+          "llm_calls": {
+            "max": 13712,
+            "mean": 13471.333333333334,
+            "min": 13262,
+            "range_width": 450,
+            "sample_sd": 226.63038925380977
+          },
+          "prompt_tokens": {
+            "max": 294495919,
+            "mean": 276563641.3333333,
+            "min": 258208421,
+            "range_width": 36287498,
+            "sample_sd": 18147445.774804406
+          },
+          "reasoning_tokens": {
+            "max": 0,
+            "mean": 0,
+            "min": 0,
+            "range_width": 0,
+            "sample_sd": 0.0
+          },
+          "resolved_instances": {
+            "max": 376,
+            "mean": 371.6666666666667,
+            "min": 365,
+            "range_width": 11,
+            "sample_sd": 5.8594652770823155
+          },
+          "resolved_rate": {
+            "max": 0.752,
+            "mean": 0.7433333333333333,
+            "min": 0.73,
+            "range_width": 0.02200000000000002,
+            "sample_sd": 0.01171893055416464
+          },
+          "tool_calls": {
+            "max": 14297,
+            "mean": 14077,
+            "min": 13854,
+            "range_width": 443,
+            "sample_sd": 221.51523649627356
+          },
+          "tool_loop_warning_case_count": {
+            "max": 8,
+            "mean": 5.666666666666667,
+            "min": 4,
+            "range_width": 4,
+            "sample_sd": 2.0816659994661326
+          },
+          "tool_loop_warning_count": {
+            "max": 25,
+            "mean": 16,
+            "min": 4,
+            "range_width": 21,
+            "sample_sd": 10.816653826391969
+          },
+          "total_tokens": {
+            "max": 299776563,
+            "mean": 281579981,
+            "min": 262896970,
+            "range_width": 36879593,
+            "sample_sd": 18444607.74428242
+          }
+        }
+      },
+      "within_arm_repeatability": {
+        "pairwise": [
+          {
+            "agreement": 0.94,
+            "both_resolved": 360,
+            "first_only_resolved": 14,
+            "first_replicate": 1,
+            "neither_resolved": 110,
+            "resolved_set_jaccard": 0.9230769230769231,
+            "second_only_resolved": 16,
+            "second_replicate": 2
+          },
+          {
+            "agreement": 0.922,
+            "both_resolved": 350,
+            "first_only_resolved": 24,
+            "first_replicate": 1,
+            "neither_resolved": 111,
+            "resolved_set_jaccard": 0.8997429305912596,
+            "second_only_resolved": 15,
+            "second_replicate": 3
+          },
+          {
+            "agreement": 0.91,
+            "both_resolved": 348,
+            "first_only_resolved": 28,
+            "first_replicate": 2,
+            "neither_resolved": 107,
+            "resolved_set_jaccard": 0.8854961832061069,
+            "second_only_resolved": 17,
+            "second_replicate": 3
+          }
+        ],
+        "pairwise_agreement_mean": 0.924,
+        "pairwise_resolved_set_jaccard_mean": 0.9027720122914299,
+        "resolution_frequency_histogram": {
+          "one_of_three": 31,
+          "three_of_three": 344,
+          "two_of_three": 26,
+          "zero_of_three": 99
+        }
+      }
+    }
+  },
+  "descriptive_rag_adapt_minus_native": {
+    "direction": "rag_adapt minus native",
+    "mean_canonical_cost": -48.102665333333334,
+    "mean_canonical_cost_percent": -6.220466405090619,
+    "mean_resolved_instances": 3.3333333333333712,
+    "mean_resolved_rate": 0.006666666666666599,
+    "mean_resolved_rate_percentage_points": 0.6666666666666599,
+    "mean_total_tokens": -1859086.3333333135,
+    "mean_total_tokens_percent": -0.6559033484071497,
+    "native_mean_resolved_rate": 0.7366666666666667,
+    "rag_adapt_mean_resolved_rate": 0.7433333333333333,
+    "interpretation": "RAG Adapt is higher by 0.667 percentage points in the three-run means. With n=3 run-level observations per bundle and overlapping ranges, this is descriptive rather than a stable nonzero-effect claim."
+  },
+  "operational_accounting": {
+    "canonical_boundary": "All arm metrics use only the six final 500-case canonical sets. The successful fresh Native R1 recovery is included once in its canonical run; displaced or zero-model control-plane attempts are excluded.",
+    "infrastructure_failures": [
+      {
+        "event": "native_r1_single_attempt_endpoint_timeout",
+        "run_id": "tag-cleanroom-loopwarn-timeout4h-native-20260729-r1",
+        "instance_id": "django__django-12663",
+        "classification": "qualifying model-endpoint infrastructure interruption",
+        "failed_attempt": {
+          "terminal": "Error/endpoint_timeout/retryable",
+          "duration_ms": 5421179,
+          "llm_calls": 117,
+          "tool_calls": 118,
+          "prompt_tokens": 4354610,
+          "cached_input_tokens": 4318784,
+          "completion_tokens": 70289,
+          "total_tokens": 4424899,
+          "tool_loop_warning_count": 0,
+          "cost": 10.892268,
+          "cost_currency": "billing_unit"
+        },
+        "recovery": "Quality-blind full-case fresh recovery from the initial prompt produced a Submitted canonical trajectory before the Native R1 generation gate.",
+        "canonical_metrics_effect": "The failed attempt is excluded; the selected fresh recovery is included once."
+      },
+      {
+        "event": "adapt_r1_empty_endpoint_scan_pseudo_retry",
+        "run_id": "tag-cleanroom-loopwarn-timeout4h-adapt-20260729-r1",
+        "classification": "control-plane empty-list representation bug",
+        "elapsed_seconds": 0.3,
+        "runner_exit": 1,
+        "model_calls": 0,
+        "model_tokens": 0,
+        "model_cost": 0,
+        "canonical_artifacts_changed": false,
+        "secondary_effect": "The generation controller and original harness queue exited before Adapt R1 validation or harness start."
+      },
+      {
+        "event": "amendment_04_controller_nounset_startup_failure",
+        "classification": "control-plane Bash declaration-order bug",
+        "elapsed_seconds": 0.31,
+        "exit_status": 1,
+        "error": "line 125: run_dir: unbound variable",
+        "model_calls": 0,
+        "model_tokens": 0,
+        "model_cost": 0,
+        "canonical_artifacts_changed": false,
+        "generation_or_harness_started": false
+      }
+    ],
+    "known_noncanonical_model_overhead": {
+      "llm_calls": 117,
+      "tool_calls": 118,
+      "duration_ms": 5421179,
+      "total_tokens": 4424899,
+      "cost": 10.892268,
+      "cost_currency": "billing_unit"
+    }
+  },
+  "tool_loop_warning_interpretation": {
+    "measurement": "Each warning case records the first warning LLM call and whether the immediately following tool-name-and-canonical-arguments batch differs from the preceding batch.",
+    "native_first_post_warning_batch_changed_case_observations": 14,
+    "native_warning_case_observations": 15,
+    "rag_adapt_first_post_warning_batch_changed_case_observations": 13,
+    "rag_adapt_warning_case_observations": 17,
+    "limitation": "There is no warning-disabled fresh control. Warning counts, next actions, and resolution outcomes are descriptive and do not estimate warning effectiveness."
+  },
+  "decision": {
+    "quality": "Native run RR values are 73.8%, 73.8%, and 73.4% (mean 73.667%, sample SD 0.231pp, range 73.4%-73.8%). RAG Adapt values are 74.8%, 75.2%, and 73.0% (mean 74.333%, sample SD 1.172pp, range 73.0%-75.2%).",
+    "repeatability": "Mean pairwise resolution agreement/Jaccard are 92.13%/89.86% for Native and 92.40%/90.28% for RAG Adapt.",
+    "usage": "Across run-level means, RAG Adapt uses 0.656% fewer total tokens and 6.220% fewer billing units while resolving 0.667 percentage points more cases; these are bundle-level descriptive differences with n=3 per arm.",
+    "conclusion": "Record both three-run distributions. Do not select the best repetition, pool V10, treat 1500 case-runs as independent, or attribute the bundle contrast to any single component."
+  },
+  "limitations": [
+    "Three run-level repetitions quantify only a small sample of stochastic run variation.",
+    "The same 500 cases recur in every run, so case-runs are not independent observations.",
+    "The complete bundle contrast cannot isolate code_search, AST representation, prompt adaptation, embedding, worker count, clean-room isolation, or the loop warning.",
+    "Generation wall-clock latency is confounded by registered harness overlap and is not used as a performance endpoint; canonical case-duration sums are reported instead.",
+    "Billing units are reproducible model-side accounting, not monetary spend; embedding monetary cost is outside this result."
+  ],
+  "artifact_hashes": {
+    "private_final_metrics_and_generation_audits": {
+      "tag-cleanroom-loopwarn-timeout4h-adapt-20260729-r1.generation-audit.json": "8c729ba05bf6ccad733ad18109942baf5adc95e5c535bf08b88320e6d6a5ffa1",
+      "tag-cleanroom-loopwarn-timeout4h-adapt-20260729-r1.metrics-summary.json": "c7b419a664b00551609cfaa9cb72f5d79f710ad92b01aa53dd8ef32cbea9f7e5",
+      "tag-cleanroom-loopwarn-timeout4h-adapt-20260729-r2.generation-audit.json": "ba630f02b464c258d8e75fefae2c27aa412bdfad59d937025b241df4e9144ca0",
+      "tag-cleanroom-loopwarn-timeout4h-adapt-20260729-r2.metrics-summary.json": "606f6f81f35db62dd3876eee019abc552eb6bc9b8a66a32eb8fd7c6e5f7725ad",
+      "tag-cleanroom-loopwarn-timeout4h-adapt-20260729-r3.generation-audit.json": "2c708a8598292eea89196d1dc536b27ff789ff7bbb65262ebdfc0d3f4a99fce0",
+      "tag-cleanroom-loopwarn-timeout4h-adapt-20260729-r3.metrics-summary.json": "04f0a0e543a2fe8d544ac35424c03c13b68f7061081a2e76c449715f600d573e",
+      "tag-cleanroom-loopwarn-timeout4h-native-20260729-r1.generation-audit.json": "c555d84c079dd7596bec68effdcf94f7b21d8dbd474aa677a33c82965357434f",
+      "tag-cleanroom-loopwarn-timeout4h-native-20260729-r1.metrics-summary.json": "d42f07a4b18e33bf46de659410da003b314b5080475c836f59b486cd0ed7c00a",
+      "tag-cleanroom-loopwarn-timeout4h-native-20260729-r2.generation-audit.json": "100f9c7b9b7ddc6a63b0b5ed52ab012e91eca1dff713cc269aef59dd5bee2a7e",
+      "tag-cleanroom-loopwarn-timeout4h-native-20260729-r2.metrics-summary.json": "01de40b5e852c096d06e0842e7e15dca02fd5493a69d01495c8b55fcbd35fa0a",
+      "tag-cleanroom-loopwarn-timeout4h-native-20260729-r3.generation-audit.json": "f0bca45fa61e98eee70e5bbad8ecec370f3bb1d395be19adaa6c4c197e2403d9",
+      "tag-cleanroom-loopwarn-timeout4h-native-20260729-r3.metrics-summary.json": "34703abeef528e3b60acf14f8c0c1069c27bd277583c8158efd90ad7e690e138",
+      "warning-summary.json": "080c62400de45a7e93f1ec34c02e34af1a0ee4a08960541631c3b40149359138"
+    },
+    "note": "Only hashes and sanitized aggregate fields are published; raw responses, absolute paths, endpoint hostnames, server addresses, and credentials are excluded."
+  },
+  "validation": {
+    "status": "passed",
+    "checks": [
+      "exactly six pre-registered canonical run IDs in frozen order",
+      "three runs per arm and exactly 500 canonical cases per run",
+      "all generation-audit issues arrays empty",
+      "for every run, nonempty harness instances plus empty patches equals 500",
+      "for every run, resolved plus unresolved equals nonempty harness instances",
+      "all six official harness error counts equal zero",
+      "resolved-id list lengths equal reported resolved counts",
+      "each arm's 0-of-3 through 3-of-3 histogram sums to 500",
+      "every pairwise repeatability table sums to 500 cases",
+      "arm statistics use the three run-level values with sample SD",
+      "V10 is excluded and no best-of-three metric is present",
+      "public artifact contains no raw model responses, absolute validation paths, server addresses, endpoint hostnames, or credentials"
+    ]
+  }
+}
