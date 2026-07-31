@@ -1,0 +1,179 @@
+{
+  "schema_version": 1,
+  "status": "preregistered",
+  "created_at": "2026-07-31",
+  "plan_id": "v12-cleanroom-native-noloopwarn-timeout4h-r3-20260731",
+  "objective": "Establish a three-run fresh full-500 clean-room Native baseline with the model-visible exact tool-loop warning disabled, while preserving the V11 Native runner and every other generation control.",
+  "question": "How do Native quality, prompt and completion token volume, calls, long-tail outcomes, and cache-standardized cost behave when the exact repeated tool-use/result warning is disabled?",
+  "inference_boundary": {
+    "design": "Three serial fresh full-500 Native generations with tool_loop_warning=false, followed by a serial official harness queue after all three generation gates pass.",
+    "experimental_unit": "The fresh 500-case run; n=3 run-level observations.",
+    "authoritative_runs": "Only the three V12 runs are authoritative for the no-warning baseline.",
+    "historical_reference": "The three V11 Native tool_loop_warning=true runs are a non-contemporaneous historical reference. Their comparison to V12 is secondary and descriptive, not a strict causal estimate.",
+    "time_boundary": "Calendar date and time of day are recorded as metadata only. No start window is selected, delayed, or repeated because of observed service state, latency, cache hit, generation outcome, or harness quality.",
+    "single_variable": "The only intended V11 Native generation change is tool_loop_warning true to false. The same already-built Native binary is used; no stripped or rebuilt binary is permitted.",
+    "quality_blinding": "Do not start or inspect a V12 official harness result until all three V12 generations pass the quality-blind generation gate."
+  },
+  "reference": {
+    "result_id": "v11-cleanroom-loopwarn-timeout4h-r3",
+    "public_commit": "d6719df",
+    "reference_runs": [
+      "tag-cleanroom-loopwarn-timeout4h-native-20260729-r1",
+      "tag-cleanroom-loopwarn-timeout4h-native-20260729-r2",
+      "tag-cleanroom-loopwarn-timeout4h-native-20260729-r3"
+    ],
+    "reference_tool_loop_warning": true,
+    "excluded": [
+      "V10",
+      "all RAG Adapt runs as a warning-ablation control",
+      "best-of-three summaries"
+    ]
+  },
+  "frozen_inputs": {
+    "benchmark_revision": "a702c2f589996b96785b020a3d7f2df9438748d4",
+    "framework_revision": "358d376784889fd539a764190e1970ee4f4fc5f6",
+    "native_runner_binary": "trpc-agent-go-impl-cleanroom-a702c2f",
+    "native_runner_binary_sha256": "839a4f327704554697592335b1fa4a3fd9fac32ec9f8de19923a5e870806e4b8",
+    "preflight_binary": "tag-swebench-offline-preflight-a702c2f",
+    "preflight_binary_sha256": "33ab173c379b668386ef4409a9534641ee232a79d80dd03ea7ee54bea7fbf863",
+    "case_count": 500,
+    "case_list_sha256": "a6b0fd7c8c2969a0eef892e032250adcfa6d32362d395c246930e61b575ac9b9",
+    "cases_sha256": "4b2a050a82d356963320cbfa8e2efdf6a133af8863f31b291a973ab4dd349d07",
+    "model_config_sha256": "fbfdf25e9fced3ecc51d244ccbb652c078b02ac640abbdbcca53ddbaa7af27de",
+    "environment_config_sha256": "3cfa72f92f4010d242e6adb9bb507ccdf9db261ba5726163b5adecd509c140f0",
+    "endpoint_retry_helper_sha256": "4fc02177ce6e96fc93cfa738dee0461c7705ac5306e9b097eedd123c78df415b",
+    "harness_worktree_revision": "65d99680dfb0af1bccaf46ea2bd477917a136afb"
+  },
+  "common_generation": {
+    "model": "GLM-5.2",
+    "reasoning_effort": "high",
+    "observation_codec": "xml",
+    "command_timeout": "1m",
+    "case_timeout": "4h",
+    "single_llm_http_attempt_timeout": "300s",
+    "max_llm_calls": 250,
+    "offline_generation": true,
+    "sanitized_git_history": true,
+    "tool_loop_warning": false,
+    "workspace_preload": false,
+    "redo_existing": false
+  },
+  "arm": {
+    "name": "native_no_loop_warning",
+    "replicates": 3,
+    "workers": 15,
+    "code_search": false,
+    "workspace_representation": "current-fixed",
+    "embedding": "disabled"
+  },
+  "generation_order": [
+    {
+      "order": 1,
+      "replicate": 1,
+      "run_id": "tag-cleanroom-noloopwarn-timeout4h-native-20260731-r1"
+    },
+    {
+      "order": 2,
+      "replicate": 2,
+      "run_id": "tag-cleanroom-noloopwarn-timeout4h-native-20260731-r2"
+    },
+    {
+      "order": 3,
+      "replicate": 3,
+      "run_id": "tag-cleanroom-noloopwarn-timeout4h-native-20260731-r3"
+    }
+  ],
+  "preflight": {
+    "scope": "fresh all-500 preflight before R1",
+    "workers": 4,
+    "requires": [
+      "500 unique Passed cases and zero Failed cases",
+      "local images and offline assets available",
+      "public DNS and raw-IP egress blocked",
+      "required loopback HTTP and HTTPS behavior available",
+      "sanitized Git repository retains only legitimate base history",
+      "all preflight containers cleaned before R1"
+    ]
+  },
+  "terminal_and_recovery_policy": {
+    "canonical_agent_outcomes": [
+      "Submitted",
+      "exact max LLM calls (250) exceeded Agent error",
+      "exact four-hour case_timeout",
+      "other explicitly audited genuine Agent outcomes"
+    ],
+    "qualifying_endpoint_timeout": {
+      "signature": "Error, error_category=endpoint_timeout, retryable=true, empty patch, and error ending in chat/completions\": context deadline exceeded",
+      "interpretation": "A single 300-second model HTTP attempt interruption, not a case-level Agent outcome.",
+      "recovery": "After the primary 500 finishes, select solely by the exact signature and rerun the complete case from its initial prompt, empty history, and a new clean-room environment. Permit at most three consecutive qualifying endpoint-timeout attempts; the first non-qualifying terminal outcome becomes canonical.",
+      "cache_policy": "Do not alter prompts or retry because of cache behavior. Natural service-side cache behavior is accepted."
+    },
+    "four_hour_timeout": "Canonical; never rerun.",
+    "exact_call_limit": "Canonical; never rerun.",
+    "other_infrastructure_failure": "Freeze evidence, stop, and classify before any amendment.",
+    "evidence": "Displaced endpoint-timeout attempts remain immutable and their usage, cost, calls, and duration are reported separately from canonical metrics."
+  },
+  "generation_gate": {
+    "required_per_run": [
+      "500 unique final canonical terminal artifacts",
+      "predictions, progress, manifest, tags, and responses complete",
+      "responses length matches llm_calls for every canonical trajectory under the audited terminal rules",
+      "all frozen hashes and Native configuration match",
+      "manifest tool_loop_warning is false",
+      "tool_loop_warning_count and tool_loop_warning_case_count are zero",
+      "no model history contains the injected <tool_loop_detected> warning",
+      "no unresolved non-qualifying infrastructure failure"
+    ],
+    "serial_transition": "R2 starts only after R1 passes; R3 starts only after R2 passes. Generation order and configuration never adapt to intermediate outcomes."
+  },
+  "official_harness": {
+    "starts_after": "all three V12 generation gates pass",
+    "order": [
+      "tag-cleanroom-noloopwarn-timeout4h-native-20260731-r1",
+      "tag-cleanroom-noloopwarn-timeout4h-native-20260731-r2",
+      "tag-cleanroom-noloopwarn-timeout4h-native-20260731-r3"
+    ],
+    "serial": true,
+    "max_active_runs": 1,
+    "target": "tag",
+    "workers": 4,
+    "verifier_mode": "calibrated",
+    "cache_level": "instance",
+    "clean": false,
+    "apply_harness_compat": true,
+    "instances_from_predictions": true,
+    "rate_denominator": 500
+  },
+  "analysis": {
+    "primary": [
+      "resolved count and resolved/500 for each run",
+      "run-level mean, sample standard deviation, and range across the three resolved rates",
+      "prompt, cached-input, uncached-input, completion, and total tokens",
+      "llm_calls, tool_calls, canonical duration, empty patches, exact 250-call outcomes, four-hour timeouts, and other audited Agent outcomes",
+      "per-case 0-of-3 through 3-of-3 resolution frequency and pairwise agreement and Jaccard within V12"
+    ],
+    "cache_and_cost": {
+      "actual": "Report observed cached-input ratio and billed cost, but do not use actual cost alone as evidence of warning effect.",
+      "all_uncached": "Reprice every prompt token at the uncached-input rate and every completion token at the output rate.",
+      "fixed_hit_sensitivity": "Reprice every run at common prompt cache-hit rates of 0%, 90%, 95%, 98%, and 100%.",
+      "decomposition": "Separate cost differences caused by prompt volume, completion volume, and observed cache mix."
+    },
+    "shadow_repeat_analysis": [
+      "Replay the unchanged exact repeated tool-use/result batch detector offline over each no-warning tag event stream without mutating model history.",
+      "Report would-warn cases, event counts, first would-warn call, subsequent repeat/change/submit/error behavior, and tokens and calls after the first would-warn point.",
+      "Report cases reaching at least 100 calls, at least 200 calls, the exact 250-call limit, and the four-hour case limit."
+    ],
+    "historical_warning_on_comparison": {
+      "scope": "Secondary comparison against the three V11 Native warning-on runs using run-level token, call, tail, quality, and standardized-cost metrics.",
+      "claim_boundary": "Because service state and time are not randomized or directly observed, call the difference a historical baseline contrast or sensitivity result, not a strict causal warning effect."
+    },
+    "prohibitions": [
+      "do not use best-of-three",
+      "do not treat the repeated panels as 1500 independent cases",
+      "do not pool V10",
+      "do not use RAG Adapt as a tool-loop-warning control",
+      "do not retry cache misses, low cache-hit trajectories, high-latency successful calls, 250-call outcomes, or four-hour case timeouts",
+      "do not change start time, run order, configuration, case membership, or replicate count based on observed outcomes"
+    ]
+  }
+}
