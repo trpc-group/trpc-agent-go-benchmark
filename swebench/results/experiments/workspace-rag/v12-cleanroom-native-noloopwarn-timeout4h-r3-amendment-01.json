@@ -1,0 +1,123 @@
+{
+  "schema_version": 1,
+  "status": "active",
+  "created_at": "2026-07-31",
+  "amendment_id": "v12-cleanroom-native-noloopwarn-timeout4h-r3-amendment-01",
+  "amends": "v12-cleanroom-native-noloopwarn-timeout4h-r3-20260731",
+  "scope": "Adopt the V11 serialized harness-overlap policy so completed-run official evaluation can proceed alongside later frozen generation runs without changing any generation input, outcome, or ordering rule.",
+  "authorization": {
+    "authorized_by": "experiment owner",
+    "authorization": "Use the V11 approach for harness overlap.",
+    "authorization_observed_at": "2026-07-31T15:15:39+08:00",
+    "boundary": "Do not touch active R1 or any generation process. Replace only the waiting harness queue, preserve its evidence, and retain all generation and evaluation invariants."
+  },
+  "decision_timing": {
+    "state": "R1 generation active with 88 of 500 terminal cases, all Submitted; R2 and R3 not started.",
+    "prospective_v12_harness_results_seen": false,
+    "v12_harness_directories_present": 0,
+    "primary_harness_queue_state": "Active and sleeping behind all-generation-complete-at.txt; no evaluator had started.",
+    "selection_effect": "none; the three-run order, configuration, case membership, replicate count, terminal policy, and canonical mapping remain frozen",
+    "quality_adaptive": false
+  },
+  "unchanged_generation_contract": {
+    "run_count": 3,
+    "order": [
+      "tag-cleanroom-noloopwarn-timeout4h-native-20260731-r1",
+      "tag-cleanroom-noloopwarn-timeout4h-native-20260731-r2",
+      "tag-cleanroom-noloopwarn-timeout4h-native-20260731-r3"
+    ],
+    "frozen": [
+      "case membership",
+      "GLM-5.2 high model configuration and XML observations",
+      "Native binary and all binary/configuration hashes",
+      "workers=15, code_search=false, current-fixed, workspace_preload=false, and tool_loop_warning=false",
+      "one-minute command timeout, four-hour case timeout, and 250-call limit",
+      "offline clean-room isolation and Git sanitization",
+      "endpoint-timeout recovery and every canonical terminal rule"
+    ],
+    "early_harness_results_must_not_change": [
+      "remaining generation order or run count",
+      "remaining generation configuration or start transition",
+      "terminal classification, retry selection, or canonical replacement",
+      "monitoring conclusions about model quality"
+    ]
+  },
+  "harness_pipeline": {
+    "eligibility": "A run enters the harness queue only after its quality-blind 500-case generation gate passes.",
+    "queue_order": [
+      "tag-cleanroom-noloopwarn-timeout4h-native-20260731-r1",
+      "tag-cleanroom-noloopwarn-timeout4h-native-20260731-r2",
+      "tag-cleanroom-noloopwarn-timeout4h-native-20260731-r3"
+    ],
+    "serial": true,
+    "max_active_harness_runs": 1,
+    "during_generation": {
+      "workers": 1,
+      "launch_condition": "The next generation has passed its start resource gate and is active, or all generation is complete.",
+      "resource_policy": "Harness may wait for adequate host headroom; material pressure may delay or stop only harness, never generation."
+    },
+    "after_all_generation": {
+      "workers": 4,
+      "transition": "An already-active workers=1 harness finishes unchanged; every harness not yet started uses workers=4."
+    },
+    "fixed_options": {
+      "target": "tag",
+      "python": "/data/validation/swebench-py/bin/python",
+      "verifier_mode": "calibrated",
+      "cache_level": "instance",
+      "clean": false,
+      "apply_harness_compat": true,
+      "instances_from_predictions": true,
+      "rate_denominator": 500
+    },
+    "post_run_gate": "After each harness succeeds, generate and validate that run's metrics-summary.json and update the root harness-metrics-index.json before starting the next queued harness.",
+    "result_visibility": "Per-run metrics may be inspected and reported immediately, but cannot adapt the frozen generation contract."
+  },
+  "control_plane_transition": {
+    "primary_queue_action": "Record its logical PID as stale, terminate only the sleeping primary harness queue, and retain its start marker, log, timing output, wrapper PID, logical PID, and original script.",
+    "replacement_queue_action": "Start a separately named amendment-01 queue only after verifying the primary logical PID is inactive, no harness directory exists, all registered hashes match, and the harness worktree is clean at its frozen revision.",
+    "generation_action": "none",
+    "canonical_artifact_action": "none"
+  },
+  "monitoring": {
+    "normal_interval": "25m",
+    "switch_to_10m_when": [
+      "R1 has at most 80 non-terminal cases or the first harness ETA is within 60 minutes",
+      "R1 generation gate passes and the queue is waiting for R2 to become active",
+      "the first overlapping harness starts",
+      "any generation, harness, resource, Docker, or shared-service anomaly appears"
+    ],
+    "first_overlap_stability_window": "At least three consecutive 10-minute checks spanning at least 30 minutes after the first harness starts.",
+    "return_to_25m": "After the stability window passes, or after the first harness metrics gate succeeds if that occurs earlier.",
+    "required_observations": [
+      "generation and harness process trees and terminal progress",
+      "endpoint retries and canonical mapping",
+      "harness completed, resolved, unresolved, and error counts",
+      "CPU/load/idle, RSS, MemAvailable, Swap, PSI, iowait, vdb utilization/await, and /data free space",
+      "generation case, evaluation, and managed-httpbin containers"
+    ]
+  },
+  "interpretation": {
+    "superseded_rule": "The plan's no-V12-harness-before-all-generation rule is replaced by this frozen-generation early-harness policy.",
+    "generation_effect": "none intended; harness timing is orchestration, not a model-visible generation configuration.",
+    "v11_alignment": "The queue order, one-worker overlap, four-worker post-generation transition, resource gate, and non-adaptation boundary follow V11 amendment-01 semantics.",
+    "residual_risk": "Concurrent harness load could matter only through observed resource pressure, model-cache behavior, tool timing/observations, timeouts, or infrastructure failures; these mediators are monitored and reported.",
+    "claim_boundary": "V12 remains a historical contrast to V11, not a randomized causal estimate."
+  },
+  "implementation": {
+    "plan_sha256": "fb63729c716206a86f62742e1b12a7e7de9106e04bdd528dfd86bf0646af8481",
+    "controller_sha256": "94f5b7beb8d783a08715acd63ceda3ddf37109631f5d0946f071e8e329bb8105",
+    "validator_sha256": "5b23997c21155fabc73e592c99fe01978b95521bd9fdb7cce47f580d8b695953",
+    "primary_harness_queue_sha256": "66e51bc4ba2555ffbb47dfbea03c2e673b14aa6042f529a2fc54aa6a54eaa10f",
+    "amendment_01_harness_queue_sha256": "37991fc22c216c00600f999b6deed42a2730a8f48cf63d1561f1a08a04f1dae7",
+    "metrics_sha256": "47ca87dd9cd6ba5a862e31fc32898027481373bcd4408c7ced213281ca97d8a8",
+    "endpoint_retry_helper_sha256": "4fc02177ce6e96fc93cfa738dee0461c7705ac5306e9b097eedd123c78df415b",
+    "harness_worktree_revision": "65d99680dfb0af1bccaf46ea2bd477917a136afb"
+  },
+  "reporting": {
+    "canonical_metrics": "unchanged; use only the three final V12 canonical runs",
+    "orchestration_change": "Report this amendment and the exact overlap intervals and worker counts for every harness.",
+    "resource_evidence": "Report any overlap-period pressure or infrastructure event separately from model outcomes.",
+    "causal_boundary": "The amendment supplies no quality evidence and does not authorize a best-of-three or case-level adaptive decision."
+  }
+}
