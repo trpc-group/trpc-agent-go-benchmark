@@ -1,0 +1,1571 @@
+{
+  "schema_version": 1,
+  "status": "completed",
+  "evidence_status": "complete_with_one_reproducible_harness_error",
+  "completed_on": "2026-08-02",
+  "result_id": "v12-cleanroom-native-noloopwarn-timeout4h-r3",
+  "question": "How do Native quality, prompt and completion token volume, calls, long-tail outcomes, and cache-standardized cost behave across three fresh full-500 runs when the exact repeated tool-use/result warning is disabled?",
+  "inference_scope": {
+    "design": "Three serial fresh full-500 Native generations with the model-visible exact tool-loop warning disabled.",
+    "panel": "The same canonical SWE-bench Verified 500-case panel is repeated in every run.",
+    "experimental_unit": "The fresh 500-case run; n=3 run-level observations.",
+    "authoritative_runs": [
+      "tag-cleanroom-noloopwarn-timeout4h-native-20260731-r1",
+      "tag-cleanroom-noloopwarn-timeout4h-native-20260731-r2",
+      "tag-cleanroom-noloopwarn-timeout4h-native-20260731-r3"
+    ],
+    "single_intended_generation_variable": "The frozen V11 and V12 public plans specify the same Native binary and generation controls except tool_loop_warning=true versus false.",
+    "historical_reference": "V11 Native warning-on is non-contemporaneous and secondary. It is a historical sensitivity contrast, not a randomized or strict causal estimate.",
+    "excluded": [
+      "V10",
+      "RAG Adapt as a warning-ablation control",
+      "best-of-three selection",
+      "treating 1500 repeated case-runs as independent observations"
+    ]
+  },
+  "protocol": {
+    "artifacts": [
+      {
+        "role": "plan",
+        "path": "results/experiments/workspace-rag/v12-cleanroom-native-noloopwarn-timeout4h-r3-plan.json",
+        "sha256": "fb63729c716206a86f62742e1b12a7e7de9106e04bdd528dfd86bf0646af8481",
+        "commit": "9f68ff2338faf660e7202bbd779352627f26ea4c"
+      },
+      {
+        "role": "amendment_01",
+        "path": "results/experiments/workspace-rag/v12-cleanroom-native-noloopwarn-timeout4h-r3-amendment-01.json",
+        "sha256": "1f6193c3322c5059d3a51d5762e4ae792dd43cc63db81d4422ba6feedf9c617d",
+        "commit": "973871c9d2246476e28979a2ba6c16469f22c7e8"
+      }
+    ],
+    "benchmark_revision": "a702c2f589996b96785b020a3d7f2df9438748d4",
+    "framework_revision": "358d376784889fd539a764190e1970ee4f4fc5f6",
+    "preflight": {
+      "scope_cases": 500,
+      "passed": 500,
+      "failed": 0,
+      "duration_ms": 3041879,
+      "workers": 4
+    },
+    "generation_order": [
+      "tag-cleanroom-noloopwarn-timeout4h-native-20260731-r1",
+      "tag-cleanroom-noloopwarn-timeout4h-native-20260731-r2",
+      "tag-cleanroom-noloopwarn-timeout4h-native-20260731-r3"
+    ],
+    "generation_started_at": [
+      "2026-07-31T14:33:26+08:00",
+      "2026-08-01T00:36:07+08:00",
+      "2026-08-01T10:25:18+08:00"
+    ],
+    "generation_gates_passed_at": [
+      "2026-08-01T00:36:06+08:00",
+      "2026-08-01T10:25:17+08:00",
+      "2026-08-01T23:12:15+08:00"
+    ],
+    "all_generation_completed_at": "2026-08-01T23:12:15+08:00",
+    "generation_gates_passed": 3,
+    "harness_pipeline": {
+      "order": [
+        "tag-cleanroom-noloopwarn-timeout4h-native-20260731-r1",
+        "tag-cleanroom-noloopwarn-timeout4h-native-20260731-r2",
+        "tag-cleanroom-noloopwarn-timeout4h-native-20260731-r3"
+      ],
+      "serial": true,
+      "max_active_runs": 1,
+      "workers_during_generation": 1,
+      "workers_for_not_yet_started_after_generation": 4,
+      "target": "tag",
+      "verifier_mode": "calibrated",
+      "cache_level": "instance",
+      "clean": false,
+      "apply_harness_compat": true,
+      "instances_from_predictions": true,
+      "rate_denominator": 500,
+      "amendment_interpretation": "Amendment 01 prospectively replaced only the waiting harness queue while R1 generation was active and before any V12 harness result existed; remaining generation stayed frozen."
+    },
+    "all_harness_completed_at": "2026-08-02T02:27:06+08:00",
+    "harness_metrics_outcome": {
+      "strict_error_zero_gates_passed": 2,
+      "audited_exception_runs": 1,
+      "exception": "R1 retained one candidate-patch-induced, cleanly reproducible 1800-second harness timeout. Its original report and RR were not rewritten."
+    }
+  },
+  "public_provenance": {
+    "case_list": "data/case-lists/verified-test-500.case_ids.txt",
+    "case_count": 500,
+    "case_list_sha256": "a6b0fd7c8c2969a0eef892e032250adcfa6d32362d395c246930e61b575ac9b9",
+    "cases_jsonl_sha256": "4b2a050a82d356963320cbfa8e2efdf6a133af8863f31b291a973ab4dd349d07",
+    "model_config_sha256": "fbfdf25e9fced3ecc51d244ccbb652c078b02ac640abbdbcca53ddbaa7af27de",
+    "environment_config_sha256": "3cfa72f92f4010d242e6adb9bb507ccdf9db261ba5726163b5adecd509c140f0"
+  },
+  "common_generation": {
+    "model": "GLM-5.2",
+    "reasoning_effort": "high",
+    "observation_codec": "xml",
+    "command_timeout": "1m",
+    "case_timeout": "4h",
+    "single_llm_http_attempt_timeout": "300s",
+    "max_llm_calls": 250,
+    "offline_generation": true,
+    "sanitized_git_history": true,
+    "tool_loop_warning": false,
+    "workspace_preload": false,
+    "redo_existing": false,
+    "workers": 15,
+    "code_search": false,
+    "workspace_representation": "current-fixed",
+    "embedding": "disabled",
+    "native_runner_binary_sha256": "839a4f327704554697592335b1fa4a3fd9fac32ec9f8de19923a5e870806e4b8"
+  },
+  "arm": {
+    "name": "native_no_loop_warning",
+    "runs": [
+      {
+        "run_id": "tag-cleanroom-noloopwarn-timeout4h-native-20260731-r1",
+        "replicate": 1,
+        "generation_integrity": {
+          "canonical_cases": 500,
+          "prediction_count": 500,
+          "tag_count": 500,
+          "responses_file_count": 500,
+          "response_records": 13929,
+          "terminal_counts": {
+            "Submitted": 498,
+            "Error": 1,
+            "Timeout": 1
+          },
+          "canonical_agent_failure_categories": {
+            "agent_error": 1,
+            "case_timeout": 1
+          },
+          "canonical_agent_failure_details": [
+            {
+              "classification": "exact_call_limit",
+              "instance_id": "django__django-12663",
+              "llm_calls": 250
+            },
+            {
+              "classification": "four_hour_case_timeout",
+              "instance_id": "django__django-10554",
+              "duration_ms": 14425030,
+              "llm_calls": 213,
+              "responses": 212
+            }
+          ],
+          "generation_audit_issues": [],
+          "unrecovered_non_agent_failures": 0,
+          "tool_loop_warning_enabled": false,
+          "tool_loop_warning_count": 0,
+          "tool_loop_warning_case_count": 0
+        },
+        "official_harness": {
+          "status": "completed_with_reproducible_error",
+          "panel_instances": 500,
+          "nonempty_patch_instances": 498,
+          "completed_instances": 497,
+          "resolved_instances": 377,
+          "resolved_rate": 0.754,
+          "unresolved_nonempty_instances": 120,
+          "empty_patch_instances": 2,
+          "error_instances": 1,
+          "error_ids": [
+            "sympy__sympy-19040"
+          ],
+          "workers": 1,
+          "rate_denominator": 500,
+          "started_at": "2026-08-01T00:36:21+08:00",
+          "finished_at": "2026-08-01T05:52:31+08:00"
+        },
+        "model_metrics": {
+          "llm_calls": 13930,
+          "prompt_tokens": 301692458,
+          "cached_input_tokens": 286723968,
+          "uncached_input_tokens": 14968490,
+          "completion_tokens": 4956023,
+          "reasoning_tokens_reported": 0,
+          "total_tokens": 306648481,
+          "cached_over_prompt_ratio": 0.9503849380285138,
+          "cached_over_total_ratio": 0.9350249088629922,
+          "rate_card": {
+            "cached_input_per_million": 2,
+            "uncached_input_per_million": 8,
+            "output_per_million": 28,
+            "currency": "billing_unit"
+          },
+          "actual_cost": 831.9645,
+          "all_prompt_uncached_cost": 2552.308308,
+          "fixed_prompt_cache_hit_rate_cost": {
+            "0": 2552.308308,
+            "0.9": 923.1690348,
+            "0.95": 832.6612974,
+            "0.98": 778.35665496,
+            "1": 742.15356
+          }
+        },
+        "agent_metrics": {
+          "tool_calls": 14890,
+          "canonical_case_duration_sum_ms": 422389345,
+          "canonical_case_duration_sum_hours": 117.33037361111111,
+          "call_threshold_case_counts": {
+            "at_least_100": 8,
+            "at_least_200": 2,
+            "exactly_250": 1
+          },
+          "duration_quantiles_ms_nearest_rank": {
+            "p0": 19142,
+            "p50": 318442,
+            "p90": 2137208,
+            "p95": 3113734,
+            "p98": 5599472,
+            "p99": 7483630,
+            "p100": 14425030
+          },
+          "llm_call_quantiles_nearest_rank": {
+            "p0": 4,
+            "p50": 21,
+            "p90": 57,
+            "p95": 74,
+            "p98": 93,
+            "p99": 109,
+            "p100": 250
+          }
+        },
+        "shadow_repeat_metrics": {
+          "would_warn_case_count": 6,
+          "would_warn_event_count": 35,
+          "first_would_warn_call_min": 14,
+          "first_would_warn_call_median": 24.5,
+          "first_would_warn_call_max": 45,
+          "immediate_changed_cases": 4,
+          "immediate_exact_repeat_cases": 2,
+          "terminal_counts": {
+            "Submitted": 6
+          },
+          "post_first_llm_calls": 211,
+          "post_first_llm_calls_mean": 35.166666666666664,
+          "post_first_llm_calls_median": 30.5,
+          "post_first_llm_calls_range": [
+            4,
+            85
+          ],
+          "post_first_tool_calls": 216,
+          "post_first_prompt_tokens": 13369919,
+          "post_first_cached_input_tokens": 12977600,
+          "post_first_uncached_input_tokens": 392319,
+          "post_first_completion_tokens": 258691,
+          "post_first_total_tokens": 13628610,
+          "input_file_count": 1000,
+          "input_bytes": 159189124,
+          "input_fileset_sha256": "72823fe0d684c2f2fbd5421234e6ec9da189b2bec49e70d2eec7ca9a2565095d"
+        }
+      },
+      {
+        "run_id": "tag-cleanroom-noloopwarn-timeout4h-native-20260731-r2",
+        "replicate": 2,
+        "generation_integrity": {
+          "canonical_cases": 500,
+          "prediction_count": 500,
+          "tag_count": 500,
+          "responses_file_count": 500,
+          "response_records": 14331,
+          "terminal_counts": {
+            "Submitted": 499,
+            "Error": 1
+          },
+          "canonical_agent_failure_categories": {
+            "agent_error": 1
+          },
+          "canonical_agent_failure_details": [
+            {
+              "classification": "exact_call_limit",
+              "instance_id": "django__django-15732",
+              "llm_calls": 250
+            }
+          ],
+          "generation_audit_issues": [],
+          "unrecovered_non_agent_failures": 0,
+          "tool_loop_warning_enabled": false,
+          "tool_loop_warning_count": 0,
+          "tool_loop_warning_case_count": 0
+        },
+        "official_harness": {
+          "status": "completed",
+          "panel_instances": 500,
+          "nonempty_patch_instances": 499,
+          "completed_instances": 499,
+          "resolved_instances": 368,
+          "resolved_rate": 0.736,
+          "unresolved_nonempty_instances": 131,
+          "empty_patch_instances": 1,
+          "error_instances": 0,
+          "error_ids": [],
+          "workers": 4,
+          "rate_denominator": 500,
+          "started_at": "2026-08-01T23:59:01+08:00",
+          "finished_at": "2026-08-02T01:13:27+08:00"
+        },
+        "model_metrics": {
+          "llm_calls": 14331,
+          "prompt_tokens": 340283422,
+          "cached_input_tokens": 330612288,
+          "uncached_input_tokens": 9671134,
+          "completion_tokens": 5880987,
+          "reasoning_tokens_reported": 0,
+          "total_tokens": 346164409,
+          "cached_over_prompt_ratio": 0.9715791796639449,
+          "cached_over_total_ratio": 0.955073021386205,
+          "rate_card": {
+            "cached_input_per_million": 2,
+            "uncached_input_per_million": 8,
+            "output_per_million": 28,
+            "currency": "billing_unit"
+          },
+          "actual_cost": 903.261284,
+          "all_prompt_uncached_cost": 2886.935012,
+          "fixed_prompt_cache_hit_rate_cost": {
+            "0": 2886.935012,
+            "0.9": 1049.4045332,
+            "0.95": 947.3195066,
+            "0.98": 886.06849064,
+            "1": 845.23448
+          }
+        },
+        "agent_metrics": {
+          "tool_calls": 15312,
+          "canonical_case_duration_sum_ms": 420201917,
+          "canonical_case_duration_sum_hours": 116.72275472222222,
+          "call_threshold_case_counts": {
+            "at_least_100": 13,
+            "at_least_200": 1,
+            "exactly_250": 1
+          },
+          "duration_quantiles_ms_nearest_rank": {
+            "p0": 34560,
+            "p50": 368910,
+            "p90": 1923784,
+            "p95": 2999156,
+            "p98": 5822694,
+            "p99": 7188334,
+            "p100": 11368042
+          },
+          "llm_call_quantiles_nearest_rank": {
+            "p0": 4,
+            "p50": 20,
+            "p90": 60,
+            "p95": 73,
+            "p98": 113,
+            "p99": 126,
+            "p100": 250
+          }
+        },
+        "shadow_repeat_metrics": {
+          "would_warn_case_count": 15,
+          "would_warn_event_count": 177,
+          "first_would_warn_call_min": 8,
+          "first_would_warn_call_median": 20,
+          "first_would_warn_call_max": 128,
+          "immediate_changed_cases": 10,
+          "immediate_exact_repeat_cases": 5,
+          "terminal_counts": {
+            "Submitted": 14,
+            "exact_call_limit": 1
+          },
+          "post_first_llm_calls": 674,
+          "post_first_llm_calls_mean": 44.93333333333333,
+          "post_first_llm_calls_median": 24,
+          "post_first_llm_calls_range": [
+            5,
+            163
+          ],
+          "post_first_tool_calls": 675,
+          "post_first_prompt_tokens": 70778798,
+          "post_first_cached_input_tokens": 69406208,
+          "post_first_uncached_input_tokens": 1372590,
+          "post_first_completion_tokens": 868075,
+          "post_first_total_tokens": 71646873,
+          "input_file_count": 1000,
+          "input_bytes": 169982480,
+          "input_fileset_sha256": "6e4f96e96b8dc72be91d938476b94d7046c23187c0ef39e1ab2af1d005146f81"
+        }
+      },
+      {
+        "run_id": "tag-cleanroom-noloopwarn-timeout4h-native-20260731-r3",
+        "replicate": 3,
+        "generation_integrity": {
+          "canonical_cases": 500,
+          "prediction_count": 500,
+          "tag_count": 500,
+          "responses_file_count": 500,
+          "response_records": 13385,
+          "terminal_counts": {
+            "Submitted": 498,
+            "Timeout": 2
+          },
+          "canonical_agent_failure_categories": {
+            "case_timeout": 2
+          },
+          "canonical_agent_failure_details": [
+            {
+              "classification": "four_hour_case_timeout",
+              "instance_id": "django__django-10554",
+              "duration_ms": 14425688,
+              "llm_calls": 162,
+              "responses": 161
+            },
+            {
+              "classification": "four_hour_case_timeout",
+              "instance_id": "django__django-14792",
+              "duration_ms": 14427399,
+              "llm_calls": 100,
+              "responses": 99
+            }
+          ],
+          "generation_audit_issues": [],
+          "unrecovered_non_agent_failures": 0,
+          "tool_loop_warning_enabled": false,
+          "tool_loop_warning_count": 0,
+          "tool_loop_warning_case_count": 0
+        },
+        "official_harness": {
+          "status": "completed",
+          "panel_instances": 500,
+          "nonempty_patch_instances": 497,
+          "completed_instances": 497,
+          "resolved_instances": 367,
+          "resolved_rate": 0.734,
+          "unresolved_nonempty_instances": 130,
+          "empty_patch_instances": 3,
+          "error_instances": 0,
+          "error_ids": [],
+          "workers": 4,
+          "rate_denominator": 500,
+          "started_at": "2026-08-02T01:13:29+08:00",
+          "finished_at": "2026-08-02T02:27:04+08:00"
+        },
+        "model_metrics": {
+          "llm_calls": 13387,
+          "prompt_tokens": 267984875,
+          "cached_input_tokens": 247049088,
+          "uncached_input_tokens": 20935787,
+          "completion_tokens": 4739833,
+          "reasoning_tokens_reported": 0,
+          "total_tokens": 272724708,
+          "cached_over_prompt_ratio": 0.9218769827961373,
+          "cached_over_total_ratio": 0.9058551746620626,
+          "rate_card": {
+            "cached_input_per_million": 2,
+            "uncached_input_per_million": 8,
+            "output_per_million": 28,
+            "currency": "billing_unit"
+          },
+          "actual_cost": 794.299796,
+          "all_prompt_uncached_cost": 2276.594324,
+          "fixed_prompt_cache_hit_rate_cost": {
+            "0": 2276.594324,
+            "0.9": 829.475999,
+            "0.95": 749.0805365,
+            "0.98": 700.843259,
+            "1": 668.685074
+          }
+        },
+        "agent_metrics": {
+          "tool_calls": 14360,
+          "canonical_case_duration_sum_ms": 599616418,
+          "canonical_case_duration_sum_hours": 166.5601161111111,
+          "call_threshold_case_counts": {
+            "at_least_100": 8,
+            "at_least_200": 0,
+            "exactly_250": 0
+          },
+          "duration_quantiles_ms_nearest_rank": {
+            "p0": 26467,
+            "p50": 459683,
+            "p90": 3090189,
+            "p95": 4651563,
+            "p98": 7184462,
+            "p99": 10799729,
+            "p100": 14427399
+          },
+          "llm_call_quantiles_nearest_rank": {
+            "p0": 4,
+            "p50": 20,
+            "p90": 57,
+            "p95": 70,
+            "p98": 90,
+            "p99": 116,
+            "p100": 164
+          }
+        },
+        "shadow_repeat_metrics": {
+          "would_warn_case_count": 6,
+          "would_warn_event_count": 27,
+          "first_would_warn_call_min": 10,
+          "first_would_warn_call_median": 26,
+          "first_would_warn_call_max": 116,
+          "immediate_changed_cases": 5,
+          "immediate_exact_repeat_cases": 1,
+          "terminal_counts": {
+            "Submitted": 4,
+            "four_hour_case_timeout": 2
+          },
+          "post_first_llm_calls": 188,
+          "post_first_llm_calls_mean": 31.333333333333332,
+          "post_first_llm_calls_median": 32.5,
+          "post_first_llm_calls_range": [
+            9,
+            52
+          ],
+          "post_first_tool_calls": 186,
+          "post_first_prompt_tokens": 17513049,
+          "post_first_cached_input_tokens": 14447040,
+          "post_first_uncached_input_tokens": 3066009,
+          "post_first_completion_tokens": 182447,
+          "post_first_total_tokens": 17695496,
+          "input_file_count": 1000,
+          "input_bytes": 153281505,
+          "input_fileset_sha256": "9679cc3a7dd442fea3e847715646730ce9cb217b2ce75b78a99f4c0646069108"
+        }
+      }
+    ],
+    "run_level_summary": {
+      "replicates": 3,
+      "run_level_statistics": {
+        "resolved_instances": {
+          "mean": 370.6666666666667,
+          "sample_sd": 5.507570547286102,
+          "min": 367,
+          "max": 377,
+          "range_width": 10
+        },
+        "resolved_rate": {
+          "mean": 0.7413333333333333,
+          "sample_sd": 0.011015141094572214,
+          "min": 0.734,
+          "max": 0.754,
+          "range_width": 0.020000000000000018
+        },
+        "prompt_tokens": {
+          "mean": 303320251.6666667,
+          "sample_sd": 36176750.251283385,
+          "min": 267984875,
+          "max": 340283422,
+          "range_width": 72298547
+        },
+        "cached_input_tokens": {
+          "mean": 288128448,
+          "sample_sd": 41799300.49190775,
+          "min": 247049088,
+          "max": 330612288,
+          "range_width": 83563200
+        },
+        "uncached_input_tokens": {
+          "mean": 15191803.666666666,
+          "sample_sd": 5635645.7968801,
+          "min": 9671134,
+          "max": 20935787,
+          "range_width": 11264653
+        },
+        "completion_tokens": {
+          "mean": 5192281,
+          "sample_sd": 606153.0292360173,
+          "min": 4739833,
+          "max": 5880987,
+          "range_width": 1141154
+        },
+        "total_tokens": {
+          "mean": 308512532.6666667,
+          "sample_sd": 36755318.48868068,
+          "min": 272724708,
+          "max": 346164409,
+          "range_width": 73439701
+        },
+        "cached_over_prompt_ratio": {
+          "mean": 0.9479470334961987,
+          "sample_sd": 0.024940622030195814,
+          "min": 0.9218769827961373,
+          "max": 0.9715791796639449,
+          "range_width": 0.049702196867807635
+        },
+        "cached_over_total_ratio": {
+          "mean": 0.9319843683037532,
+          "sample_sd": 0.024749399471695813,
+          "min": 0.9058551746620626,
+          "max": 0.955073021386205,
+          "range_width": 0.04921784672414242
+        },
+        "actual_cost": {
+          "mean": 843.1751933333334,
+          "sample_sd": 55.33905673711896,
+          "min": 794.299796,
+          "max": 903.261284,
+          "range_width": 108.96148800000003
+        },
+        "all_prompt_uncached_cost": {
+          "mean": 2571.9458813333335,
+          "sample_sd": 305.6438525013955,
+          "min": 2276.594324,
+          "max": 2886.935012,
+          "range_width": 610.3406879999998
+        },
+        "llm_calls": {
+          "mean": 13882.666666666666,
+          "sample_sd": 473.77667031348574,
+          "min": 13387,
+          "max": 14331,
+          "range_width": 944
+        },
+        "tool_calls": {
+          "mean": 14854,
+          "sample_sd": 477.01991572679646,
+          "min": 14360,
+          "max": 15312,
+          "range_width": 952
+        },
+        "case_duration_sum_ms": {
+          "mean": 480735893.3333333,
+          "sample_sd": 102959363.67849334,
+          "min": 420201917,
+          "max": 599616418,
+          "range_width": 179414501
+        },
+        "case_duration_sum_hours": {
+          "mean": 133.53774814814815,
+          "sample_sd": 28.599823244025927,
+          "min": 116.72275472222222,
+          "max": 166.5601161111111,
+          "range_width": 49.837361388888894
+        },
+        "canonical_agent_failures": {
+          "mean": 1.6666666666666667,
+          "sample_sd": 0.5773502691896257,
+          "min": 1,
+          "max": 2,
+          "range_width": 1
+        },
+        "harness_errors": {
+          "mean": 0.3333333333333333,
+          "sample_sd": 0.5773502691896258,
+          "min": 0,
+          "max": 1,
+          "range_width": 1
+        },
+        "shadow_would_warn_cases": {
+          "mean": 9,
+          "sample_sd": 5.196152422706632,
+          "min": 6,
+          "max": 15,
+          "range_width": 9
+        },
+        "shadow_would_warn_events": {
+          "mean": 79.66666666666667,
+          "sample_sd": 84.38799282678391,
+          "min": 27,
+          "max": 177,
+          "range_width": 150
+        },
+        "fixed_prompt_cache_hit_rate_cost": {
+          "0": {
+            "mean": 2571.9458813333335,
+            "sample_sd": 305.6438525013955,
+            "min": 2276.594324,
+            "max": 2886.935012,
+            "range_width": 610.3406879999998
+          },
+          "0.9": {
+            "mean": 934.0165223333333,
+            "sample_sd": 110.36480883043977,
+            "min": 829.475999,
+            "max": 1049.4045332,
+            "range_width": 219.92853420000006
+          },
+          "0.95": {
+            "mean": 843.0204468333333,
+            "sample_sd": 99.52465171661625,
+            "min": 749.0805365,
+            "max": 947.3195066,
+            "range_width": 198.23897009999996
+          },
+          "0.98": {
+            "mean": 788.4228015333333,
+            "sample_sd": 93.02199787765146,
+            "min": 700.843259,
+            "max": 886.06849064,
+            "range_width": 185.22523164000006
+          },
+          "1": {
+            "mean": 752.0243713333333,
+            "sample_sd": 88.6876421888749,
+            "min": 668.685074,
+            "max": 845.23448,
+            "range_width": 176.54940599999998
+          }
+        }
+      }
+    },
+    "within_arm_repeatability": {
+      "binary_resolution_definition": "resolved versus all other original states; non-resolved states are not reclassified in source reports",
+      "resolution_frequency_histogram": {
+        "zero_of_three": 98,
+        "one_of_three": 27,
+        "two_of_three": 40,
+        "three_of_three": 335
+      },
+      "binary_all_three_agreement_cases": 433,
+      "binary_all_three_agreement": 0.866,
+      "four_state_all_three_agreement_cases": 429,
+      "four_state_all_three_agreement": 0.858,
+      "pairwise": [
+        {
+          "first_replicate": 1,
+          "second_replicate": 2,
+          "both_resolved": 352,
+          "first_only_resolved": 25,
+          "second_only_resolved": 16,
+          "neither_resolved": 107,
+          "binary_agreement": 0.918,
+          "four_state_exact_agreement": 0.912,
+          "resolved_set_jaccard": 0.8956743002544529
+        },
+        {
+          "first_replicate": 1,
+          "second_replicate": 3,
+          "both_resolved": 346,
+          "first_only_resolved": 31,
+          "second_only_resolved": 21,
+          "neither_resolved": 102,
+          "binary_agreement": 0.896,
+          "four_state_exact_agreement": 0.892,
+          "resolved_set_jaccard": 0.8693467336683417
+        },
+        {
+          "first_replicate": 2,
+          "second_replicate": 3,
+          "both_resolved": 347,
+          "first_only_resolved": 21,
+          "second_only_resolved": 20,
+          "neither_resolved": 112,
+          "binary_agreement": 0.918,
+          "four_state_exact_agreement": 0.91,
+          "resolved_set_jaccard": 0.8943298969072165
+        }
+      ],
+      "pairwise_binary_agreement_mean": 0.9106666666666667,
+      "pairwise_four_state_exact_agreement_mean": 0.9046666666666666,
+      "pairwise_resolved_set_jaccard_mean": 0.8864503102766704
+    }
+  },
+  "shadow_repeat_analysis": {
+    "method": "Replay the frozen exact consecutive complete tool-use/result batch detector over each no-warning event stream without mutating model history.",
+    "detector_semantics": "A complete ordered batch of tool name, JSON-UseNumber-canonical arguments, and exact model-visible XML observation is compared only with the immediately preceding complete batch. A match resets detector history; a warning is counted only when a following BeforeModel point exists.",
+    "post_first_boundary": "Inclusive from the LLM call that would have received the first injected warning through the original terminal trajectory.",
+    "case_run_count": 27,
+    "unique_instance_count": 24,
+    "total_would_warn_events": 239,
+    "per_case_run": [
+      {
+        "replicate": 1,
+        "instance_id": "django__django-14007",
+        "would_warn_events": 4,
+        "first_would_warn_llm_call": 23,
+        "immediate_no_warning_trajectory": "changed",
+        "generation_terminal": "Submitted",
+        "total_llm_calls": 66,
+        "post_first_llm_calls": 44,
+        "post_first_total_tokens": 1140390,
+        "official_harness": "resolved"
+      },
+      {
+        "replicate": 1,
+        "instance_id": "django__django-15732",
+        "would_warn_events": 27,
+        "first_would_warn_llm_call": 45,
+        "immediate_no_warning_trajectory": "exact_repeat",
+        "generation_terminal": "Submitted",
+        "total_llm_calls": 129,
+        "post_first_llm_calls": 85,
+        "post_first_total_tokens": 10658564,
+        "official_harness": "empty_patch_not_evaluated"
+      },
+      {
+        "replicate": 1,
+        "instance_id": "django__django-16315",
+        "would_warn_events": 1,
+        "first_would_warn_llm_call": 30,
+        "immediate_no_warning_trajectory": "changed",
+        "generation_terminal": "Submitted",
+        "total_llm_calls": 69,
+        "post_first_llm_calls": 40,
+        "post_first_total_tokens": 1019173,
+        "official_harness": "resolved"
+      },
+      {
+        "replicate": 1,
+        "instance_id": "django__django-16819",
+        "would_warn_events": 1,
+        "first_would_warn_llm_call": 26,
+        "immediate_no_warning_trajectory": "changed",
+        "generation_terminal": "Submitted",
+        "total_llm_calls": 29,
+        "post_first_llm_calls": 4,
+        "post_first_total_tokens": 49607,
+        "official_harness": "resolved"
+      },
+      {
+        "replicate": 1,
+        "instance_id": "matplotlib__matplotlib-23476",
+        "would_warn_events": 1,
+        "first_would_warn_llm_call": 14,
+        "immediate_no_warning_trajectory": "changed",
+        "generation_terminal": "Submitted",
+        "total_llm_calls": 34,
+        "post_first_llm_calls": 21,
+        "post_first_total_tokens": 352992,
+        "official_harness": "resolved"
+      },
+      {
+        "replicate": 1,
+        "instance_id": "matplotlib__matplotlib-24870",
+        "would_warn_events": 1,
+        "first_would_warn_llm_call": 19,
+        "immediate_no_warning_trajectory": "exact_repeat",
+        "generation_terminal": "Submitted",
+        "total_llm_calls": 35,
+        "post_first_llm_calls": 17,
+        "post_first_total_tokens": 407884,
+        "official_harness": "empty_patch_not_evaluated"
+      },
+      {
+        "replicate": 2,
+        "instance_id": "django__django-10554",
+        "would_warn_events": 16,
+        "first_would_warn_llm_call": 83,
+        "immediate_no_warning_trajectory": "exact_repeat",
+        "generation_terminal": "Submitted",
+        "total_llm_calls": 156,
+        "post_first_llm_calls": 74,
+        "post_first_total_tokens": 10235577,
+        "official_harness": "empty_patch_not_evaluated"
+      },
+      {
+        "replicate": 2,
+        "instance_id": "django__django-11749",
+        "would_warn_events": 1,
+        "first_would_warn_llm_call": 18,
+        "immediate_no_warning_trajectory": "changed",
+        "generation_terminal": "Submitted",
+        "total_llm_calls": 28,
+        "post_first_llm_calls": 11,
+        "post_first_total_tokens": 92895,
+        "official_harness": "resolved"
+      },
+      {
+        "replicate": 2,
+        "instance_id": "django__django-13568",
+        "would_warn_events": 1,
+        "first_would_warn_llm_call": 17,
+        "immediate_no_warning_trajectory": "changed",
+        "generation_terminal": "Submitted",
+        "total_llm_calls": 38,
+        "post_first_llm_calls": 22,
+        "post_first_total_tokens": 402629,
+        "official_harness": "resolved"
+      },
+      {
+        "replicate": 2,
+        "instance_id": "django__django-14007",
+        "would_warn_events": 51,
+        "first_would_warn_llm_call": 51,
+        "immediate_no_warning_trajectory": "exact_repeat",
+        "generation_terminal": "Submitted",
+        "total_llm_calls": 163,
+        "post_first_llm_calls": 113,
+        "post_first_total_tokens": 15839241,
+        "official_harness": "resolved"
+      },
+      {
+        "replicate": 2,
+        "instance_id": "django__django-14053",
+        "would_warn_events": 1,
+        "first_would_warn_llm_call": 32,
+        "immediate_no_warning_trajectory": "changed",
+        "generation_terminal": "Submitted",
+        "total_llm_calls": 66,
+        "post_first_llm_calls": 35,
+        "post_first_total_tokens": 2512314,
+        "official_harness": "resolved"
+      },
+      {
+        "replicate": 2,
+        "instance_id": "django__django-15252",
+        "would_warn_events": 1,
+        "first_would_warn_llm_call": 13,
+        "immediate_no_warning_trajectory": "changed",
+        "generation_terminal": "Submitted",
+        "total_llm_calls": 33,
+        "post_first_llm_calls": 21,
+        "post_first_total_tokens": 243672,
+        "official_harness": "empty_patch_not_evaluated"
+      },
+      {
+        "replicate": 2,
+        "instance_id": "django__django-15277",
+        "would_warn_events": 1,
+        "first_would_warn_llm_call": 19,
+        "immediate_no_warning_trajectory": "changed",
+        "generation_terminal": "Submitted",
+        "total_llm_calls": 28,
+        "post_first_llm_calls": 10,
+        "post_first_total_tokens": 74364,
+        "official_harness": "resolved"
+      },
+      {
+        "replicate": 2,
+        "instance_id": "django__django-15629",
+        "would_warn_events": 1,
+        "first_would_warn_llm_call": 49,
+        "immediate_no_warning_trajectory": "changed",
+        "generation_terminal": "Submitted",
+        "total_llm_calls": 123,
+        "post_first_llm_calls": 75,
+        "post_first_total_tokens": 4450451,
+        "official_harness": "empty_patch_not_evaluated"
+      },
+      {
+        "replicate": 2,
+        "instance_id": "django__django-15732",
+        "would_warn_events": 82,
+        "first_would_warn_llm_call": 88,
+        "immediate_no_warning_trajectory": "exact_repeat",
+        "generation_terminal": "exact_call_limit",
+        "total_llm_calls": 250,
+        "post_first_llm_calls": 163,
+        "post_first_total_tokens": 28716199,
+        "official_harness": "empty_patch_not_evaluated"
+      },
+      {
+        "replicate": 2,
+        "instance_id": "django__django-16661",
+        "would_warn_events": 1,
+        "first_would_warn_llm_call": 17,
+        "immediate_no_warning_trajectory": "changed",
+        "generation_terminal": "Submitted",
+        "total_llm_calls": 45,
+        "post_first_llm_calls": 29,
+        "post_first_total_tokens": 465903,
+        "official_harness": "resolved"
+      },
+      {
+        "replicate": 2,
+        "instance_id": "pylint-dev__pylint-7277",
+        "would_warn_events": 1,
+        "first_would_warn_llm_call": 8,
+        "immediate_no_warning_trajectory": "changed",
+        "generation_terminal": "Submitted",
+        "total_llm_calls": 12,
+        "post_first_llm_calls": 5,
+        "post_first_total_tokens": 18686,
+        "official_harness": "resolved"
+      },
+      {
+        "replicate": 2,
+        "instance_id": "scikit-learn__scikit-learn-14087",
+        "would_warn_events": 17,
+        "first_would_warn_llm_call": 128,
+        "immediate_no_warning_trajectory": "changed",
+        "generation_terminal": "Submitted",
+        "total_llm_calls": 183,
+        "post_first_llm_calls": 56,
+        "post_first_total_tokens": 7383044,
+        "official_harness": "empty_patch_not_evaluated"
+      },
+      {
+        "replicate": 2,
+        "instance_id": "sphinx-doc__sphinx-11510",
+        "would_warn_events": 1,
+        "first_would_warn_llm_call": 32,
+        "immediate_no_warning_trajectory": "exact_repeat",
+        "generation_terminal": "Submitted",
+        "total_llm_calls": 52,
+        "post_first_llm_calls": 21,
+        "post_first_total_tokens": 758466,
+        "official_harness": "empty_patch_not_evaluated"
+      },
+      {
+        "replicate": 2,
+        "instance_id": "sphinx-doc__sphinx-7910",
+        "would_warn_events": 1,
+        "first_would_warn_llm_call": 13,
+        "immediate_no_warning_trajectory": "changed",
+        "generation_terminal": "Submitted",
+        "total_llm_calls": 27,
+        "post_first_llm_calls": 15,
+        "post_first_total_tokens": 158483,
+        "official_harness": "resolved"
+      },
+      {
+        "replicate": 2,
+        "instance_id": "sympy__sympy-23262",
+        "would_warn_events": 1,
+        "first_would_warn_llm_call": 20,
+        "immediate_no_warning_trajectory": "exact_repeat",
+        "generation_terminal": "Submitted",
+        "total_llm_calls": 43,
+        "post_first_llm_calls": 24,
+        "post_first_total_tokens": 294949,
+        "official_harness": "resolved"
+      },
+      {
+        "replicate": 3,
+        "instance_id": "django__django-10554",
+        "would_warn_events": 22,
+        "first_would_warn_llm_call": 116,
+        "immediate_no_warning_trajectory": "exact_repeat",
+        "generation_terminal": "four_hour_case_timeout",
+        "total_llm_calls": 162,
+        "post_first_llm_calls": 47,
+        "post_first_total_tokens": 9593045,
+        "official_harness": "empty_patch_not_evaluated"
+      },
+      {
+        "replicate": 3,
+        "instance_id": "django__django-11964",
+        "would_warn_events": 1,
+        "first_would_warn_llm_call": 11,
+        "immediate_no_warning_trajectory": "changed",
+        "generation_terminal": "Submitted",
+        "total_llm_calls": 19,
+        "post_first_llm_calls": 9,
+        "post_first_total_tokens": 69074,
+        "official_harness": "resolved"
+      },
+      {
+        "replicate": 3,
+        "instance_id": "django__django-13121",
+        "would_warn_events": 1,
+        "first_would_warn_llm_call": 39,
+        "immediate_no_warning_trajectory": "changed",
+        "generation_terminal": "Submitted",
+        "total_llm_calls": 53,
+        "post_first_llm_calls": 15,
+        "post_first_total_tokens": 602350,
+        "official_harness": "resolved"
+      },
+      {
+        "replicate": 3,
+        "instance_id": "django__django-14792",
+        "would_warn_events": 1,
+        "first_would_warn_llm_call": 66,
+        "immediate_no_warning_trajectory": "changed",
+        "generation_terminal": "four_hour_case_timeout",
+        "total_llm_calls": 100,
+        "post_first_llm_calls": 35,
+        "post_first_total_tokens": 5517169,
+        "official_harness": "empty_patch_not_evaluated"
+      },
+      {
+        "replicate": 3,
+        "instance_id": "django__django-15022",
+        "would_warn_events": 1,
+        "first_would_warn_llm_call": 10,
+        "immediate_no_warning_trajectory": "changed",
+        "generation_terminal": "Submitted",
+        "total_llm_calls": 61,
+        "post_first_llm_calls": 52,
+        "post_first_total_tokens": 1537251,
+        "official_harness": "resolved"
+      },
+      {
+        "replicate": 3,
+        "instance_id": "scikit-learn__scikit-learn-14629",
+        "would_warn_events": 1,
+        "first_would_warn_llm_call": 13,
+        "immediate_no_warning_trajectory": "changed",
+        "generation_terminal": "Submitted",
+        "total_llm_calls": 42,
+        "post_first_llm_calls": 30,
+        "post_first_total_tokens": 376607,
+        "official_harness": "empty_patch_not_evaluated"
+      }
+    ],
+    "equivalence_validation": {
+      "v12_extraction_or_delivery_mismatches": 0,
+      "v11_warning_on_replay_matches_telemetry": true,
+      "v11_per_run_actual_and_replayed": [
+        {
+          "replicate": 1,
+          "cases": 4,
+          "events": 4
+        },
+        {
+          "replicate": 2,
+          "cases": 8,
+          "events": 18
+        },
+        {
+          "replicate": 3,
+          "cases": 3,
+          "events": 7
+        }
+      ],
+      "v11_case_level_differences": 0,
+      "source_sha256": {
+        "tool_loop.go": "6ab597a339c0683c251c84cf9b316986bd8a07188a5f70d2f80b428cdabea874",
+        "tool_loop_tracker.go": "a4f2223c9c4bd04dd6dbf5291d99c9e712ee733a720e8080ab9fc0fb51673168",
+        "callbacks.go": "06e7685d57832a372e110e182ea3010bf404f41c38d5f1f0c3a01575b6e2f7f8"
+      },
+      "input_fileset_sha256_algorithm": "SHA-256 over each sorted relative path, NUL, file bytes, NUL for the 500 response and 500 tag files in a run"
+    },
+    "interpretation": "The no-warning trajectories contain exact immediate repeat cycles, including long repeated tails. The replay identifies where the frozen warning would have been injected; it does not simulate the counterfactual model response after injection."
+  },
+  "historical_warning_on_reference": {
+    "result_id": "v11-cleanroom-loopwarn-timeout4h-r3",
+    "source_result_path": "results/experiments/workspace-rag/v11-cleanroom-loopwarn-timeout4h-r3-result.json",
+    "source_result_commit": "d6719df7b52897d3566ca85ac3e066f720f4670b",
+    "source_result_sha256": "b2b9a8e1c70398838ca30d40cd47740904a9ec720ddbc937ef51715dcd6e9b52",
+    "source_plan_path": "results/experiments/workspace-rag/v11-cleanroom-loopwarn-timeout4h-r3-plan.json",
+    "source_plan_commit": "3b853219b993049d3b335221ad488d68e9d9e8e7",
+    "source_plan_sha256": "23deef6cb328a5c98557cd6c99496d03aada1d4cb3ba97e4b71eb079694f3f0c",
+    "native_runner_binary_sha256": "839a4f327704554697592335b1fa4a3fd9fac32ec9f8de19923a5e870806e4b8",
+    "tool_loop_warning": true,
+    "runs": [
+      {
+        "replicate": 1,
+        "resolved_instances": 369,
+        "resolved_rate": 0.738,
+        "prompt_tokens": 316406803,
+        "cached_input_tokens": 294469696,
+        "uncached_input_tokens": 21937107,
+        "completion_tokens": 5362117,
+        "total_tokens": 321768920,
+        "llm_calls": 14088,
+        "tool_calls": 15093,
+        "case_duration_sum_ms": 375302432,
+        "actual_cost": 914.575524,
+        "fixed_prompt_cache_hit_rate_cost": {
+          "0": 2681.3937,
+          "0.9": 972.7969638,
+          "0.95": 877.8749229,
+          "0.98": 820.92169836,
+          "1": 782.952882
+        },
+        "warning_case_count": 4,
+        "warning_event_count": 4
+      },
+      {
+        "replicate": 2,
+        "resolved_instances": 369,
+        "resolved_rate": 0.738,
+        "prompt_tokens": 234592973,
+        "cached_input_tokens": 229582656,
+        "uncached_input_tokens": 5010317,
+        "completion_tokens": 4455521,
+        "total_tokens": 239048494,
+        "llm_calls": 13336,
+        "tool_calls": 14190,
+        "case_duration_sum_ms": 204500183,
+        "actual_cost": 624.002436,
+        "fixed_prompt_cache_hit_rate_cost": {
+          "0": 2001.498372,
+          "0.9": 734.6963178,
+          "0.95": 664.3184259,
+          "0.98": 622.09169076,
+          "1": 593.940534
+        },
+        "warning_case_count": 8,
+        "warning_event_count": 18
+      },
+      {
+        "replicate": 3,
+        "resolved_instances": 367,
+        "resolved_rate": 0.734,
+        "prompt_tokens": 284591290,
+        "cached_input_tokens": 272142656,
+        "uncached_input_tokens": 12448634,
+        "completion_tokens": 4908498,
+        "total_tokens": 289499788,
+        "llm_calls": 13766,
+        "tool_calls": 14709,
+        "case_duration_sum_ms": 388665436,
+        "actual_cost": 781.312328,
+        "fixed_prompt_cache_hit_rate_cost": {
+          "0": 2414.168264,
+          "0.9": 877.375298,
+          "0.95": 791.997911,
+          "0.98": 740.7714788,
+          "1": 706.620524
+        },
+        "warning_case_count": 3,
+        "warning_event_count": 7
+      }
+    ],
+    "run_level_summary": {
+      "resolved_instances": {
+        "mean": 368.3333333333333,
+        "sample_sd": 1.1547005383792515,
+        "min": 367,
+        "max": 369,
+        "range_width": 2
+      },
+      "resolved_rate": {
+        "mean": 0.7366666666666667,
+        "sample_sd": 0.0023094010767585054,
+        "min": 0.734,
+        "max": 0.738,
+        "range_width": 0.0040000000000000036
+      },
+      "prompt_tokens": {
+        "mean": 278530355.3333333,
+        "sample_sd": 41242294.93605352,
+        "min": 234592973,
+        "max": 316406803,
+        "range_width": 81813830
+      },
+      "cached_input_tokens": {
+        "mean": 265398336,
+        "sample_sd": 32965078.176567394,
+        "min": 229582656,
+        "max": 294469696,
+        "range_width": 64887040
+      },
+      "uncached_input_tokens": {
+        "mean": 13132019.333333334,
+        "sample_sd": 8484062.503387533,
+        "min": 5010317,
+        "max": 21937107,
+        "range_width": 16926790
+      },
+      "completion_tokens": {
+        "mean": 4908712,
+        "sample_sd": 453298.03788567183,
+        "min": 4455521,
+        "max": 5362117,
+        "range_width": 906596
+      },
+      "total_tokens": {
+        "mean": 283439067.3333333,
+        "sample_sd": 41691923.32640567,
+        "min": 239048494,
+        "max": 321768920,
+        "range_width": 82720426
+      },
+      "llm_calls": {
+        "mean": 13730,
+        "sample_sd": 377.2903391288995,
+        "min": 13336,
+        "max": 14088,
+        "range_width": 752
+      },
+      "tool_calls": {
+        "mean": 14664,
+        "sample_sd": 453.1787726714481,
+        "min": 14190,
+        "max": 15093,
+        "range_width": 903
+      },
+      "case_duration_sum_ms": {
+        "mean": 322822683.6666667,
+        "sample_sd": 102687891.65225862,
+        "min": 204500183,
+        "max": 388665436,
+        "range_width": 184165253
+      },
+      "actual_cost": {
+        "mean": 773.2967626666666,
+        "sample_sd": 145.45228369872243,
+        "min": 624.002436,
+        "max": 914.575524,
+        "range_width": 290.573088
+      },
+      "warning_case_count": {
+        "mean": 5,
+        "sample_sd": 2.6457513110645907,
+        "min": 3,
+        "max": 8,
+        "range_width": 5
+      },
+      "warning_event_count": {
+        "mean": 9.666666666666666,
+        "sample_sd": 7.371114795831994,
+        "min": 4,
+        "max": 18,
+        "range_width": 14
+      },
+      "fixed_prompt_cache_hit_rate_cost": {
+        "0": {
+          "mean": 2365.6867786666667,
+          "sample_sd": 342.5306629692466,
+          "min": 2001.498372,
+          "max": 2681.3937,
+          "range_width": 679.8953280000001
+        },
+        "0.9": {
+          "mean": 861.6228598666667,
+          "sample_sd": 119.82939491945497,
+          "min": 734.6963178,
+          "max": 972.7969638,
+          "range_width": 238.10064599999998
+        },
+        "0.95": {
+          "mean": 778.0637532666667,
+          "sample_sd": 107.45796813885333,
+          "min": 664.3184259,
+          "max": 877.8749229,
+          "range_width": 213.55649700000004
+        },
+        "0.98": {
+          "mean": 727.9282893066667,
+          "sample_sd": 100.03526187212822,
+          "min": 622.09169076,
+          "max": 820.92169836,
+          "range_width": 198.83000760000004
+        },
+        "1": {
+          "mean": 694.5046466666666,
+          "sample_sd": 95.08686968654278,
+          "min": 593.940534,
+          "max": 782.952882,
+          "range_width": 189.0123480000001
+        }
+      }
+    },
+    "v12_no_warning_minus_v11_warning_on_run_mean": {
+      "resolved_instances": {
+        "v12_minus_v11_mean": 2.3333333333333712,
+        "v12_minus_v11_mean_percent": 0.6334841628959476
+      },
+      "resolved_rate": {
+        "v12_minus_v11_mean": 0.004666666666666597,
+        "v12_minus_v11_mean_percent": 0.6334841628959254
+      },
+      "prompt_tokens": {
+        "v12_minus_v11_mean": 24789896.333333373,
+        "v12_minus_v11_mean_percent": 8.900249419373285
+      },
+      "cached_input_tokens": {
+        "v12_minus_v11_mean": 22730112,
+        "v12_minus_v11_mean_percent": 8.564526945639939
+      },
+      "uncached_input_tokens": {
+        "v12_minus_v11_mean": 2059784.333333332,
+        "v12_minus_v11_mean_percent": 15.685206372678184
+      },
+      "completion_tokens": {
+        "v12_minus_v11_mean": 283569,
+        "v12_minus_v11_mean_percent": 5.776851442903963
+      },
+      "total_tokens": {
+        "v12_minus_v11_mean": 25073465.333333373,
+        "v12_minus_v11_mean_percent": 8.84615715442154
+      },
+      "llm_calls": {
+        "v12_minus_v11_mean": 152.66666666666606,
+        "v12_minus_v11_mean_percent": 1.1119203690216128
+      },
+      "tool_calls": {
+        "v12_minus_v11_mean": 190,
+        "v12_minus_v11_mean_percent": 1.2956901254773667
+      },
+      "case_duration_sum_ms": {
+        "v12_minus_v11_mean": 157913209.66666663,
+        "v12_minus_v11_mean_percent": 48.91639208034131
+      },
+      "actual_cost": {
+        "v12_minus_v11_mean": 69.87843066666676,
+        "v12_minus_v11_mean_percent": 9.03643129523719
+      },
+      "fixed_prompt_cache_hit_rate_cost": {
+        "0": {
+          "v12_minus_v11_mean": 206.25910266666688,
+          "v12_minus_v11_mean_percent": 8.718783252570628
+        },
+        "0.9": {
+          "v12_minus_v11_mean": 72.39366246666668,
+          "v12_minus_v11_mean_percent": 8.402012741150976
+        },
+        "0.95": {
+          "v12_minus_v11_mean": 64.95669356666656,
+          "v12_minus_v11_mean_percent": 8.348505285582153
+        },
+        "0.98": {
+          "v12_minus_v11_mean": 60.49451222666664,
+          "v12_minus_v11_mean_percent": 8.310504360846615
+        },
+        "1": {
+          "v12_minus_v11_mean": 57.51972466666666,
+          "v12_minus_v11_mean_percent": 8.282122364873645
+        }
+      }
+    },
+    "headline": "V12 mean RR is 0.467 percentage points higher, while mean total tokens are 8.846% higher, LLM calls 1.112% higher, and observed cost 9.036% higher than historical V11 Native.",
+    "cache_standardized_sensitivity": "At common prompt cache-hit rates from 0% through 100%, V12 mean cost remains 8.283%-8.719% above V11 Native, so the historical cost difference is primarily volume rather than observed cache mix.",
+    "claim_boundary": "These are non-contemporaneous three-run distributions. Service state and time are neither randomized nor directly controlled, and warning-on changes subsequent model-visible history; no strict causal warning effect is claimed."
+  },
+  "operational_accounting": {
+    "canonical_boundary": "All reported arm metrics use exactly the three final 500-case canonical sets. Displaced qualifying endpoint-timeout attempts are excluded from canonical metrics and listed separately.",
+    "displaced_endpoint_timeout_attempts": [
+      {
+        "replicate": 1,
+        "attempt_count": 4,
+        "instance_ids": [
+          "django__django-11555",
+          "django__django-11734",
+          "django__django-12663",
+          "django__django-13449"
+        ],
+        "llm_calls": 276,
+        "duration_ms": 30171591,
+        "prompt_tokens": 11991743,
+        "cached_input_tokens": 10095168,
+        "uncached_input_tokens": 1896575,
+        "completion_tokens": 282465,
+        "total_tokens": 12274208,
+        "cost": 43.271956
+      },
+      {
+        "replicate": 2,
+        "attempt_count": 1,
+        "instance_ids": [
+          "scikit-learn__scikit-learn-14087"
+        ],
+        "llm_calls": 32,
+        "duration_ms": 5373285,
+        "prompt_tokens": 529402,
+        "cached_input_tokens": 520576,
+        "uncached_input_tokens": 8826,
+        "completion_tokens": 34248,
+        "total_tokens": 563650,
+        "cost": 2.070704
+      },
+      {
+        "replicate": 3,
+        "attempt_count": 5,
+        "instance_ids": [
+          "django__django-14017",
+          "django__django-14053",
+          "django__django-14122",
+          "django__django-14155",
+          "django__django-14311"
+        ],
+        "llm_calls": 109,
+        "duration_ms": 21453995,
+        "prompt_tokens": 1018785,
+        "cached_input_tokens": 904256,
+        "uncached_input_tokens": 114529,
+        "completion_tokens": 53998,
+        "total_tokens": 1072783,
+        "cost": 4.236688
+      }
+    ],
+    "displaced_endpoint_timeout_totals": {
+      "attempt_count": 10,
+      "llm_calls": 417,
+      "duration_ms": 56998871,
+      "prompt_tokens": 13539930,
+      "cached_input_tokens": 11520000,
+      "uncached_input_tokens": 2019930,
+      "completion_tokens": 370711,
+      "total_tokens": 13910641,
+      "cost": 49.579348
+    },
+    "control_plane_events": [
+      {
+        "event": "prospective_harness_overlap_amendment",
+        "generation_effect": "none",
+        "quality_adaptive": false
+      },
+      {
+        "event": "premature_r1_single_case_rerun_attempt_1",
+        "disposition": "manually terminated and ineligible as a result after the R3 recovery resource gate detected an active evaluator",
+        "generation_cases_interrupted": 0
+      },
+      {
+        "event": "r3_recovery_controller_resume",
+        "disposition": "continued only the three not-yet-started cases from the frozen recovery list; no completed recovery was rerun",
+        "helper_sha256": "6fe14d7570d9c28d8532b3d15c3361fe090c9f30dfae5abd65b94a773eca3b88"
+      },
+      {
+        "event": "post_error_harness_queue_resume",
+        "disposition": "after all generation completed, validated the repeated R1 error and resumed the fixed R2 then R3 serial queue",
+        "helper_sha256": "7b23745dfd5390f5594566a046f249eb04292d239865658bde37301fd3be09e1"
+      }
+    ]
+  },
+  "harness_error_interpretation": {
+    "run_id": "tag-cleanroom-noloopwarn-timeout4h-native-20260731-r1",
+    "instance_id": "sympy__sympy-19040",
+    "classification": "candidate_patch_induced_nonterminating_computation",
+    "observed": "The original official evaluation and an eligible clean single-case rerun with the same prediction and harness settings both reached the exact 1800-second test timeout at test_issue_5786.",
+    "code_level_cause": "The candidate patch's recursive factorization path produces unit factor [1] and then reaches dmp_trial_division(1, [1]); division by the unit returns the same dividend with zero remainder, so the existing trial-division loop does not terminate.",
+    "infrastructure_interpretation": "Not a resource, Docker, or harness-infrastructure failure; it is a patch correctness failure represented in the official harness error bucket.",
+    "attempt_1": "Manually terminated for the generation resource gate and ineligible as evidence.",
+    "attempt_2": "Eligible clean rerun reproduced the exact 1800-second timeout and sole error ID.",
+    "canonical_disposition": "Retain R1 as 377 resolved, 120 unresolved, 1 error, 2 empty, RR 75.4%/500; do not rewrite or reclassify the error.",
+    "cross_run_outcome": "The same case resolved in V12 R2 and R3, so its V12 per-case resolution frequency is 2/3."
+  },
+  "decision": {
+    "quality": "V12 RR values are 75.4%, 73.6%, and 73.4% (mean 74.133%, sample SD 1.102pp, range 73.4%-75.4%).",
+    "repeatability": "The 0/3, 1/3, 2/3, and 3/3 resolved counts are 98, 27, 40, and 335; mean pairwise binary agreement/Jaccard are 91.07%/88.65%.",
+    "usage": "V12 mean total tokens are 308,512,533 and mean observed cost is 843.175193 billing units. The fixed-cache sensitivity mean costs at 0/90/95/98/100% hit are 2571.945881/934.016522/843.020447/788.422802/752.024371.",
+    "loop_behavior": "Offline exact-detector replay finds 27 case-runs across 24 unique cases and 239 would-warn events. The three event-heaviest trajectories contribute 160/239 events (66.9%); separately, the replay set includes the V12 R2 exact-call-limit case and both V12 R3 four-hour timeouts.",
+    "historical_contrast": "Relative to historical V11 Native run means, V12 is +0.467pp RR, +8.846% total tokens, +1.112% LLM calls, and +9.036% observed cost; standardized cost remains about 8.3%-8.7% higher across fixed cache-hit assumptions.",
+    "conclusion": "Record the full V12 three-run distribution and the offline would-warn trajectories. The observed no-warning trajectories contain substantial exact-repeat continuation, but the non-contemporaneous n=3 comparison does not establish a causal quality, cost, or latency effect."
+  },
+  "limitations": [
+    "Three run-level repetitions provide only a small sample of stochastic run variation.",
+    "The same 500 cases recur in every run, so the 1500 case-runs are not independent observations.",
+    "V11 is historical rather than simultaneous or randomized; service state, time, and natural cache behavior can confound differences.",
+    "Shadow replay locates injections on the observed no-warning trajectory but cannot predict the counterfactual trajectory after a warning changes model-visible history.",
+    "Generation wall time is not a performance endpoint because registered harness activity overlapped generation under amendment 01; canonical case-duration sums are reported instead.",
+    "Billing units are reproducible model-side accounting, not monetary spend.",
+    "R1 contains one reproducible patch-induced harness error, so only R2 and R3 satisfy the literal error=0 post-run gate; the exception is preserved rather than hidden."
+  ],
+  "artifact_hashes": {
+    "generation_audits": {
+      "r1": "28e4d85f783b348fc3a01e6b4006451952bd6f2e8c051e98c4e72e74c4af354a",
+      "r2": "fa0789548014978ff327475154bb73c4f45c5b3c566790f0671af491391fc857",
+      "r3": "641152abfbb3ce90f9751f4c7108c7022682c144f4de9e7a649b8d7d9a7274a3"
+    },
+    "metrics_summaries": {
+      "r1": "a2a27f3fd31ff2f8754efe233614dabb098e2dcc9c356ce5d54a7321a2d0cab6",
+      "r2": "e7f218b3d23dade70c1f26f4cc325df3c81a67a39e48d4fe3ff20c02621457ed",
+      "r3": "9e059562fa90e9e050c510578f94f4b0627663abaf1a8d6ef3385661705f9592"
+    },
+    "harness_aggregate_reports": {
+      "r1": "8ea6af352e395aaeb322c4c048702e5f53a90f883cbb67542032f03f4c614cc3",
+      "r2": "994ff9e68ca5759221f3759f731f8aa16b8dccc6de8b0d76cd9919e2f7ebd665",
+      "r3": "dba28d8e86cdbefe645274181fb2a3013a5be8a809d13dc9f3dd5bd5e79def3d"
+    },
+    "verifier_manifests": {
+      "r1": "973d325dc4cae105d83cf98bebc9ae3656728e4ebd51b9943fc422fdb15f3188",
+      "r2": "cd4c31d7a8b38257481765b5256175fc91bcd81c33525392ed22765726b701b4",
+      "r3": "49cfbb64214ab18d95f187a475b23d4e9aa39d9c1c8b5f91f76e3cf69cf31925"
+    },
+    "infrastructure_attempt_indexes": {
+      "r1": "4194cc5d5be2b333412741b55f0194a79673e5ec2fd63675be516bccf784a9e6",
+      "r2": "bb6e91f210cc78cb39f9fa707cbcde8c2bb76dea35ac47884f274b7f7f79a195",
+      "r3": "778f22d3dc1d3f21c9745e96350c8333c4602749364a3ad979a046bbd9fb7122"
+    },
+    "root_harness_metrics_index": "8a09787102549e192411b2e8df157cdaf7c7ec2eb816dc7ef57f75f27050d3cf",
+    "r1_repeat_timeout_audit": "d95d26c933104de5391dac75bf881ff4a03d4e5de9938e562c59960e14ac7711",
+    "note": "Only hashes and sanitized aggregate fields are published; raw responses, absolute validation paths, endpoint hostnames, server addresses, and credentials are excluded."
+  },
+  "validation": {
+    "status": "passed_with_documented_r1_harness_exception",
+    "checks": [
+      "exactly three pre-registered canonical run IDs in frozen order",
+      "every run has exactly 500 canonical cases, predictions, tag files, and response files",
+      "all generation-audit issues arrays are empty and warning telemetry is zero",
+      "response-record deficits equal the one or two in-flight four-hour timeout calls and no other artifact is missing",
+      "every harness report's resolved, unresolved, error, and empty sets are disjoint and cover the fixed 500-case panel",
+      "R2 and R3 official harness error counts are zero",
+      "R1's sole error is preserved and cleanly reproduced under the same prediction and official harness settings",
+      "the 0-of-3 through 3-of-3 histogram sums to 500 and reproduces all 1112 resolved observations",
+      "every pairwise repeatability table sums to 500 cases",
+      "run-level statistics use the three run-level values with sample SD",
+      "fixed-cache costs reproduce the 2/8/28 per-million rate card",
+      "shadow replay matches V11 warning-on telemetry exactly before application to V12",
+      "V10 and RAG Adapt are excluded and no best-of-three metric is present",
+      "public artifact contains no raw model responses, absolute validation paths, server addresses, endpoint hostnames, or credentials"
+    ]
+  }
+}

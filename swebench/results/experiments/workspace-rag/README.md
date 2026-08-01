@@ -1760,3 +1760,105 @@ The frozen plan and five amendments are adjacent to this section. Sanitized
 per-run metrics, run-level distributions, repeatability tables, warning-case
 details, infrastructure accounting, artifact hashes, and validation checks are
 in [`v11-cleanroom-loopwarn-timeout4h-r3-result.json`](./v11-cleanroom-loopwarn-timeout4h-r3-result.json).
+
+## V12: Native with the exact tool-loop warning disabled
+
+V12 is three more fresh 500-case Native runs. Relative to the historical V11
+Native bundle, the single intended generation variable is
+`tool_loop_warning=true` versus `false`. The Native binary and its SHA, model,
+reasoning level, XML observations, one-minute command timeout, four-hour case
+timeout, 250-call limit, clean-room isolation, recursive Git sanitization,
+15 generation workers, case membership, order, and remaining runner options
+were frozen. Each run passed its 500-case generation gate with zero emitted
+warnings and zero `<tool_loop_detected>` history entries.
+
+The official harness remained serial. R1 began with one worker while later
+generation was active; R2 and R3 used four workers after all generation was
+complete. RR always uses 500 as its denominator, including empty patches and
+harness errors.
+
+### Canonical run results
+
+| Run | Generation terminals | Harness completed / nonempty | Resolved / 500 | Total tokens | Cached / total | Billing units | LLM / tool calls | Canonical case-duration sum (h) | Shadow would-warn cases / events |
+|---:|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| R1 | 498 Submitted, 1 Error, 1 Timeout | 497/498, error 1 | 377 (75.4%) | 306,648,481 | 93.5025% | 831.964500 | 13,930 / 14,890 | 117.330 | 6 / 35 |
+| R2 | 499 Submitted, 1 Error | 499/499, error 0 | 368 (73.6%) | 346,164,409 | 95.5073% | 903.261284 | 14,331 / 15,312 | 116.723 | 15 / 177 |
+| R3 | 498 Submitted, 2 Timeout | 497/497, error 0 | 367 (73.4%) | 272,724,708 | 90.5855% | 794.299796 | 13,387 / 14,360 | 166.560 | 6 / 27 |
+
+The generation `Error` outcomes are exact 250-call Agent limits. The `Timeout`
+outcomes are exact four-hour case deadlines. They are canonical Agent outcomes,
+not infrastructure retries. Qualifying 300-second model-endpoint failures were
+recovered only after each frozen main-500 run and are reported separately from
+canonical usage.
+
+### Run-level distribution and cache sensitivity
+
+Across the three runs, RR is **74.133% ± 1.102pp** with range
+**73.4%-75.4%**. Mean resolved count is 370.667 ± 5.508, mean total tokens are
+308,512,533 ± 36,755,318, mean billing units are
+843.175193 ± 55.339057, and mean canonical case-hours are
+133.538 ± 28.600. The reported `±` values are mean and sample standard
+deviation over three full-run observations; full ranges are in the result
+artifact. The 1,500 case-runs are not independent replicates.
+
+The observed cache mix is not used as the sole cost comparison. Applying the
+same 0%, 90%, 95%, 98%, and 100% prompt-cache hit rates to every run gives V12
+mean costs of 2571.945881, 934.016522, 843.020447, 788.422802, and
+752.024371 billing units respectively.
+
+### Per-case repeatability
+
+Resolved in 0/3, 1/3, 2/3, and 3/3 runs were 98, 27, 40, and 335 cases.
+All three runs agreed on binary resolved status for 433/500 cases (86.6%) and
+on the original resolved/unresolved/error/empty state for 429/500 (85.8%).
+
+| Pair | Both resolved | First only | Second only | Neither | Binary agreement | Four-state agreement | Resolved-set Jaccard |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| R1/R2 | 352 | 25 | 16 | 107 | 91.8% | 91.2% | 89.57% |
+| R1/R3 | 346 | 31 | 21 | 102 | 89.6% | 89.2% | 86.93% |
+| R2/R3 | 347 | 21 | 20 | 112 | 91.8% | 91.0% | 89.43% |
+
+### Offline exact-detector replay
+
+The frozen warning detector was replayed offline against the original V12
+event streams without injecting a warning or changing any trajectory. Before
+using it for V12, the same replay exactly reproduced V11 Native's recorded
+4/4, 8/18, and 3/7 warning cases/events with zero case-level difference.
+
+V12 would have warned on 6/35, 15/177, and 6/27 case-runs/events in R1-R3:
+27 case-runs across 24 unique cases and 239 events. From the first would-warn
+call through termination, those trajectories contain 1,073 LLM calls,
+1,077 tool calls, and 102,970,979 tokens. The largest concentration is R2
+`django__django-15732`, with 82 would-warn events before reaching the exact
+250-call limit. R3's two four-hour timeouts are also in the replay set. These
+are observed no-warning trajectories, not counterfactual warning-on outcomes;
+the replay cannot say how an injected warning would have changed them.
+
+### Reproducible R1 harness error
+
+R1's only harness error is `sympy__sympy-19040`. Its original evaluation and
+an independent clean single-case rerun both reached the exact 1,800-second
+harness timeout. The candidate patch's recursive factorization path produces
+the unit factor `[1]` and reaches `dmp_trial_division(1, [1], ...)`, which then
+repeatedly divides 1 by 1 without reducing the dividend. The suite hangs in
+`test_issue_5786`. This is therefore a reproducible nonterminating computation
+introduced by the candidate patch, not a host, Docker, service, memory, or I/O
+failure. The source report remains 377 resolved, 120 unresolved, one error,
+and two empty patches; the error was not rewritten as unresolved.
+
+### Historical contrast and limits
+
+The historical V11 Native warning-on means were 73.667% RR, 283,439,067 total
+tokens, and 773.296763 billing units. V12 is descriptively +0.467 percentage
+points in RR, +8.846% in total tokens, +1.112% in LLM calls, and +9.036% in
+observed cost. At the common cache-hit assumptions above, V12 remains
+8.282%-8.719% more expensive. V11 is a non-contemporaneous historical
+reference: service state and time were not randomized, and a warning changes
+subsequent model-visible history. These measurements do not establish a strict
+causal warning effect and must not be reported as best-of-three.
+
+The frozen plan, harness-overlap amendment, and complete sanitized result are
+[`v12-cleanroom-native-noloopwarn-timeout4h-r3-plan.json`](./v12-cleanroom-native-noloopwarn-timeout4h-r3-plan.json),
+[`v12-cleanroom-native-noloopwarn-timeout4h-r3-amendment-01.json`](./v12-cleanroom-native-noloopwarn-timeout4h-r3-amendment-01.json),
+and
+[`v12-cleanroom-native-noloopwarn-timeout4h-r3-result.json`](./v12-cleanroom-native-noloopwarn-timeout4h-r3-result.json).
