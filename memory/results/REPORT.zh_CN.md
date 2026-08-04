@@ -1,6 +1,182 @@
-# 基于 LoCoMo 基准的长期对话记忆评估
+# Memory Benchmark 结果报告
 
-## 1. 引言
+## LongMemEval
+
+> **开发阶段评测快照。** 第 1-5 节记录固定 50-case turn-pair 评测
+> `turn_pair_full50_parallel4_20260717`，并包含对瞬时基础设施失败的
+> case-local 恢复；第 6 节记录最终条件式两阶段 assistant-episode 提取
+> 诊断实验。更早的 LongMemEval 结果使用了不同的建库协议或结果治理
+> 方式，现已从文档删除。这些结果可用于开发阶段比较，但 legacy case-ID
+> manifest 和归档后的 artifact locator 未通过 publication gate，因此都
+> 不能称为正式 holdout baseline。
+
+本报告已统一使用当前 policy 名称。这只是对行为完全相同的历史运行进行文档
+重命名，指标和原始 artifact 均未重新生成。
+
+### 1. 评测协议
+
+| 项目 | 值 |
+| --- | --- |
+| 数据集 | `longmemeval_s_cleaned.json` |
+| Case | 覆盖全部六类问题的固定 50 case |
+| 分布 | knowledge-update 8；multi-session 13；assistant 6；preference 3；user 7；temporal 13 |
+| 输入规模 | 2,353 sessions；24,370 turns；12,280 user/assistant pairs |
+| 建库协议 | 无损 turn-pair replay；共用同一个 replay 和 build plan |
+| Build chunk 上限 | 6,000 `cl100k_base` tokens；仅一个 pair 需要无损拆分 |
+| 回答、提取与评判模型 | `glm52` |
+| Embedding 模型 | `text-embedding-ada-002` |
+| 检索 | 标准 `memory_search`，固定 `top-k=20` |
+| Benchmark revision | `c8c305c4c50594e3d083e06a5248cfeb81b15823` |
+| trpc-agent-go revision | `1b3adb2f4bb8` |
+| 主要指标 | 固定分母的 LLM-judge Accuracy |
+
+四个场景使用相同的 replay/build-plan digest 和 case 顺序。同一来源 session
+中的 pair 保持原 session 身份，不同来源 session 在同一 case 用户级 memory
+下相互隔离。Auto 通过 extractor reference-date API 获得 observation date；
+Mem0 OSS 2.0.11 (`3b9aed866ae70d29043388ed0ae5cc4e1844f3e8`) 通过受支持的
+extraction `prompt` 字段获得相同日期。QA 使用 fresh session，只能看到当前
+问题、问题日期和 `memory_search` 返回结果；gold answer 和 evidence 仅用于
+评测与诊断。
+
+三个 Auto 场景只改变 update policy，并使用独立 pgvector 表；Mem0 保留其
+原生提取和 reconcile 行为。瞬时 build 失败使用相同 immutable replay、build
+plan、模型和配置进行 case-local 重跑；成功重试只替换对应失败 case，不会
+重试或挑选回答错误的 case。仍然失败的 case 保留在固定分母中并记为错误。
+
+### 2. Case-local 最终结果
+
+| 场景 | Policy | 成功执行 | 失败 | 正确 | Accuracy | F1 | BLEU | ROUGE-L | 耗时* |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Auto | Merge Similar | 48/50 | 2 | 14 | 0.2800 | 0.0961 | 0.0635 | 0.0885 | 28h34m |
+| Auto | Preserve History | 50/50 | 0 | 41 | 0.8200 | 0.1683 | 0.1079 | 0.1614 | 29h51m |
+| Auto | Append Only | 50/50 | 0 | 41 | 0.8200 | **0.1730** | **0.1112** | **0.1679** | 28h07m |
+| Mem0 OSS | native | 50/50 | 0 | 42 | **0.8400** | 0.1681 | 0.1067 | 0.1588 | 30h15m |
+
+`*` 耗时包含初始运行和 case-local 恢复。Preserve History 与 Append Only 各恢复了同一个
+case 的 Auto build acknowledgement timeout；Mem0 恢复了两个 HTTP 502
+build 失败。Merge Similar 没有需要恢复的瞬时 build 失败；其两个 QA 因超过
+八次工具迭代而失败，继续在固定分母中记为错误。
+
+#### 各问题类型 Accuracy
+
+| 问题类型 | 数量 | Merge Similar | Preserve History | Append Only | Mem0 OSS |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| knowledge-update | 8 | 0.5000 | 0.8750 | **1.0000** | 0.8750 |
+| multi-session | 13 | 0.2308 | **0.8462** | 0.7692 | 0.7692 |
+| single-session-assistant | 6 | 0.0000 | 0.0000 | 0.1667 | **0.5000** |
+| single-session-preference | 3 | 0.0000 | **1.0000** | **1.0000** | **1.0000** |
+| single-session-user | 7 | 0.2857 | **1.0000** | 0.8571 | **1.0000** |
+| temporal-reasoning | 13 | 0.3846 | **1.0000** | **1.0000** | 0.9231 |
+
+### 3. 最终 Memory 条目统计
+
+| 场景 | 完整建库 Case | 最终条目总数 | 每 Case 均值 | 中位数 | 范围 |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Auto Merge Similar | 50/50 | 2,955 | 59.10 | 58 | 35-87 |
+| Auto Preserve History | 50/50 | 15,353 | 307.06 | 305.5 | 257-381 |
+| Auto Append Only | 50/50 | 16,280 | 325.60 | 326 | 264-396 |
+| Mem0 OSS | 50/50 | 28,041 | 560.82 | 564.5 | 465-602 |
+
+该统计从每个完整建库 case 最后一次成功的 persistence snapshot 中还原。
+Snapshot 读取上限为 10,000 条，显著高于本轮观测到的最大值 602，因此没有
+发生条目截断。这里统计的是 ingestion 完成后的 active memory entries，而非
+extraction operation 数量，也不是多个 case 共享数据库中的物理行数。
+
+对于恢复 case，失败 attempt 的部分库存会被丢弃，并由成功的 case-local
+建库结果替换：Preserve History 为 333 条，Append Only 为 346 条，Mem0 两个 case 分别
+为 584 和 501 条。Merge Similar 的两个 QA 失败 case 已计入，因为它们的
+memory build 均已成功完成。
+
+### 4. 成本与耗时
+
+| 场景 | Build LLM calls | Build LLM tokens | QA+judge calls | QA+judge tokens | Build embedding requests | 远程 embedding calls | Cache hits |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Auto Merge Similar | 12,281 | 96,999,123 | 240 | 2,048,381 | 37,907 | 26,074 | 11,833 |
+| Auto Preserve History | 12,336 | 95,086,050 | 163 | 434,852 | 28,028 | 27,581 | 447 |
+| Auto Append Only | 12,411 | **84,701,403** | 168 | 467,266 | 28,860 | 28,401 | 459 |
+| Mem0 OSS | 12,359 | 113,205,317* | 171 | 410,912 | 23,044 | 23,044 | 0 |
+
+`*` Mem0 proxy 记录了调用和可观测 token 字段，但 provider 记录将 build
+LLM 与 embedding token 标记为 `tokens_known=false`，不能将其解释为完整
+provider usage。共享 cache 和并发运行也意味着远程调用量与 wall-clock
+不能单独作为后端速度排名。该表同时计入初始 attempt 和 case-local 恢复，
+与上文最终结果使用相同的 case 集合。
+
+### 5. 结论与限制
+
+1. **Update policy 是本轮样本中最主要的影响因素。** Preserve History 将原始
+   Accuracy 从 28% 提升到 82%。Merge Similar 答对的 case 在 Preserve History 中全部
+   仍然正确，Preserve History 额外答对 27 个 case，且没有仅在 Merge Similar 中
+   答对的回退 case。
+   在完整建库 case 中，Preserve History 每 case 最终保留的条目约为 Merge Similar 的
+   5.2 倍，说明 Merge Similar reconcile policy 会显著压缩最终证据集合。
+2. **Preserve History 与 Append Only 的 Accuracy 相同，但保留的信息不同。** 两者共同
+   答对 39 个 case，各有两个独有正确 case。Preserve History 在 multi-session 和
+   single-session-user 上更强；Append Only 在 knowledge-update、assistant
+   问题和词面重合指标上更强。
+3. **Mem0 与两个新 Auto policy 具有互补性。** Mem0 与 Preserve History
+   共同答对 38 个 case；Mem0 有四个独有正确 case，Preserve History 有三个。Mem0 在
+   assistant-memory 问题上最强，Preserve History 则在 multi-session 和 temporal
+   Accuracy 上领先。
+4. **该样本不是正式 holdout。** Manifest 仍是 legacy `case_ids`-only
+   schema，没有记录 seeded selection method 或 dev/holdout split；归档后的
+   artifact path 也未通过当前 publication validation。Case-local 恢复消除
+   了瞬时基础设施失败，但不会让这份 legacy 样本自动成为正式 holdout。
+
+### 6. Policy 与 Assistant-Episode 矩阵
+
+本节对比三种 Auto update policy 在关闭和开启 assistant-episode 提取时的
+结果。开启后的行使用最终的条件式两阶段实现：先执行普通用户记忆提取，仅在
+当前 user/assistant pair 明显包含结构化结果时，才发起一次输入受限的
+assistant-result 提取。Mem0 保持其原生提取行为。
+
+七行实验使用完全相同的 50 个 case 及顺序、`glm52`、
+`text-embedding-ada-002`、无损 turn-pair replay、6,000-token chunk
+上限和 `top-k=20`。
+
+| Policy / 后端 | Assistant 提取 | QA 成功 | 失败 | 正确 | Accuracy | F1 | BLEU | ROUGE-L |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Merge Similar | 关闭 | 48/50 | 2 | 14 | 0.2800 | 0.0961 | 0.0635 | 0.0885 |
+| Merge Similar | 开启 | 45/50 | 5 | 29 | 0.5800 | 0.1626 | 0.1083 | 0.1518 |
+| Preserve History | 关闭 | 50/50 | 0 | 41 | 0.8200 | 0.1683 | 0.1079 | 0.1614 |
+| Preserve History | 开启 | 48/50 | 2 | **45** | **0.9000** | 0.1876 | 0.1204 | 0.1779 |
+| Append Only | 关闭 | 50/50 | 0 | 41 | 0.8200 | 0.1730 | 0.1112 | 0.1679 |
+| Append Only | 开启 | 47/50 | 3 | 44 | 0.8800 | **0.1970** | **0.1295** | **0.1865** |
+| Mem0 OSS | 原生 | 50/50 | 0 | 42 | 0.8400 | 0.1681 | 0.1067 | 0.1588 |
+
+失败 QA 仍保留在固定 50-case 分母中并记为错误。Assistant 开启行不是按
+得分筛选的替换结果，每一行都代表一组完整的实验配置。
+
+#### 完整建库 Memory 统计
+
+| Policy / 后端 | Assistant 提取 | Active memories | 完整建库 |
+| --- | --- | ---: | ---: |
+| Merge Similar | 关闭 | 2,955 | 50/50 |
+| Merge Similar | 开启 | 6,011 | 50/50 |
+| Preserve History | 关闭 | 15,353 | 50/50 |
+| Preserve History | 开启 | 17,696 | 49/50 |
+| Append Only | 关闭 | 16,280 | 50/50 |
+| Append Only | 开启 | 18,728 | 49/50 |
+| Mem0 OSS | 原生 | 28,041 | 50/50 |
+
+统计只计入每个完整建库 case 最后一次成功的 persistence snapshot。
+Preserve History 的失败 attempt 留下 357 条部分数据，Append Only 的失败
+attempt 留下 162 条，均未计入。
+
+#### 结论与限制
+
+- 开启 assistant 提取后，Merge Similar、Preserve History 和 Append Only
+  的 Accuracy 分别提高 30、8 和 6 个百分点。
+- Append Only + assistant 的词面重合指标最高；Preserve History +
+  assistant 的 Accuracy 最高。
+- Mem0 是原生外部 baseline，不启用 Auto 专属 assistant 选项。
+- 这些结果仍是开发诊断：manifest 使用 legacy `case_ids`-only schema，
+  assistant 开启的归档没有通过当前 clean-worktree publication gate，并且
+  其中两行各有一个未完成的 memory build。
+
+## 基于 LoCoMo 基准的长期对话记忆评估
+
+### 1. 引言
 
 本报告使用 **LoCoMo** 基准（Maharana et al., 2024）评估
 **trpc-agent-go** 的长期对话记忆能力。报告涵盖两个版本：
@@ -12,9 +188,9 @@
 以上两个版本与四个 Python Agent 框架（AutoGen、Agno、ADK、
 CrewAI）和十个外部记忆系统（Mem0、Zep 等）进行对比。
 
-## 2. 实验设置
+### 2. 实验设置
 
-### 2.1 基准数据集
+#### 2.1 基准数据集
 
 | 项目 | 值 |
 | --- | --- |
@@ -23,7 +199,7 @@ CrewAI）和十个外部记忆系统（Mem0、Zep 等）进行对比。
 | 模型 | GPT-4o-mini（推理 + 评判） |
 | Embedding | text-embedding-3-small |
 
-### 2.2 评估场景
+#### 2.2 评估场景
 
 | 场景 | 描述 |
 | --- | --- |
@@ -31,7 +207,7 @@ CrewAI）和十个外部记忆系统（Mem0、Zep 等）进行对比。
 | **原版** | Auto 提取 + pgvector 基线；后台提取器自动生成记忆并在查询时检索 |
 | **优化版** | 面向抽取式持久化 memory 的优化记忆提取策略与多轮检索流程 |
 
-### 2.3 优化项：原版 → 优化版
+#### 2.3 优化项：原版 → 优化版
 
 优化版在原版基线的基础上，围绕记忆提取、存储和检索三个环节
 进行了一系列针对性改进：
@@ -80,9 +256,9 @@ CrewAI）和十个外部记忆系统（Mem0、Zep 等）进行对比。
    的记忆（词级 Jaccard 相似度 > 80%）进行去重，仅保留得分
    最高的版本，减少检索结果中的冗余上下文。
 
-## 3. 结果
+### 3. 结果
 
-### 3.1 内部场景对比
+#### 3.1 内部场景对比
 
 **表 1：总体指标**
 
@@ -154,7 +330,7 @@ CrewAI）和十个外部记忆系统（Mem0、Zep 等）进行对比。
 > Long-Context，也在 10 个样本里全部超过优化版，提升最大的样本是
 > `locomo10_2`、`locomo10_3` 和 `locomo10_5`。
 
-### 3.2 检索策略 vs Long-Context
+#### 3.2 检索策略 vs Long-Context
 
 Long-Context 将完整对话历史放入单次 LLM 调用，在短单 session
 场景中有效；两种检索式方案则体现出不同的生产权衡：
@@ -171,7 +347,7 @@ Long-Context 将完整对话历史放入单次 LLM 调用，在短单 session
 
 ---
 
-### 3.3 SQLite vs SQLiteVec（子集实验）
+#### 3.3 SQLite vs SQLiteVec（子集实验）
 
 本小节对比 `sqlite`（关键词/Token 匹配）与 `sqlitevec`（sqlite-vec 语义向量检索）
 在若干个可控的子集实验上的表现，用于观察 token 成本与检索差异。
@@ -265,13 +441,13 @@ Long-Context 将完整对话历史放入单次 LLM 调用，在短单 session
 
 ---
 
-## 4. 与 Python Agent 框架对比
+### 4. 与 Python Agent 框架对比
 
 我们在四个 Python Agent 框架——**AutoGen**、**Agno**、**ADK**、
 **CrewAI**——上运行了相同的 LoCoMo 基准，均使用 GPT-4o-mini、
 相同的 10 个样本（1,986 QA）及 LLM-as-Judge 评估。
 
-### 4.1 框架配置
+#### 4.1 框架配置
 
 | 框架 | 记忆后端 | 检索方式 | Embedding |
 | --- | --- | --- | --- |
@@ -281,7 +457,7 @@ Long-Context 将完整对话历史放入单次 LLM 调用，在短单 session
 | **ADK** | 纯内存 | Agent 工具调用（LoadMemoryTool） | 内置 |
 | **CrewAI** | 内置向量 | Crew 自动检索 | 内置 |
 
-### 4.2 各框架记忆方案详解
+#### 4.2 各框架记忆方案详解
 
 以下按记忆存储、检索、QA 调用流程三个维度，对比五个框架的具体
 实现方案。所有框架的 benchmark 代码均使用相同的 system prompt
@@ -401,7 +577,7 @@ Long-Context 将完整对话历史放入单次 LLM 调用，在短单 session
 > Session Recall 现在在保持低 token 档位的同时给出了最高的总体
 > 质量，而优化版则仍是更偏抽取式、tool-driven 的另一条路线。
 
-### 4.3 总体结果
+#### 4.3 总体结果
 
 **表 7：Memory 场景——总体指标**
 
@@ -440,7 +616,7 @@ Agno                           |===============================                 
                                0.0      0.1      0.2      0.3      0.4      0.5
 ```
 
-### 4.4 各类别 F1
+#### 4.4 各类别 F1
 
 **表 8：各类别 F1 对比**
 
@@ -468,7 +644,7 @@ Agno                           |===============================                 
 > 4 类加权 F1 也以 **0.531 排名第一**，超过 AutoGen 的 0.511
 > 达 0.020，并显著领先其他 trpc-agent-go 方案和专用记忆系统。
 
-### 4.5 Token 效率与延迟
+#### 4.5 Token 效率与延迟
 
 **表 10：Token 效率对比**
 
@@ -549,7 +725,7 @@ fact/episode。
 名义 token 成本**（计入 cache 折扣后远低于此）换取 **+17.5% F1
 提升**（0.399→0.469），在重视回答质量的生产场景中是值得的。
 
-### 4.6 ADK 失败分析
+#### 4.6 ADK 失败分析
 
 ADK（Google Agent Development Kit）使用纯内存后端，通过 Agent
 工具调用（`LoadMemoryTool`）检索记忆。在本次评估中，ADK 在部分
@@ -578,7 +754,7 @@ ADK（Google Agent Development Kit）使用纯内存后端，通过 Agent
   不做选择性检索，导致长对话场景下严重的 token 浪费
 - 平均 49,224 tokens/QA 是所有框架中最高的，但 F1 仅 0.362
 
-### 4.7 各样本 F1
+#### 4.7 各样本 F1
 
 **表 12：各样本 F1 对比**
 
@@ -600,7 +776,7 @@ ADK（Google Agent Development Kit）使用纯内存后端，通过 Agent
 
 ---
 
-## 5. 与外部记忆系统对比
+### 5. 与外部记忆系统对比
 
 数据来源：Mem0 论文 Table 1（Chhikara et al., 2025,
 arXiv:2504.19413）。所有系统均使用 GPT-4o-mini。为跨系统可比性，
@@ -693,9 +869,9 @@ Agno                |====================                      | 0.267
 
 ---
 
-## 6. 结论
+### 6. 结论
 
-### 核心发现
+#### 核心发现
 
 1. **trpc-agent-go 的 Session Recall 已成为当前最强配置。**
    它在 **5 类加权 F1 上排名第一**（**0.549**），4 类加权 F1
@@ -743,7 +919,7 @@ Agno                |====================                      | 0.267
    时间感知检索、temporal query rewrite 和更强的 rerank 仍是后续
    优先方向。
 
-### 生产建议
+#### 生产建议
 
 | 使用场景 | 推荐方案 |
 | --- | --- |
@@ -754,9 +930,9 @@ Agno                |====================                      | 0.267
 
 ---
 
-## 附录
+### 附录
 
-### A. 实验环境
+#### A. 实验环境
 
 | 组件 | 版本/配置 |
 | --- | --- |
@@ -766,7 +942,7 @@ Agno                |====================                      | 0.267
 | PostgreSQL | 15+ with pgvector extension |
 | 数据集 | LoCoMo-10（10 样本，1,986 QA） |
 
-### B. 完整类别详情（F1 / BLEU / LLM）
+#### B. 完整类别详情（F1 / BLEU / LLM）
 
 | 场景 | single-hop | multi-hop | temporal | open-domain | adversarial |
 | --- | --- | --- | --- | --- | --- |
@@ -775,7 +951,7 @@ Agno                |====================                      | 0.267
 | 优化版 | 0.396/0.325/0.395 | 0.453/0.415/0.519 | 0.247/0.192/0.364 | 0.441/0.398/0.552 | 0.626/0.626/0.626 |
 | 原版 | 0.316/0.250/0.270 | 0.096/0.088/0.060 | 0.088/0.068/0.115 | 0.358/0.319/0.425 | 0.814/0.814/0.814 |
 
-### C. Token 消耗——完整数据
+#### C. Token 消耗——完整数据
 
 | 场景 | Prompt Tokens | Completion Tokens | Total Tokens | LLM 调用 | 调用/QA |
 | --- | ---: | ---: | ---: | ---: | ---: |
@@ -788,9 +964,83 @@ Agno                |====================                      | 0.267
 | Agno | 20,694,534 | 31,194 | 20,725,728 | 1,986 | 1.0 |
 | ADK | 97,691,620 | 67,833 | 97,759,453 | 4,028 | 2.0 |
 
+
 ---
 
-## 参考文献
+## 最新 LoCoMo Policy 对比
+
+### 评测口径
+
+本节将使用默认 Merge Similar policy 的历史 Optimized 结果，与 Preserve
+History 和 Append Only 进行对比。两组新实验只改变 Auto update policy。
+Assistant-episode 实验不纳入报告：LoCoMo 将第二位人类说话人映射到
+assistant role，并不适合评估模型生成的 assistant result。
+
+| 项目 | 值 |
+| --- | --- |
+| 数据集 | 官方 LoCoMo-10；10 个 conversation；1,986 QA |
+| Dataset SHA-256 | `79fa87e90f04081343b8c8debecb80a9a6842b76a7aa537dc9fdf651ea698ff4` |
+| 场景与后端 | Auto + pgvector |
+| 回答与 judge 模型 | `gpt-4o-mini` |
+| Embedding 模型 | `text-embedding-3-small` |
+| 检索 | top-k 30；两轮 `memory_search` |
+| QA 上下文 | 不注入 QA 历史；最大上下文 128,000 token |
+| 指标 | F1、BLEU、LLM Score、分类指标、token、调用次数和延迟 |
+
+### 总体结果
+
+| Policy 配置 | F1 | 差值 | BLEU | 差值 | LLM Score | 差值 | Active memories |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Optimized / Merge Similar | 0.4690 | - | 0.4310 | - | 0.5320 | - | unavailable |
+| **Preserve History** | **0.4865** | **+1.75pp** | **0.4473** | **+1.63pp** | **0.5609** | **+2.89pp** | 2,740 |
+| Append Only | 0.4773 | +0.83pp | 0.4397 | +0.87pp | 0.5441 | +1.21pp | 2,627 |
+
+Preserve History 在三个总体指标上都是最强配置。Append Only 同样超过
+Optimized baseline，并且比 Preserve History 少保留 113 条 active memory。
+
+### 分类指标
+
+每个单元格依次为 `F1 / BLEU / LLM Score`。
+
+| Policy 配置 | Single-hop | Multi-hop | Temporal | Open-domain | Adversarial |
+| --- | --- | --- | --- | --- | --- |
+| Optimized / Merge Similar | 0.396/0.325/0.395 | 0.453/0.415/0.519 | 0.247/0.192/0.364 | 0.441/0.398/0.552 | 0.626/0.626/0.626 |
+| Preserve History | 0.386/0.319/0.387 | 0.530/0.484/0.603 | 0.242/0.196/0.415 | 0.479/0.432/0.607 | 0.586/0.585/0.585 |
+| Append Only | 0.381/0.312/0.353 | 0.498/0.456/0.579 | 0.209/0.161/0.348 | 0.464/0.420/0.585 | 0.605/0.605/0.605 |
+
+新 policy 的提升主要集中在 multi-hop 和 open-domain；Optimized baseline
+在 single-hop 和 adversarial F1 上仍然更强。
+
+### 可回答类别加权 F1
+
+该口径排除 adversarial，使用固定的 1,540 道可回答 QA 作为分母。
+
+| Policy 配置 | 加权 F1 | 相对 Optimized |
+| --- | ---: | ---: |
+| Optimized / Merge Similar | 0.4230 | - |
+| **Preserve History** | **0.4579** | **+3.49pp** |
+| Append Only | 0.4402 | +1.72pp |
+
+### 成本与耗时
+
+| Policy 配置 | Prompt tokens | Completion tokens | Total tokens | 差值 | Cached tokens | LLM calls | 平均延迟 | 总耗时 |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Optimized / Merge Similar | 34,007,814 | 115,960 | 34,123,774 | - | unavailable | 5,981 | 8.59s | 4h44m |
+| Preserve History | 35,097,721 | 118,823 | 35,216,544 | +3.20% | 15,295,232 | 5,983 | 10.83s | 5.98h |
+| Append Only | 34,558,815 | 118,906 | 34,677,721 | +1.62% | 15,111,168 | 5,977 | 10.83s | 5.97h |
+
+### 结果完整性
+
+- Preserve History 和 Append Only 都包含 10 个 conversation 和固定
+  1,986 道 QA，具有结构化结果文件，并使用独立 pgvector 表。
+- 一次瞬时 embedding 504 已由重试恢复，没有替换 case 或分数。
+- Optimized 数字来自报告中已有的历史 baseline。仓库内没有保留对应的
+  原始结构化 result artifact，因此精确差值来自报告数值，不能描述成由
+  已提交 artifact 独立复现。
+
+---
+
+### 参考文献
 
 1. Maharana, A., Lee, D., Tulyakov, S., Bansal, M., Barbieri, F., and Fang, Y. "Evaluating Very Long-Term Conversational Memory of LLM Agents." arXiv:2402.17753, 2024.
 2. Chhikara, P., Khant, D., Aryan, S., Singh, T., and Yadav, D. "Mem0: Building Production-Ready AI Agents with Scalable Long-Term Memory." arXiv:2504.19413, 2025.

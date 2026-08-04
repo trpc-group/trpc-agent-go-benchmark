@@ -31,6 +31,9 @@ const (
 	ScenarioSessionRecall ScenarioType = "session_recall"
 	ScenarioAgentic       ScenarioType = "agentic"
 	ScenarioAuto          ScenarioType = "auto"
+	ScenarioReplay        ScenarioType = "replay"
+	ScenarioMem0          ScenarioType = "mem0"
+	ScenarioMem0OSS       ScenarioType = "mem0_oss"
 )
 
 // Config holds scenario evaluation configuration.

@@ -30,43 +30,42 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"flag"
 	"fmt"
 	"log"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"time"
 
 	"trpc.group/trpc-go/trpc-agent-go-benchmark/memory/trpc-agent-go-impl/evaluation/dataset"
 	"trpc.group/trpc-go/trpc-agent-go-benchmark/memory/trpc-agent-go-impl/evaluation/metrics"
 	"trpc.group/trpc-go/trpc-agent-go-benchmark/memory/trpc-agent-go-impl/evaluation/scenarios"
-	"trpc.group/trpc-go/trpc-agent-go/knowledge/embedder/openai"
+	"trpc.group/trpc-go/trpc-agent-go-benchmark/memory/trpc-agent-go-impl/internal/benchruntime"
+	"trpc.group/trpc-go/trpc-agent-go-benchmark/memory/trpc-agent-go-impl/internal/longmemeval"
 	"trpc.group/trpc-go/trpc-agent-go/memory"
-	"trpc.group/trpc-go/trpc-agent-go/memory/extractor"
-	"trpc.group/trpc-go/trpc-agent-go/memory/inmemory"
-	memorymysql "trpc.group/trpc-go/trpc-agent-go/memory/mysql"
-	memorypgvector "trpc.group/trpc-go/trpc-agent-go/memory/pgvector"
 	"trpc.group/trpc-go/trpc-agent-go/model"
 	openaimodel "trpc.group/trpc-go/trpc-agent-go/model/openai"
 	"trpc.group/trpc-go/trpc-agent-go/session"
-	sessionpgvector "trpc.group/trpc-go/trpc-agent-go/session/pgvector"
 )
 
 // Command-line flags.
 var (
-	flagModel     = flag.String("model", "", "Model name (env MODEL_NAME or gpt-4o-mini)")
-	flagEvalModel = flag.String("eval-model", "", "Evaluation model for LLM judge")
-	flagDataset   = flag.String("dataset", "../data", "Dataset directory")
-	flagDataFile  = flag.String("data-file", "locomo10.json", "Dataset file name")
-	flagOutput    = flag.String("output", "../results", "Output directory")
+	flagModel         = flag.String("model", "", "Model name (env LLM_NAME, MODEL_NAME, or gpt-4o-mini)")
+	flagEvalModel     = flag.String("eval-model", "", "Evaluation model for LLM judge")
+	flagDataset       = flag.String("dataset", "../data", "Dataset directory")
+	flagDataFile      = flag.String("data-file", "locomo10.json", "Dataset file name")
+	flagDatasetFormat = flag.String("dataset-format", "locomo", "Dataset format: locomo or longmemeval")
+	flagOutput        = flag.String("output", "../results", "Output directory")
 
 	flagScenario = flag.String(
 		"scenario",
 		"long_context",
 		"Evaluation scenario (comma-separated): "+
-			"long_context, session_recall, agentic, auto, all",
+			"long_context, session_recall, agentic, auto, replay, all "+
+			"(LongMemEval supports long_context, replay, auto, mem0_oss, all)",
 	)
 	// Memory backend flags (comma-separated for multiple).
 	flagMemoryBackends = flag.String(
@@ -89,7 +88,7 @@ var (
 	flagVectorTopK = flag.Int(
 		"vector-topk",
 		30,
-		"Top-k results for vector backends (pgvector, sqlitevec)",
+		"Top-k results for non-LongMemEval vector backends (pgvector, sqlitevec)",
 	)
 	flagSessionRecallMinScore = flag.Float64(
 		"session-recall-min-score",
@@ -117,13 +116,103 @@ var (
 		"Number of memory_search calls per QA "+
 			"(1=single search, auto/agentic only)",
 	)
-	flagLLMJudge = flag.Bool("llm-judge", false, "Enable LLM-as-Judge evaluation")
-	flagVerbose  = flag.Bool("verbose", false, "Verbose output")
+	flagLLMJudge          = flag.Bool("llm-judge", false, "Enable LLM-as-Judge evaluation")
+	flagVerbose           = flag.Bool("verbose", false, "Verbose output")
+	flagLMEQuestionTypes  = flag.String("lme-question-types", "", "LongMemEval question types (comma-separated)")
+	flagLMEManifest       = flag.String("lme-manifest", "", "LongMemEval fixed case-id manifest path")
+	flagLMEReplayRoot     = flag.String("lme-replay-root", "", "LongMemEval Runner replay artifact root")
+	flagLMEBuildMaxTokens = flag.Int(
+		"lme-build-max-tokens",
+		7500,
+		"Maximum embedding-model tokens per LongMemEval turn-pair chunk",
+	)
+	flagLMEBuildTokenizerModel = flag.String(
+		"lme-build-tokenizer-model",
+		"",
+		"Tokenizer model for LongMemEval build plans (default: -embed-model)",
+	)
+	flagLMEBuildTokenizerEncoding = flag.String(
+		"lme-build-tokenizer-encoding",
+		"",
+		"Explicit tiktoken encoding (known OpenAI embedding models default to cl100k_base)",
+	)
+	flagLMEAutoQAOnly       = flag.Bool("lme-auto-qa-only", false, "Reuse existing pgvector auto memories and run QA only")
+	flagLMEAutoMemoryTable  = flag.String("lme-auto-memory-table", "", "Explicit pgvector table for LongMemEval auto memories")
+	flagLMEAutoUpdatePolicy = flag.String(
+		"lme-auto-update-policy",
+		"merge_similar",
+		"Auto-memory update policy for LongMemEval: merge_similar, preserve_history, or append_only",
+	)
+	flagLMEConversationExtraction = flag.String(
+		"lme-conversation-extraction",
+		"disabled",
+		"Conversation extraction for LongMemEval auto memory: disabled or assistant-episode",
+	)
+	flagLMEMaxRetries      = flag.Int("lme-max-retries", lmeDefaultMaxRetries, "LongMemEval transport retry count")
+	flagLMEAnswerMaxTokens = flag.Int("lme-answer-max-tokens", lmeDefaultAnswerMaxTokens, "LongMemEval answer max tokens")
+	flagLMEJudgeMaxTokens  = flag.Int("lme-judge-max-tokens", lmeDefaultJudgeMaxTokens, "LongMemEval judge max tokens")
+	flagLMEExtractionWait  = flag.Duration("lme-extraction-wait", 10*time.Minute, "LongMemEval auto extraction wait timeout")
+	flagLMETraceContent    = flag.String(
+		"lme-trace-content",
+		"hash",
+		"LongMemEval build trace content mode: full, hash, or none",
+	)
+	flagLMETraceGzip = flag.Bool(
+		"lme-trace-gzip",
+		false,
+		"Compress LongMemEval build trace attempt files with gzip",
+	)
+	flagLMEEmbeddingCache    = flag.Bool("lme-embedding-cache", true, "Enable persistent embedding cache for LongMemEval")
+	flagLMEEmbeddingCacheDir = flag.String(
+		"lme-embedding-cache-dir",
+		"",
+		"LongMemEval embedding cache directory (default: <output>/longmemeval/.cache)",
+	)
+	flagMem0Host = flag.String(
+		"mem0-host",
+		"",
+		"Mem0 OSS host for LongMemEval mem0_oss (env MEM0_HOST, e.g. http://localhost:8888)",
+	)
+	flagMem0APIKey = flag.String(
+		"mem0-api-key",
+		"",
+		"Mem0 API key for LongMemEval mem0_oss (env MEM0_API_KEY; omit when local AUTH_DISABLED=true)",
+	)
+	flagMem0Version = flag.String(
+		"mem0-version",
+		"",
+		"Mem0 OSS release version for provenance (env MEM0_VERSION)",
+	)
+	flagMem0Revision = flag.String(
+		"mem0-revision",
+		"",
+		"Optional expected Mem0 OSS source commit; verified preflight value is authoritative (env MEM0_REVISION)",
+	)
+	flagMem0Preflight = flag.String(
+		"mem0-preflight",
+		"",
+		"Sanitized Mem0 OSS preflight JSON for maintained LongMemEval runs (env MEM0_PREFLIGHT)",
+	)
+	flagMem0IngestTimeout = flag.Duration(
+		"mem0-ingest-timeout",
+		0,
+		"Mem0 sync ingestion timeout for LongMemEval mem0_oss (default: -lme-extraction-wait)",
+	)
+	flagMem0ProxyUsageLog = flag.String(
+		"mem0-proxy-usage-log",
+		"",
+		"Optional split proxy JSONL usage log for Mem0 internal LLM/embedding cost",
+	)
+	flagMem0ProxyRunID = flag.String(
+		"mem0-proxy-run-id",
+		"",
+		"Unique split proxy run ID for scoped Mem0 usage accounting (env MEM0_PROXY_RUN_ID)",
+	)
 	// Debug flags (auto scenario diagnosis).
 	flagDebugDumpMemories = flag.Bool("debug-dump-memories", false, "Dump extracted memories (auto scenario only)")
 	flagDebugMemLimit     = flag.Int("debug-mem-limit", 200, "Max memories to dump when debug-dump-memories is enabled")
 	flagDebugQALimit      = flag.Int("debug-qa-limit", 5, "Dump retrieval hits for the first N questions (auto scenario only)")
-	flagResume            = flag.Bool("resume", false, "Resume from checkpoint (TODO: implement)")
+	flagResume            = flag.Bool("resume", false, "Resume LongMemEval scenarios from checkpoint")
 	flagTableSuffix       = flag.String(
 		"table-suffix",
 		"",
@@ -134,6 +223,10 @@ var (
 
 // Base table name constants (before suffix).
 const (
+	lmeDatasetFormat          = "longmemeval"
+	lmeDefaultAnswerMaxTokens = 500
+	lmeDefaultJudgeMaxTokens  = 10240
+	lmeDefaultMaxRetries      = 3
 	pgvectorTableDefaultBase  = "memory_eval"
 	pgvectorTableAutoBase     = "memory_eval_auto"
 	mysqlTableDefaultBase     = "memory_eval_mysql"
@@ -153,10 +246,7 @@ const (
 
 // tableNameWithSuffix appends the user-specified suffix to a base table name.
 func tableNameWithSuffix(base string) string {
-	if *flagTableSuffix == "" {
-		return base
-	}
-	return base + *flagTableSuffix
+	return benchruntime.TableNameWithSuffix(base, *flagTableSuffix)
 }
 
 type memoryMode string
@@ -223,6 +313,23 @@ type EvalSummary struct {
 func main() {
 	flag.Parse()
 	validateFlags()
+
+	if *flagDatasetFormat == lmeDatasetFormat {
+		ctx, stop := signal.NotifyContext(
+			context.Background(),
+			os.Interrupt,
+			syscall.SIGTERM,
+		)
+		defer stop()
+		llm := openaimodel.New(
+			getModelName(),
+			longMemEvalOpenAIOptions(lmeLLMAPIKey(), lmeLLMBaseURL())...,
+		)
+		if err := longmemeval.Run(ctx, buildLongMemEvalConfig(llm)); err != nil {
+			log.Fatalf("LongMemEval memory benchmark failed: %v", err)
+		}
+		return
+	}
 
 	modelName := getModelName()
 	evalModelName := getEvalModelName()
@@ -319,6 +426,17 @@ func main() {
 	}
 }
 
+func parseCSV(raw string) []string {
+	var out []string
+	for _, part := range strings.Split(raw, ",") {
+		part = strings.TrimSpace(part)
+		if part != "" {
+			out = append(out, part)
+		}
+	}
+	return out
+}
+
 func parseMemoryBackends(backendsStr string) []string {
 	parts := strings.Split(backendsStr, ",")
 	backends := make([]string, 0, len(parts))
@@ -385,6 +503,7 @@ func getScenarios(scenario string) []scenarios.ScenarioType {
 		"session_recall": scenarios.ScenarioSessionRecall,
 		"agentic":        scenarios.ScenarioAgentic,
 		"auto":           scenarios.ScenarioAuto,
+		"mem0_oss":       scenarios.ScenarioMem0OSS,
 	}
 	if scenario == "all" {
 		return []scenarios.ScenarioType{
@@ -520,7 +639,18 @@ func buildScenarioDir(outputDir string, scenario scenarios.ScenarioType, backend
 }
 
 func validateFlags() {
-	if *flagVectorTopK < 1 {
+	validateDatasetFlags()
+	validateScenarioFlags()
+	backends := validateMemoryBackendFlags()
+	validateLMEAutoQAOnlyFlags(backends)
+	validateSessionFlags()
+}
+
+func validateDatasetFlags() {
+	if *flagDatasetFormat != "locomo" && *flagDatasetFormat != lmeDatasetFormat {
+		log.Fatalf("Invalid dataset-format: %s", *flagDatasetFormat)
+	}
+	if *flagDatasetFormat != lmeDatasetFormat && *flagVectorTopK < 1 {
 		log.Fatalf("Invalid vector-topk: %d", *flagVectorTopK)
 	}
 	if *flagQASearchPasses < 1 ||
@@ -531,12 +661,16 @@ func validateFlags() {
 			maxQASearchPasses,
 		)
 	}
+}
 
+func validateScenarioFlags() {
 	validScenarios := map[string]bool{
 		"long_context":   true,
 		"session_recall": true,
 		"agentic":        true,
 		"auto":           true,
+		"mem0_oss":       true,
+		"replay":         true,
 		"all":            true,
 	}
 	for _, s := range strings.Split(*flagScenario, ",") {
@@ -544,8 +678,14 @@ func validateFlags() {
 		if !validScenarios[s] {
 			log.Fatalf("Invalid scenario: %s", s)
 		}
+		if (s == "replay" || s == "mem0_oss") &&
+			*flagDatasetFormat != lmeDatasetFormat {
+			log.Fatalf("%s is only supported with dataset-format longmemeval", s)
+		}
 	}
+}
 
+func validateMemoryBackendFlags() []string {
 	validBackends := map[string]bool{
 		"inmemory":  true,
 		"sqlite":    true,
@@ -553,12 +693,37 @@ func validateFlags() {
 		"pgvector":  true,
 		"mysql":     true,
 	}
-	for _, b := range parseMemoryBackends(*flagMemoryBackends) {
+	backends := parseMemoryBackends(*flagMemoryBackends)
+	for _, b := range backends {
 		if !validBackends[b] {
 			log.Fatalf("Invalid memory backend: %s", b)
 		}
 	}
+	return backends
+}
 
+func validateLMEAutoQAOnlyFlags(backends []string) {
+	if *flagLMEAutoQAOnly {
+		if *flagDatasetFormat != lmeDatasetFormat {
+			log.Fatalf("lme-auto-qa-only requires dataset-format longmemeval")
+		}
+		scenario := strings.TrimSpace(*flagScenario)
+		if scenario != "auto" {
+			log.Fatalf("lme-auto-qa-only requires scenario auto")
+		}
+		if len(backends) != 1 || backends[0] != "pgvector" {
+			log.Fatalf("lme-auto-qa-only requires memory-backend pgvector")
+		}
+		if strings.TrimSpace(*flagTableSuffix) == "" &&
+			strings.TrimSpace(*flagLMEAutoMemoryTable) == "" {
+			log.Fatalf(
+				"lme-auto-qa-only requires table-suffix or lme-auto-memory-table",
+			)
+		}
+	}
+}
+
+func validateSessionFlags() {
 	if *flagMaxContext <= 0 {
 		log.Fatalf("Invalid max-context: %d", *flagMaxContext)
 	}
@@ -577,6 +742,9 @@ func getModelName() string {
 	if *flagModel != "" {
 		return *flagModel
 	}
+	if env := os.Getenv(envLLMName); env != "" {
+		return env
+	}
 	if env := os.Getenv("MODEL_NAME"); env != "" {
 		return env
 	}
@@ -591,510 +759,4 @@ func getEvalModelName() string {
 		return env
 	}
 	return getModelName()
-}
-
-func getEmbedModelName() string {
-	if *flagEmbedModel != "" {
-		return *flagEmbedModel
-	}
-	if env := os.Getenv("EMBED_MODEL_NAME"); env != "" {
-		return env
-	}
-	return "text-embedding-3-small"
-}
-
-const (
-	envOpenAIBaseURL          = "OPENAI_BASE_URL"
-	envOpenAIEmbeddingAPIKey  = "OPENAI_EMBEDDING_API_KEY"
-	envOpenAIEmbeddingBaseURL = "OPENAI_EMBEDDING_BASE_URL"
-)
-
-func newEmbeddingEmbedder(modelName string) *openai.Embedder {
-	opts := []openai.Option{
-		openai.WithModel(modelName),
-	}
-
-	if apiKey := os.Getenv(envOpenAIEmbeddingAPIKey); apiKey != "" {
-		opts = append(opts, openai.WithAPIKey(apiKey))
-	}
-
-	baseURL := os.Getenv(envOpenAIEmbeddingBaseURL)
-	if baseURL == "" {
-		baseURL = os.Getenv(envOpenAIBaseURL)
-	}
-	if baseURL != "" {
-		opts = append(opts, openai.WithBaseURL(baseURL))
-	}
-
-	return openai.New(opts...)
-}
-
-func getPGVectorDSN() string {
-	if *flagPGVectorDSN != "" {
-		return *flagPGVectorDSN
-	}
-	return os.Getenv("PGVECTOR_DSN")
-}
-
-func getMySQLDSN() string {
-	if *flagMySQLDSN != "" {
-		return *flagMySQLDSN
-	}
-	return os.Getenv("MYSQL_DSN")
-}
-
-func buildMemoryConfig(
-	scenarioType scenarios.ScenarioType,
-	backend string,
-) memoryConfig {
-	switch scenarioType {
-	case scenarios.ScenarioAuto:
-		return memoryConfig{
-			backend: backend,
-			mode:    memoryModeAuto,
-		}
-	case scenarios.ScenarioAgentic:
-		return memoryConfig{
-			backend: backend,
-			mode:    memoryModeManual,
-		}
-	default:
-		return memoryConfig{
-			mode: memoryModeNone,
-		}
-	}
-}
-
-func buildMemoryServiceOptions(
-	cfg memoryConfig,
-	extractorModel model.Model,
-) memoryServiceOptions {
-	opts := memoryServiceOptions{vectorTopK: *flagVectorTopK}
-	if cfg.mode != memoryModeAuto {
-		return opts
-	}
-	opts.enableExtractor = true
-	opts.extractorModel = extractorModel
-	return opts
-}
-
-type memoryServiceOptions struct {
-	enableExtractor bool
-	extractorModel  model.Model
-	vectorTopK      int
-}
-
-func createMemoryService(
-	cfg memoryConfig,
-	opts memoryServiceOptions,
-) (memory.Service, error) {
-	switch cfg.backend {
-	case "pgvector":
-		return createPGVectorService(opts)
-	case "mysql":
-		return createMySQLService(opts)
-	case "sqlite":
-		return createSQLiteService(opts)
-	case "sqlitevec":
-		return createSQLiteVecService(opts)
-	default:
-		return createInMemoryService(opts), nil
-	}
-}
-
-func createSessionRecallService(
-	cfg scenarios.Config,
-) (session.Service, error) {
-	dsn := getPGVectorDSN()
-	if dsn == "" {
-		return nil, fmt.Errorf(
-			"pgvector-dsn or PGVECTOR_DSN is required for session_recall scenario",
-		)
-	}
-	embedModelName := getEmbedModelName()
-	emb := newEmbeddingEmbedder(embedModelName)
-	log.Printf(
-		"Creating session recall pgvector service (embed_model=%s)",
-		embedModelName,
-	)
-	return sessionpgvector.NewService(
-		sessionpgvector.WithPostgresClientDSN(dsn),
-		sessionpgvector.WithEmbedder(emb),
-		sessionpgvector.WithIndexDimension(emb.GetDimensions()),
-		sessionpgvector.WithSessionEventLimit(cfg.SessionEventLimit),
-		sessionpgvector.WithMaxResults(cfg.SessionRecallResults),
-		sessionpgvector.WithTablePrefix(
-			tableNameWithSuffix(sessionRecallTableBase),
-		),
-		sessionpgvector.WithSyncIndexing(true),
-	)
-}
-
-func createPGVectorService(
-	opts memoryServiceOptions,
-) (memory.Service, error) {
-	dsn := getPGVectorDSN()
-	if dsn == "" {
-		return nil, fmt.Errorf(
-			"pgvector-dsn or PGVECTOR_DSN is required for pgvector backend",
-		)
-	}
-	embedModelName := getEmbedModelName()
-	emb := newEmbeddingEmbedder(embedModelName)
-	tableName := tableNameWithSuffix(pgvectorTableDefaultBase)
-	var ext extractor.MemoryExtractor
-	if opts.enableExtractor {
-		log.Printf(
-			"Creating pgvector memory service with extractor "+
-				"(embed_model=%s)",
-			embedModelName,
-		)
-		tableName = tableNameWithSuffix(pgvectorTableAutoBase)
-		ext = extractor.NewExtractor(opts.extractorModel)
-	} else {
-		log.Printf(
-			"Creating pgvector memory service (embed_model=%s)",
-			embedModelName,
-		)
-	}
-	svcOpts := []memorypgvector.ServiceOpt{
-		memorypgvector.WithPGVectorClientDSN(dsn),
-		memorypgvector.WithEmbedder(emb),
-		memorypgvector.WithMaxResults(opts.vectorTopK),
-		memorypgvector.WithTableName(tableName),
-		memorypgvector.WithExtractor(ext),
-	}
-	if opts.enableExtractor {
-		svcOpts = append(svcOpts,
-			memorypgvector.WithAsyncMemoryNum(autoMemoryAsyncWorkers),
-			memorypgvector.WithMemoryQueueSize(autoMemoryQueueSize),
-			memorypgvector.WithMemoryJobTimeout(autoMemoryJobTimeout),
-		)
-	}
-	return memorypgvector.NewService(svcOpts...)
-}
-
-func createMySQLService(
-	opts memoryServiceOptions,
-) (memory.Service, error) {
-	dsn := getMySQLDSN()
-	if dsn == "" {
-		return nil, fmt.Errorf(
-			"mysql-dsn or MYSQL_DSN is required for mysql backend",
-		)
-	}
-
-	tableName := tableNameWithSuffix(mysqlTableDefaultBase)
-	var ext extractor.MemoryExtractor
-	if opts.enableExtractor {
-		log.Printf("Creating mysql memory service with extractor")
-		tableName = tableNameWithSuffix(mysqlTableAutoBase)
-		ext = extractor.NewExtractor(opts.extractorModel)
-	} else {
-		log.Printf("Creating mysql memory service")
-	}
-
-	svcOpts := []memorymysql.ServiceOpt{
-		memorymysql.WithMySQLClientDSN(dsn),
-		memorymysql.WithTableName(tableName),
-		memorymysql.WithExtractor(ext),
-	}
-	if opts.enableExtractor {
-		svcOpts = append(svcOpts,
-			memorymysql.WithAsyncMemoryNum(autoMemoryAsyncWorkers),
-			memorymysql.WithMemoryQueueSize(autoMemoryQueueSize),
-			memorymysql.WithMemoryJobTimeout(autoMemoryJobTimeout),
-		)
-	}
-	return memorymysql.NewService(svcOpts...)
-}
-
-func createInMemoryService(opts memoryServiceOptions) memory.Service {
-	if opts.enableExtractor {
-		log.Printf("Creating inmemory memory service with extractor")
-		ext := extractor.NewExtractor(opts.extractorModel)
-		return inmemory.NewMemoryService(
-			inmemory.WithExtractor(ext),
-			inmemory.WithAsyncMemoryNum(autoMemoryAsyncWorkers),
-			inmemory.WithMemoryQueueSize(autoMemoryQueueSize),
-			inmemory.WithMemoryJobTimeout(autoMemoryJobTimeout),
-		)
-	}
-	return inmemory.NewMemoryService()
-}
-
-// standardCategories is the ordered list of QA categories.
-var standardCategories = []string{
-	"single-hop", "multi-hop", "temporal",
-	"open-domain", "adversarial",
-}
-
-func runEvaluation(
-	samples []*dataset.LoCoMoSample,
-	evaluator scenarios.Evaluator,
-	config scenarios.Config,
-	backend string,
-	scenarioDir string,
-) *EvaluationResult {
-	startTime := time.Now()
-	catAgg := metrics.NewCategoryAggregator()
-	sampleResults := make([]*scenarios.SampleResult, 0, len(samples))
-	var totalQuestions int
-	var totalUsage scenarios.TokenUsage
-
-	for i, sample := range samples {
-		log.Printf("[%d/%d] Evaluating sample: %s (%d QA)",
-			i+1, len(samples), sample.SampleID, len(sample.QA))
-
-		sampleStart := time.Now()
-		result, err := evaluator.Evaluate(context.Background(), sample)
-		if err != nil {
-			log.Printf("  Error: %v", err)
-			continue
-		}
-
-		sampleResults = append(sampleResults, result)
-		totalQuestions += len(result.QAResults)
-
-		// Aggregate category metrics.
-		for _, qaResult := range result.QAResults {
-			catAgg.Add(qaResult.Category, qaResult.Metrics)
-		}
-
-		// Aggregate token usage.
-		if result.TokenUsage != nil {
-			totalUsage.Add(*result.TokenUsage)
-		}
-
-		log.Printf("  Completed in %v | F1=%.3f BLEU=%.3f",
-			time.Since(sampleStart).Round(time.Millisecond),
-			result.Overall.F1,
-			result.Overall.BLEU)
-		if result.TokenUsage != nil &&
-			result.TokenUsage.LLMCalls > 0 {
-			if result.TokenUsage.CachedTokens > 0 {
-				log.Printf(
-					"  Tokens: prompt=%d cached=%d"+
-						" completion=%d calls=%d",
-					result.TokenUsage.PromptTokens,
-					result.TokenUsage.CachedTokens,
-					result.TokenUsage.CompletionTokens,
-					result.TokenUsage.LLMCalls,
-				)
-			} else {
-				log.Printf(
-					"  Tokens: prompt=%d"+
-						" completion=%d calls=%d",
-					result.TokenUsage.PromptTokens,
-					result.TokenUsage.CompletionTokens,
-					result.TokenUsage.LLMCalls,
-				)
-			}
-		}
-
-		// Log per-sample category breakdown.
-		logSampleCategoryBreakdown(result)
-
-		// Incremental checkpoint: save partial results after
-		// each sample so progress is not lost.
-		partial := buildEvaluationResult(
-			config, backend, startTime,
-			sampleResults, catAgg, totalQuestions, totalUsage,
-		)
-		saveResults(scenarioDir, partial)
-	}
-
-	return buildEvaluationResult(
-		config, backend, startTime,
-		sampleResults, catAgg, totalQuestions, totalUsage,
-	)
-}
-
-// logSampleCategoryBreakdown prints a one-line per-category
-// summary for the completed sample.
-func logSampleCategoryBreakdown(result *scenarios.SampleResult) {
-	if len(result.ByCategory) == 0 {
-		return
-	}
-	parts := make([]string, 0, len(standardCategories))
-	for _, cat := range standardCategories {
-		m, ok := result.ByCategory[cat]
-		if !ok {
-			continue
-		}
-		parts = append(parts, fmt.Sprintf(
-			"%s: F1=%.3f", cat, m.F1,
-		))
-	}
-	if len(parts) > 0 {
-		log.Printf("  Categories: %s", strings.Join(parts, " | "))
-	}
-}
-
-// buildEvaluationResult constructs the full result from
-// accumulated data.
-func buildEvaluationResult(
-	config scenarios.Config,
-	backend string,
-	startTime time.Time,
-	sampleResults []*scenarios.SampleResult,
-	catAgg *metrics.CategoryAggregator,
-	totalQuestions int,
-	totalUsage scenarios.TokenUsage,
-) *EvaluationResult {
-	totalTime := time.Since(startTime)
-	overall := catAgg.GetOverall()
-	qCount := max(totalQuestions, 1)
-	var cacheHitRate float64
-	if totalUsage.PromptTokens > 0 {
-		cacheHitRate = float64(totalUsage.CachedTokens) /
-			float64(totalUsage.PromptTokens)
-	}
-	return &EvaluationResult{
-		Metadata: &EvalMetadata{
-			Framework:      "trpc-agent-go",
-			Version:        "1.0.0",
-			Timestamp:      time.Now(),
-			Model:          getModelName(),
-			EvalModel:      getEvalModelName(),
-			Scenario:       string(config.Scenario),
-			MemoryBackend:  backend,
-			MaxContext:     config.MaxContext,
-			QAHistoryTurns: config.QAHistoryTurns,
-			QASearchPasses: config.QASearchPasses,
-			LLMJudge:       config.EnableLLMJudge,
-		},
-		Summary: &EvalSummary{
-			TotalSamples:          len(sampleResults),
-			TotalQuestions:        totalQuestions,
-			OverallF1:             overall.F1,
-			OverallBLEU:           overall.BLEU,
-			OverallLLMScore:       overall.LLMScore,
-			TotalTimeMs:           totalTime.Milliseconds(),
-			AvgLatencyMs:          float64(totalTime.Milliseconds()) / float64(qCount),
-			TotalPromptTokens:     totalUsage.PromptTokens,
-			TotalCompletionTokens: totalUsage.CompletionTokens,
-			TotalTokens:           totalUsage.TotalTokens,
-			TotalCachedTokens:     totalUsage.CachedTokens,
-			TotalLLMCalls:         totalUsage.LLMCalls,
-			AvgPromptTokensPerQA:  float64(totalUsage.PromptTokens) / float64(qCount),
-			AvgCompletionPerQA:    float64(totalUsage.CompletionTokens) / float64(qCount),
-			AvgCachedTokensPerQA:  float64(totalUsage.CachedTokens) / float64(qCount),
-			AvgLLMCallsPerQA:      float64(totalUsage.LLMCalls) / float64(qCount),
-			CacheHitRate:          cacheHitRate,
-		},
-		ByCategory:    catAgg.GetCategoryMetrics(),
-		SampleResults: sampleResults,
-	}
-}
-
-func saveResults(outputDir string, result *EvaluationResult) {
-	if err := os.MkdirAll(outputDir, 0755); err != nil {
-		log.Printf("Failed to create output directory: %v", err)
-		return
-	}
-
-	// Save full results.
-	resultsPath := filepath.Join(outputDir, "results.json")
-	data, err := json.MarshalIndent(result, "", "  ")
-	if err != nil {
-		log.Printf("Failed to marshal results: %v", err)
-		return
-	}
-	if err := os.WriteFile(resultsPath, data, 0644); err != nil {
-		log.Printf("Failed to write results: %v", err)
-		return
-	}
-	log.Printf("Results saved to: %s", resultsPath)
-
-	// Save checkpoint (same as results for now).
-	checkpointPath := filepath.Join(outputDir, "checkpoint.json")
-	if err := os.WriteFile(checkpointPath, data, 0644); err != nil {
-		log.Printf("Failed to write checkpoint: %v", err)
-	}
-}
-
-func printSummary(result *EvaluationResult) {
-	fmt.Println()
-	fmt.Println(strings.Repeat("=", 60))
-	fmt.Printf("Memory Evaluation Results - %s\n", result.Metadata.Scenario)
-	fmt.Println(strings.Repeat("=", 60))
-
-	fmt.Printf("\nModel: %s\n", result.Metadata.Model)
-	fmt.Printf("Scenario: %s\n", result.Metadata.Scenario)
-	if result.Metadata.MemoryBackend != "" {
-		fmt.Printf("Memory Backend: %s\n",
-			result.Metadata.MemoryBackend)
-	}
-	if result.Metadata.QAHistoryTurns > 0 {
-		fmt.Printf("QA History Turns: %d\n",
-			result.Metadata.QAHistoryTurns)
-	}
-	if result.Metadata.QASearchPasses > 1 {
-		fmt.Printf("QA Search Passes: %d\n",
-			result.Metadata.QASearchPasses)
-	}
-	fmt.Printf("Samples: %d | Questions: %d\n",
-		result.Summary.TotalSamples, result.Summary.TotalQuestions)
-
-	fmt.Println("\n--- Overall Metrics ---")
-	fmt.Printf("F1 Score:   %.4f (%.1f)\n", result.Summary.OverallF1, result.Summary.OverallF1*100)
-	fmt.Printf("BLEU Score: %.4f\n", result.Summary.OverallBLEU)
-	if result.Summary.OverallLLMScore > 0 {
-		fmt.Printf("LLM Score:  %.4f\n", result.Summary.OverallLLMScore)
-	}
-	fmt.Printf("Total Time: %dms | Avg Latency: %.1fms\n",
-		result.Summary.TotalTimeMs, result.Summary.AvgLatencyMs)
-
-	if result.Summary.TotalLLMCalls > 0 {
-		fmt.Println("\n--- Token Usage ---")
-		fmt.Printf("Prompt Tokens:     %d (avg %.0f/QA)\n",
-			result.Summary.TotalPromptTokens,
-			result.Summary.AvgPromptTokensPerQA)
-		fmt.Printf("Completion Tokens: %d (avg %.0f/QA)\n",
-			result.Summary.TotalCompletionTokens,
-			result.Summary.AvgCompletionPerQA)
-		fmt.Printf("Total Tokens:      %d\n",
-			result.Summary.TotalTokens)
-		fmt.Printf("LLM Calls:         %d (avg %.1f/QA)\n",
-			result.Summary.TotalLLMCalls,
-			result.Summary.AvgLLMCallsPerQA)
-	}
-
-	fmt.Println("\n--- By Category ---")
-	fmt.Printf("%-15s %8s %8s %8s %8s\n", "Category", "Count", "F1", "BLEU", "LLM")
-	fmt.Println(strings.Repeat("-", 51))
-
-	categories := []string{"single-hop", "multi-hop", "temporal", "open-domain", "adversarial"}
-	for _, cat := range categories {
-		if m, ok := result.ByCategory[cat]; ok {
-			llmStr := "-"
-			if m.LLMScore > 0 {
-				llmStr = fmt.Sprintf("%.3f", m.LLMScore)
-			}
-			fmt.Printf("%-15s %8d %8.3f %8.3f %8s\n",
-				cat, m.Count, m.F1, m.BLEU, llmStr)
-		}
-	}
-
-	// Print any other categories not in the standard list.
-	for cat, m := range result.ByCategory {
-		found := false
-		for _, c := range categories {
-			if c == cat {
-				found = true
-				break
-			}
-		}
-		if !found {
-			llmStr := "-"
-			if m.LLMScore > 0 {
-				llmStr = fmt.Sprintf("%.3f", m.LLMScore)
-			}
-			fmt.Printf("%-15s %8d %8.3f %8.3f %8s\n",
-				cat, m.Count, m.F1, m.BLEU, llmStr)
-		}
-	}
-
-	fmt.Println(strings.Repeat("=", 60))
 }

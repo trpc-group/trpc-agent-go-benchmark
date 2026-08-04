@@ -49,6 +49,84 @@ jobs:
         shell: bash
         run: bash .github/scripts/run-go-tests.sh --module "${{ matrix.module }}"
 
+  test-longmemeval-standalone:
+    name: test LongMemEval standalone
+    runs-on: ubuntu-latest
+    env:
+      CGO_CFLAGS: -DSQLITE_INNOCUOUS=0x000200000
+      CGO_ENABLED: "1"
+      GOFLAGS: -mod=readonly
+      GOWORK: "off"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.24.9"
+      - name: Verify trpc-agent-go dependency pins
+        working-directory: memory/trpc-agent-go-impl
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          import subprocess
+
+          source_root = "trpc.group/trpc-go/trpc-agent-go"
+          expected_remote_root = "github.com/trpc-group/trpc-agent-go"
+          module = json.loads(
+              subprocess.check_output(["go", "mod", "edit", "-json"])
+          )
+          pins = [
+              replacement
+              for replacement in module.get("Replace", [])
+              if replacement["Old"]["Path"] == source_root
+              or replacement["Old"]["Path"].startswith(source_root + "/")
+          ]
+          if not pins:
+              raise SystemExit("no trpc-agent-go dependency pins found")
+
+          root_pin = next((
+              pin for pin in pins if pin["Old"]["Path"] == source_root
+          ), None)
+          if root_pin is None:
+              raise SystemExit("root trpc-agent-go dependency pin is missing")
+          expected_version = root_pin["New"].get("Version", "")
+          if not expected_version:
+              raise SystemExit("root trpc-agent-go dependency is not pinned")
+
+          for pin in pins:
+              old_path = pin["Old"]["Path"]
+              path = pin["New"].get("Path", "")
+              version = pin["New"].get("Version", "")
+              suffix = old_path[len(source_root):]
+              expected_path = expected_remote_root + suffix
+              if path != expected_path:
+                  raise SystemExit(
+                      f"unexpected trpc-agent-go replacement for {old_path}: "
+                      f"{path}, want {expected_path}"
+                  )
+              if version != expected_version:
+                  raise SystemExit(
+                      f"trpc-agent-go replacement {path} uses {version}, "
+                      f"want {expected_version}"
+                  )
+          if not expected_version.startswith("v0.0.0-"):
+              raise SystemExit(
+                  "trpc-agent-go dependencies must use an immutable "
+                  f"pseudo-version, got {expected_version}"
+              )
+          print(
+              "trpc-agent-go dependency pin:",
+              expected_remote_root + "@" + expected_version,
+          )
+          PY
+      - name: Verify module dependencies
+        working-directory: memory/trpc-agent-go-impl
+        run: go mod verify
+      - name: Test standalone module
+        working-directory: memory/trpc-agent-go-impl
+        run: go test ./...
+
   check-go-mod-tidy:
     name: check go mod tidy
     runs-on: ubuntu-latest

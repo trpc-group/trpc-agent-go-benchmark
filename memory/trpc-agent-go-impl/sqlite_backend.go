@@ -68,7 +68,7 @@ func createSQLiteService(
 			svcOpts,
 			memorysqlite.WithAsyncMemoryNum(autoMemoryAsyncWorkers),
 			memorysqlite.WithMemoryQueueSize(autoMemoryQueueSize),
-			memorysqlite.WithMemoryJobTimeout(autoMemoryJobTimeout),
+			memorysqlite.WithMemoryJobTimeout(autoMemoryJobTimeoutFor(opts)),
 		)
 	}
 
@@ -107,7 +107,11 @@ func createSQLiteVecService(
 	db.SetMaxIdleConns(defaultSQLiteMaxConn)
 
 	embedModelName := getEmbedModelName()
-	emb := newEmbeddingEmbedder(embedModelName)
+	emb, err := newEmbeddingEmbedder(embedModelName)
+	if err != nil {
+		_ = db.Close()
+		return nil, err
+	}
 
 	svcOpts := []memorysqlitevec.ServiceOpt{
 		memorysqlitevec.WithTableName(tableName),
@@ -120,7 +124,7 @@ func createSQLiteVecService(
 			svcOpts,
 			memorysqlitevec.WithAsyncMemoryNum(autoMemoryAsyncWorkers),
 			memorysqlitevec.WithMemoryQueueSize(autoMemoryQueueSize),
-			memorysqlitevec.WithMemoryJobTimeout(autoMemoryJobTimeout),
+			memorysqlitevec.WithMemoryJobTimeout(autoMemoryJobTimeoutFor(opts)),
 		)
 	}
 

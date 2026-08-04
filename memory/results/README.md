@@ -1,15 +1,36 @@
-# Evaluation Results
+# Memory Benchmark Results
+
+## Evaluation Results
 
 This directory stores memory benchmark evaluation results.
 
-## Reports
+### Reports
 
 | File | Description |
 |------|-------------|
 | [REPORT.md](REPORT.md) | Full evaluation report (English) |
 | [REPORT.zh_CN.md](REPORT.zh_CN.md) | Full evaluation report (Chinese) |
 
-## LoCoMo Benchmark Evaluation Summary
+### Latest LoCoMo Policy Comparison
+
+The latest policy comparison uses the full LoCoMo-10 dataset, 1,986 QA items,
+`gpt-4o-mini`, `text-embedding-3-small`, top-k 30, and two
+`memory_search` passes. The historical Optimized configuration is the default
+Merge Similar policy.
+
+| Policy configuration | F1 | BLEU | LLM Score | Active memories |
+| --- | ---: | ---: | ---: | ---: |
+| Optimized / Merge Similar | 0.4690 | 0.4310 | 0.5320 | unavailable |
+| **Preserve History** | **0.4865** | **0.4473** | **0.5609** | 2,740 |
+| Append Only | 0.4773 | 0.4397 | 0.5441 | 2,627 |
+
+Assistant-episode experiments are intentionally excluded because LoCoMo maps
+its second human speaker to the assistant role and does not represent
+model-generated assistant results. Preserve History and Append Only have
+structured result artifacts; the Optimized row is retained from the archived
+report baseline because its original structured artifact is unavailable.
+
+### Historical LoCoMo Benchmark Evaluation Summary
 
 **Configuration**:
 - Model: gpt-4o-mini
@@ -42,7 +63,7 @@ This directory stores memory benchmark evaluation results.
    to answer unanswerable questions).
 4. Open-domain LLM Score improves dramatically with history (+92.9%).
 
-## SQLite vs SQLiteVec (Subset Runs)
+### SQLite vs SQLiteVec (Subset Runs)
 
 We also run focused subset experiments comparing local SQLite keyword
 matching (`sqlite`) vs sqlite-vec semantic search (`sqlitevec`).
@@ -81,7 +102,7 @@ does not improve F1.
 | sqlitevec | 40 | 1 | 0.327 | 965,423 | 4,851 |
 | sqlitevec | 10 | 2 | 0.342 | 659,981 | 3,316 |
 
-## Directory Structure
+### Directory Structure
 
 Note: `data_*` and `log_*.log` are large, machine-generated artifacts and are
 ignored by git (see `.gitignore`).
@@ -100,7 +121,7 @@ results/
 +-- *.pdf                                # Papers (ignored).
 ```
 
-## External Baselines (From Papers)
+### External Baselines (From Papers)
 
 To extract LoCoMo baseline tables reported by external papers and generate
 Markdown snippets for `REPORT.md` and `REPORT.zh_CN.md`:
@@ -114,7 +135,7 @@ Markdown snippets for `REPORT.md` and `REPORT.zh_CN.md`:
 The script parses the tables and converts percentage-point metrics to the
 0-1 range for consistent reporting.
 
-## Result Format
+### Result Format
 
 Each `results.json` contains:
 
@@ -142,3 +163,86 @@ Each `results.json` contains:
   }
 }
 ```
+
+## LongMemEval
+
+LongMemEval is the cross-session user-memory benchmark. The current maintained
+harness uses Runner replay, sanitizer validation, and memory-only QA. The
+latest development comparison covers Auto `Merge Similar`, `Preserve History`, and
+`Append Only` update policies plus Mem0 OSS. The report intentionally omits all
+earlier LongMemEval result tables because their build or governance contracts
+differ from the current turn-pair harness.
+
+These are current display names for behaviorally identical historical runs;
+the underlying metrics and raw artifacts were not regenerated for the rename.
+
+New maintained runs use a fixed-denominator publication contract:
+
+- `checkpoint.json` is mutable resume state and is never a report input.
+- `results.json` is published atomically only after every selected case has one
+  terminal status and the run manifest, provenance, artifact digests, top-k,
+  fixed build protocol, phase cost, and build trace all pass validation.
+- Failed and judge-failed cases remain in the fixed denominator and score as
+  incorrect; missing or duplicate cases block publication.
+- `aggregate.<digest>.json` is the sanitized machine-readable aggregate.
+  Content-addressed `bad_cases.<digest>.*` files contain the linked failure
+  records in JSON, English Markdown, and Chinese Markdown.
+- Provider token counts are never estimated. `tokens_known=false` distinguishes
+  unavailable usage from a provider-reported zero.
+
+Historical or log-recovered files without this publication metadata are
+diagnostic only. The maintained report generator rejects them rather than
+silently promoting them. In particular, results produced with backend-specific
+truncation, different retrieval limits, incomplete cost accounting, or the
+obsolete whole-session build protocol are not maintained baselines.
+
+Comparable maintained runs must share the exact dataset, case manifest,
+canonical replay, build plan, model configuration, tokenizer, fixed turn-pair
+protocol, and retrieval limit. The harness builds memory after each
+user/assistant turn pair through public `Runner.Run`. One Runner is reused per
+case; pairs from one source session share its original session ID, while other
+source sessions use isolated histories under the same user-level memory. The
+harness validates and timestamps the resulting builder input, uses lossless
+token-aware chunking, and applies `top-k=20` to every memory backend. Auto
+receives the session date through its extractor reference-date capability;
+Mem0 receives the same date as extraction custom instructions through the
+official `POST /memories` `prompt` field. The date comes from the immutable
+build-plan session observation time and is not inserted into message content.
+Whole-session ingestion and metadata-only Mem0 temporal context are not
+supported by the maintained harness; older outputs that used either remain
+historical diagnostics only. Resume requires the stored and current benchmark
+worktrees to be clean.
+
+Maintained Mem0 results additionally require a successful sanitized preflight.
+The publication manifest records its digest and rejects a run unless the
+verified Mem0 source commit, version, LLM, embedding model, environment-lock
+digest, and observation-prompt capability match the benchmark configuration.
+
+### LongMemEval Policy and Assistant Matrix
+
+The latest comparable development snapshot covers all three Auto update
+policies with assistant-episode extraction disabled and enabled, plus native
+Mem0 OSS. Every row uses the same legacy 50-case manifest, `glm52`,
+`text-embedding-ada-002`, lossless turn-pair replay, and `top-k=20`.
+
+| Policy / backend | Assistant extraction | QA succeeded | Correct | Accuracy | F1 | BLEU | ROUGE-L | Complete-build memories |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Merge Similar | Disabled | 48/50 | 14 | 28% | 0.0961 | 0.0635 | 0.0885 | 2,955 / 50 cases |
+| Merge Similar | Enabled | 45/50 | 29 | 58% | 0.1626 | 0.1083 | 0.1518 | 6,011 / 50 cases |
+| Preserve History | Disabled | 50/50 | 41 | 82% | 0.1683 | 0.1079 | 0.1614 | 15,353 / 50 cases |
+| Preserve History | Enabled | 48/50 | 45 | 90% | 0.1876 | 0.1204 | 0.1779 | 17,696 / 49 cases |
+| Append Only | Disabled | 50/50 | 41 | 82% | 0.1730 | 0.1112 | 0.1679 | 16,280 / 50 cases |
+| Append Only | Enabled | 47/50 | 44 | 88% | **0.1970** | **0.1295** | **0.1865** | 18,728 / 49 cases |
+| Mem0 OSS | Native | 50/50 | **42** | 84% | 0.1681 | 0.1067 | 0.1588 | 28,041 / 50 cases |
+
+Accuracy always uses the fixed denominator of 50. Memory totals include only
+the last successful persistence snapshot for each completely built case;
+partial rows from failed attempts are excluded. The assistant-enabled rows use
+the final conditional two-stage implementation, not the earlier extraction
+prototype.
+
+This snapshot remains diagnostic because the selected manifest uses the legacy
+`case_ids`-only schema. The assistant-enabled archives also did not pass the
+current clean-worktree publication gate and two policies have one incomplete
+memory build each. The table must therefore not be presented as a maintained
+holdout baseline.

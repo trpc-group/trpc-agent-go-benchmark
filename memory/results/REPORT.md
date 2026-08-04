@@ -1,6 +1,199 @@
-# Evaluating Long-Term Conversational Memory on LoCoMo Benchmark
+# Memory Benchmark Report
 
-## 1. Introduction
+## LongMemEval
+
+> **Development snapshots.** Sections 1-5 document the fixed 50-case turn-pair
+> run `turn_pair_full50_parallel4_20260717`, including case-local recovery of
+> transient infrastructure failures. Section 6 adds the final conditional
+> two-stage assistant-episode extraction diagnostic. Earlier LongMemEval
+> numbers used different build protocols or result governance and have been
+> removed. These snapshots are useful for development comparison, but their
+> legacy case-ID manifest and archived artifact locators did not pass the
+> publication gate, so neither is an official holdout baseline.
+
+Policy labels in this report use the current names. This is a documentation
+relabeling of behaviorally identical historical runs; the metrics and raw
+artifacts were not regenerated.
+
+### 1. Protocol
+
+| Item | Value |
+| --- | --- |
+| Dataset | `longmemeval_s_cleaned.json` |
+| Cases | 50 fixed cases across all six question types |
+| Distribution | knowledge-update 8; multi-session 13; assistant 6; preference 3; user 7; temporal 13 |
+| Input | 2,353 sessions; 24,370 turns; 12,280 user/assistant pairs |
+| Build protocol | Lossless turn-pair replay; one shared replay and build plan |
+| Build chunk limit | 6,000 `cl100k_base` tokens; one pair required lossless splitting |
+| Answer, extraction, and judge model | `glm52` |
+| Embedding model | `text-embedding-ada-002` |
+| Retrieval | Standard `memory_search`, fixed `top-k=20` |
+| Benchmark revision | `c8c305c4c50594e3d083e06a5248cfeb81b15823` |
+| trpc-agent-go revision | `1b3adb2f4bb8` |
+| Primary metric | Fixed-denominator LLM-judge Accuracy |
+
+All four scenarios consume the same replay/build-plan digests and case order.
+Pairs from one source session retain their session identity; different source
+sessions remain isolated under the same case-level user memory. Auto receives
+the source observation date through the extractor reference-date API. Mem0 OSS
+2.0.11 (`3b9aed866ae70d29043388ed0ae5cc4e1844f3e8`) receives the same date through
+the supported extraction `prompt` field. QA uses a fresh session and can see
+only the current question, its date, and results returned by `memory_search`.
+Gold answers and evidence are available only to evaluation and diagnostics.
+
+The three Auto runs differ only in update policy and use independent pgvector
+tables. Mem0 retains its native extraction and reconciliation behavior.
+Transient build failures are rerun case-locally with the same immutable replay,
+build plan, model, and configuration; the successful retry replaces only that
+failed case. Incorrect answers are never retried or selected. Cases that still
+fail remain in the denominator and score as incorrect.
+
+### 2. Case-Local Final Results
+
+| Scenario | Policy | Successful | Failed | Correct | Accuracy | F1 | BLEU | ROUGE-L | Runtime* |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Auto | Merge Similar | 48/50 | 2 | 14 | 0.2800 | 0.0961 | 0.0635 | 0.0885 | 28h34m |
+| Auto | Preserve History | 50/50 | 0 | 41 | 0.8200 | 0.1683 | 0.1079 | 0.1614 | 29h51m |
+| Auto | Append Only | 50/50 | 0 | 41 | 0.8200 | **0.1730** | **0.1112** | **0.1679** | 28h07m |
+| Mem0 OSS | native | 50/50 | 0 | 42 | **0.8400** | 0.1681 | 0.1067 | 0.1588 | 30h15m |
+
+`*` Runtime includes the initial attempt and case-local recovery. Preserve
+History and Append Only each recovered one Auto build acknowledgement timeout
+for the same case; Mem0 recovered two HTTP 502 build failures. Merge Similar
+had no transient build failure to recover; its two QA failures after exceeding
+eight tool iterations remain incorrect in the fixed denominator.
+
+#### Accuracy by Question Type
+
+| Question type | Count | Merge Similar | Preserve History | Append Only | Mem0 OSS |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| knowledge-update | 8 | 0.5000 | 0.8750 | **1.0000** | 0.8750 |
+| multi-session | 13 | 0.2308 | **0.8462** | 0.7692 | 0.7692 |
+| single-session-assistant | 6 | 0.0000 | 0.0000 | 0.1667 | **0.5000** |
+| single-session-preference | 3 | 0.0000 | **1.0000** | **1.0000** | **1.0000** |
+| single-session-user | 7 | 0.2857 | **1.0000** | 0.8571 | **1.0000** |
+| temporal-reasoning | 13 | 0.3846 | **1.0000** | **1.0000** | 0.9231 |
+
+### 3. Final Memory Inventory
+
+| Scenario | Complete builds | Final entries | Entries/case | Median | Range |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Auto Merge Similar | 50/50 | 2,955 | 59.10 | 58 | 35-87 |
+| Auto Preserve History | 50/50 | 15,353 | 307.06 | 305.5 | 257-381 |
+| Auto Append Only | 50/50 | 16,280 | 325.60 | 326 | 264-396 |
+| Mem0 OSS | 50/50 | 28,041 | 560.82 | 564.5 | 465-602 |
+
+The inventory is reconstructed from the last successful persistence snapshot
+for each case whose memory build completed. The snapshot reader limit is
+10,000 entries, well above the observed maximum of 602, so these counts are
+not truncated. They count active entries after ingestion, not extraction
+operations or database rows shared across cases.
+
+For recovered cases, the failed attempt's partial inventory is discarded and
+replaced by the successful case-local build: Preserve History contributes 333
+entries, Append Only 346, and the two Mem0 cases 584 and 501. The Merge Similar
+run's two QA failures are included because their memory builds completed
+successfully.
+
+### 4. Cost and Runtime
+
+| Scenario | Build LLM calls | Build LLM tokens | QA+judge calls | QA+judge tokens | Build embedding requests | Remote embedding calls | Cache hits |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Auto Merge Similar | 12,281 | 96,999,123 | 240 | 2,048,381 | 37,907 | 26,074 | 11,833 |
+| Auto Preserve History | 12,336 | 95,086,050 | 163 | 434,852 | 28,028 | 27,581 | 447 |
+| Auto Append Only | 12,411 | **84,701,403** | 168 | 467,266 | 28,860 | 28,401 | 459 |
+| Mem0 OSS | 12,359 | 113,205,317* | 171 | 410,912 | 23,044 | 23,044 | 0 |
+
+`*` Mem0 proxy accounting captured calls and observed token fields, but the
+provider record marks build LLM and embedding token totals as
+`tokens_known=false`; they must not be interpreted as complete provider usage.
+Shared caches and concurrent execution also make remote-call and wall-clock
+figures unsuitable as standalone backend speed rankings. The table includes
+both the initial attempts and case-local recovery, matching the final result
+population reported above.
+
+### 5. Findings and Limitations
+
+1. **Update policy dominates this sample.** Preserve History raises Accuracy from
+   28% to 82%. Every Merge Similar success is also correct under Preserve
+   History; Preserve History adds 27 correct cases without a regression unique
+   to Merge Similar. Its completed cases retain about 5.2 times as many final
+   entries per case as Merge Similar, showing how strongly Merge Similar
+   reconciliation reduces the stored evidence set.
+2. **Preserve History and Append Only tie on Accuracy but preserve different
+   evidence.** They agree on 39 correct cases and each has two unique successes.
+   Preserve History is stronger on multi-session and single-session-user
+   questions; Append Only is stronger on knowledge-update and assistant
+   questions and has the highest lexical-overlap metrics.
+3. **Mem0 and the two new Auto policies are complementary.** Mem0 and Preserve
+   History agree on 38 correct cases; Mem0 has four unique successes and
+   Preserve History has three. Mem0 is strongest on assistant-memory questions,
+   while Preserve History leads multi-session and temporal Accuracy.
+4. **The sample is not an official holdout.** Its manifest uses the legacy
+   `case_ids`-only schema and records neither a seeded selection method nor a
+   dev/holdout split. Archived artifact paths also fail current publication
+   validation. Case-local recovery removes transient infrastructure failures
+   but does not make this legacy sample an official holdout.
+
+### 6. Policy and Assistant-Episode Matrix
+
+This diagnostic compares the three Auto update policies with
+assistant-episode extraction disabled and enabled. The enabled rows use the
+final conditional two-stage extractor: ordinary user-memory extraction runs
+first, and a bounded assistant-result extraction request is issued only for a
+strong structured-result candidate. Mem0 uses its native extraction behavior.
+
+All seven rows use the same 50 cases and order, `glm52`,
+`text-embedding-ada-002`, lossless turn-pair replay, the same 6,000-token
+chunk limit, and `top-k=20`.
+
+| Policy / backend | Assistant extraction | QA succeeded | Failed | Correct | Accuracy | F1 | BLEU | ROUGE-L |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Merge Similar | Disabled | 48/50 | 2 | 14 | 0.2800 | 0.0961 | 0.0635 | 0.0885 |
+| Merge Similar | Enabled | 45/50 | 5 | 29 | 0.5800 | 0.1626 | 0.1083 | 0.1518 |
+| Preserve History | Disabled | 50/50 | 0 | 41 | 0.8200 | 0.1683 | 0.1079 | 0.1614 |
+| Preserve History | Enabled | 48/50 | 2 | **45** | **0.9000** | 0.1876 | 0.1204 | 0.1779 |
+| Append Only | Disabled | 50/50 | 0 | 41 | 0.8200 | 0.1730 | 0.1112 | 0.1679 |
+| Append Only | Enabled | 47/50 | 3 | 44 | 0.8800 | **0.1970** | **0.1295** | **0.1865** |
+| Mem0 OSS | Native | 50/50 | 0 | 42 | 0.8400 | 0.1681 | 0.1067 | 0.1588 |
+
+Failed QA remains in the fixed denominator and scores as incorrect. The
+assistant-enabled runs are not replacements selected by score; each row is one
+complete experimental configuration.
+
+#### Complete-Build Memory Inventory
+
+| Policy / backend | Assistant extraction | Active memories | Complete builds |
+| --- | --- | ---: | ---: |
+| Merge Similar | Disabled | 2,955 | 50/50 |
+| Merge Similar | Enabled | 6,011 | 50/50 |
+| Preserve History | Disabled | 15,353 | 50/50 |
+| Preserve History | Enabled | 17,696 | 49/50 |
+| Append Only | Disabled | 16,280 | 50/50 |
+| Append Only | Enabled | 18,728 | 49/50 |
+| Mem0 OSS | Native | 28,041 | 50/50 |
+
+The inventory counts only the final successful persistence snapshot for each
+fully built case. A failed Preserve History attempt left 357 partial entries
+and a failed Append Only attempt left 162; neither is included.
+
+#### Interpretation and Limits
+
+- Enabling assistant extraction raises Accuracy by 30 points for Merge Similar,
+  8 points for Preserve History, and 6 points for Append Only on this sample.
+- Append Only with assistant extraction has the strongest lexical-overlap
+  metrics, while Preserve History with assistant extraction has the highest
+  Accuracy.
+- Mem0 remains a native external baseline and is not configured with the
+  Auto-only assistant option.
+- These are development diagnostics. The manifest uses the legacy
+  `case_ids`-only schema, the assistant-enabled archives did not pass the
+  current clean-worktree publication gate, and two assistant-enabled rows have
+  one incomplete memory build each.
+
+## Evaluating Long-Term Conversational Memory on LoCoMo Benchmark
+
+### 1. Introduction
 
 This report evaluates the long-term conversational memory of
 **trpc-agent-go** using the **LoCoMo** benchmark (Maharana et al.,
@@ -16,9 +209,9 @@ Both versions are compared against four Python agent frameworks
 (AutoGen, Agno, ADK, CrewAI) and ten external memory systems
 (Mem0, Zep, etc.).
 
-## 2. Experimental Setup
+### 2. Experimental Setup
 
-### 2.1 Benchmark
+#### 2.1 Benchmark
 
 | Item | Value |
 | --- | --- |
@@ -27,7 +220,7 @@ Both versions are compared against four Python agent frameworks
 | Model | GPT-4o-mini (inference + judge) |
 | Embedding | text-embedding-3-small |
 
-### 2.2 Scenarios
+#### 2.2 Scenarios
 
 | Scenario | Description |
 | --- | --- |
@@ -35,7 +228,7 @@ Both versions are compared against four Python agent frameworks
 | **Original** | Auto extraction + pgvector baseline; background extractor writes memories and retrieves them at query time |
 | **Optimized** | Optimized memory extraction strategy and multi-pass retrieval over extracted memories |
 
-### 2.3 Optimizations: Original → Optimized
+#### 2.3 Optimizations: Original → Optimized
 
 The optimized version builds on the original baseline with a series
 of targeted improvements across the memory extraction, storage, and
@@ -94,9 +287,9 @@ retrieval pipeline:
    the highest-scored version. This reduces redundant context
    in the retrieval results.
 
-## 3. Results
+### 3. Results
 
-### 3.1 Internal Scenario Comparison
+#### 3.1 Internal Scenario Comparison
 
 **Table 1: Overall Metrics**
 
@@ -172,7 +365,7 @@ retrieval pipeline:
 > samples and beats the optimized version on all 10 samples, with the
 > largest gains on `locomo10_2`, `locomo10_3`, and `locomo10_5`.
 
-### 3.2 Retrieval Strategies vs Long-Context
+#### 3.2 Retrieval Strategies vs Long-Context
 
 Long-Context places the full transcript into a single LLM call.
 It is effective for short single-session histories, but the two
@@ -190,7 +383,7 @@ retrieval-based strategies expose different production trade-offs:
 
 ---
 
-### 3.3 SQLite vs SQLiteVec (Subset Run)
+#### 3.3 SQLite vs SQLiteVec (Subset Run)
 
 This subsection compares `sqlite` (keyword matching) and `sqlitevec`
 (semantic vector search via sqlite-vec) on a few controlled subset runs.
@@ -290,13 +483,13 @@ We also rerun the same configuration on another representative sample.
 
 ---
 
-## 4. Comparison with Python Agent Frameworks
+### 4. Comparison with Python Agent Frameworks
 
 We ran the same LoCoMo benchmark on four Python agent frameworks —
 **AutoGen**, **Agno**, **ADK**, **CrewAI** — all using GPT-4o-mini,
 the same 10 samples (1,986 QA), and LLM-as-Judge evaluation.
 
-### 4.1 Framework Configurations
+#### 4.1 Framework Configurations
 
 | Framework | Memory Backend | Retrieval | Embedding |
 | --- | --- | --- | --- |
@@ -306,7 +499,7 @@ the same 10 samples (1,986 QA), and LLM-as-Judge evaluation.
 | **ADK** | In-memory | Agent tool call (LoadMemoryTool) | Internal |
 | **CrewAI** | Built-in vector | Auto-retrieve by Crew | Internal |
 
-### 4.2 Framework Memory Approaches
+#### 4.2 Framework Memory Approaches
 
 Below is a detailed breakdown of each framework's memory storage,
 retrieval, and QA call flow. All benchmark implementations share
@@ -448,7 +641,7 @@ and evaluation pipeline.
 > staying in the low-token tier, while the optimized version remains
 > the more extraction-heavy, tool-driven alternative.
 
-### 4.3 Overall Results
+#### 4.3 Overall Results
 
 **Table 7: Memory Scenario — Overall Metrics**
 
@@ -490,7 +683,7 @@ Agno                           |===============================                 
                                0.0      0.1      0.2      0.3      0.4      0.5
 ```
 
-### 4.4 Category-Level F1
+#### 4.4 Category-Level F1
 
 **Table 8: F1 by Category**
 
@@ -520,7 +713,7 @@ Agno                           |===============================                 
 > beating AutoGen's 0.511 by 0.020 while clearly leading all other
 > trpc-agent-go variants and dedicated memory systems.
 
-### 4.5 Token Efficiency and Latency
+#### 4.5 Token Efficiency and Latency
 
 **Table 10: Token Efficiency Comparison**
 
@@ -614,7 +807,7 @@ for **5.6x nominal token cost** (significantly less after cache
 discounts), making it worthwhile for production use where answer
 quality matters more than token budget.
 
-### 4.6 ADK Failure Analysis
+#### 4.6 ADK Failure Analysis
 
 ADK (Google Agent Development Kit) uses an in-memory backend with
 agent tool calls (`LoadMemoryTool`) for memory retrieval. In this
@@ -647,7 +840,7 @@ evaluation, ADK encountered context overflow issues on some samples:
 - Average 49,224 tokens/QA (highest among all frameworks) for
   only 0.362 F1
 
-### 4.7 Per-Sample F1
+#### 4.7 Per-Sample F1
 
 **Table 12: Per-Sample F1 Comparison**
 
@@ -669,7 +862,7 @@ evaluation, ADK encountered context overflow issues on some samples:
 
 ---
 
-## 5. Comparison with External Memory Systems
+### 5. Comparison with External Memory Systems
 
 Source: Mem0 Table 1 (Chhikara et al., 2025, arXiv:2504.19413).
 All systems use GPT-4o-mini. Adversarial category excluded for
@@ -766,9 +959,9 @@ Agno                |====================                      | 0.267
 
 ---
 
-## 6. Conclusion
+### 6. Conclusion
 
-### Key Findings
+#### Key Findings
 
 1. **trpc-agent-go Session Recall is now the strongest overall
    configuration.** It ranks **#1 in 5-category weighted F1** at
@@ -827,7 +1020,7 @@ Agno                |====================                      | 0.267
    still at 0.174. Time-aware retrieval, temporal query rewriting,
    and richer reranking remain the main next steps.
 
-### Production Recommendations
+#### Production Recommendations
 
 | Use Case | Recommended Approach |
 | --- | --- |
@@ -838,9 +1031,9 @@ Agno                |====================                      | 0.267
 
 ---
 
-## Appendix
+### Appendix
 
-### A. Experimental Environment
+#### A. Experimental Environment
 
 | Component | Version/Config |
 | --- | --- |
@@ -850,7 +1043,7 @@ Agno                |====================                      | 0.267
 | PostgreSQL | 15+ with pgvector extension |
 | Dataset | LoCoMo-10 (10 samples, 1,986 QA) |
 
-### B. Full Category Breakdown (F1 / BLEU / LLM)
+#### B. Full Category Breakdown (F1 / BLEU / LLM)
 
 | Scenario | single-hop | multi-hop | temporal | open-domain | adversarial |
 | --- | --- | --- | --- | --- | --- |
@@ -859,7 +1052,7 @@ Agno                |====================                      | 0.267
 | Optimized | 0.396/0.325/0.395 | 0.453/0.415/0.519 | 0.247/0.192/0.364 | 0.441/0.398/0.552 | 0.626/0.626/0.626 |
 | Original | 0.316/0.250/0.270 | 0.096/0.088/0.060 | 0.088/0.068/0.115 | 0.358/0.319/0.425 | 0.814/0.814/0.814 |
 
-### C. Token Usage — Full Breakdown
+#### C. Token Usage — Full Breakdown
 
 | Scenario | Prompt Tokens | Completion Tokens | Total Tokens | LLM Calls | Calls/QA |
 | --- | ---: | ---: | ---: | ---: | ---: |
@@ -872,9 +1065,89 @@ Agno                |====================                      | 0.267
 | Agno | 20,694,534 | 31,194 | 20,725,728 | 1,986 | 1.0 |
 | ADK | 97,691,620 | 67,833 | 97,759,453 | 4,028 | 2.0 |
 
+
 ---
 
-## References
+## Latest LoCoMo Policy Comparison
+
+### Evaluation Protocol
+
+This section compares the archived Optimized result, which uses the default
+Merge Similar policy, with Preserve History and Append Only. The two new runs
+change only the Auto update policy. Assistant-episode experiments are excluded:
+LoCoMo maps a second human speaker to the assistant role and is not an
+appropriate evaluation of model-generated assistant results.
+
+| Item | Value |
+| --- | --- |
+| Dataset | Official LoCoMo-10; 10 conversations; 1,986 QA |
+| Dataset SHA-256 | `79fa87e90f04081343b8c8debecb80a9a6842b76a7aa537dc9fdf651ea698ff4` |
+| Scenario and backend | Auto + pgvector |
+| Answer and judge model | `gpt-4o-mini` |
+| Embedding model | `text-embedding-3-small` |
+| Retrieval | top-k 30; two `memory_search` passes |
+| QA context | No QA-history injection; 128,000-token maximum context |
+| Metrics | F1, BLEU, LLM Score, category metrics, tokens, calls, and latency |
+
+### Overall Results
+
+| Policy configuration | F1 | Delta | BLEU | Delta | LLM Score | Delta | Active memories |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Optimized / Merge Similar | 0.4690 | - | 0.4310 | - | 0.5320 | - | unavailable |
+| **Preserve History** | **0.4865** | **+1.75pp** | **0.4473** | **+1.63pp** | **0.5609** | **+2.89pp** | 2,740 |
+| Append Only | 0.4773 | +0.83pp | 0.4397 | +0.87pp | 0.5441 | +1.21pp | 2,627 |
+
+Preserve History is the strongest measured configuration on all three overall
+metrics. Append Only also improves on the Optimized baseline while retaining
+113 fewer active memories than Preserve History.
+
+### Category Metrics
+
+Each cell is `F1 / BLEU / LLM Score`.
+
+| Policy configuration | Single-hop | Multi-hop | Temporal | Open-domain | Adversarial |
+| --- | --- | --- | --- | --- | --- |
+| Optimized / Merge Similar | 0.396/0.325/0.395 | 0.453/0.415/0.519 | 0.247/0.192/0.364 | 0.441/0.398/0.552 | 0.626/0.626/0.626 |
+| Preserve History | 0.386/0.319/0.387 | 0.530/0.484/0.603 | 0.242/0.196/0.415 | 0.479/0.432/0.607 | 0.586/0.585/0.585 |
+| Append Only | 0.381/0.312/0.353 | 0.498/0.456/0.579 | 0.209/0.161/0.348 | 0.464/0.420/0.585 | 0.605/0.605/0.605 |
+
+The policy gains are concentrated in multi-hop and open-domain questions.
+The Optimized baseline remains stronger on single-hop and adversarial F1.
+
+### Answerable-Category Weighted F1
+
+This view excludes adversarial questions and uses the fixed 1,540 answerable
+QA items as its denominator.
+
+| Policy configuration | Weighted F1 | Delta vs Optimized |
+| --- | ---: | ---: |
+| Optimized / Merge Similar | 0.4230 | - |
+| **Preserve History** | **0.4579** | **+3.49pp** |
+| Append Only | 0.4402 | +1.72pp |
+
+### Cost and Runtime
+
+| Policy configuration | Prompt tokens | Completion tokens | Total tokens | Delta | Cached tokens | LLM calls | Average latency | Runtime |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Optimized / Merge Similar | 34,007,814 | 115,960 | 34,123,774 | - | unavailable | 5,981 | 8.59s | 4h44m |
+| Preserve History | 35,097,721 | 118,823 | 35,216,544 | +3.20% | 15,295,232 | 5,983 | 10.83s | 5.98h |
+| Append Only | 34,558,815 | 118,906 | 34,677,721 | +1.62% | 15,111,168 | 5,977 | 10.83s | 5.97h |
+
+### Result Integrity
+
+- Preserve History and Append Only each contain 10 conversations and the fixed
+  1,986 QA items, with structured result artifacts and independent pgvector
+  tables.
+- One transient embedding 504 was retried successfully; no case or score was
+  replaced.
+- The Optimized numbers are retained from the existing report baseline. Its
+  original structured result artifact is not present in this repository, so
+  exact deltas are report-derived and must not be described as independently
+  reproduced from a committed artifact.
+
+---
+
+### References
 
 1. Maharana, A., Lee, D., Tulyakov, S., Bansal, M., Barbieri, F., and Fang, Y. "Evaluating Very Long-Term Conversational Memory of LLM Agents." arXiv:2402.17753, 2024.
 2. Chhikara, P., Khant, D., Aryan, S., Singh, T., and Yadav, D. "Mem0: Building Production-Ready AI Agents with Scalable Long-Term Memory." arXiv:2504.19413, 2025.

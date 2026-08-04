@@ -1,0 +1,86 @@
+# Tencent is pleased to support the open source community by making
+# trpc-agent-go-benchmark available.
+#
+# Copyright (C) 2026 Tencent. All rights reserved.
+#
+# trpc-agent-go-benchmark is licensed under the Apache License Version 2.0.
+
+name: trpc-agent-go-benchmark-mem0
+
+services:
+  mem0:
+    platform: linux/amd64
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        MEM0_SOURCE_COMMIT: 3b9aed866ae70d29043388ed0ae5cc4e1844f3e8
+    image: trpc-agent-go-benchmark/mem0-oss:2.0.11-3b9aed866ae7
+    pull_policy: never
+    init: true
+    ports:
+      - "127.0.0.1:${MEM0_PORT:-8888}:8000"
+    environment:
+      APP_DB_NAME: mem0_app
+      AUTH_DISABLED: "true"
+      HISTORY_DB_PATH: /app/history/history.db
+      MEM0_DEFAULT_EMBEDDER_MODEL: ${MODEL_NAME:?Set MODEL_NAME in .env}
+      MEM0_DEFAULT_LLM_MODEL: ${LLM_NAME:?Set LLM_NAME in .env}
+      MEM0_TELEMETRY: "false"
+      OPENAI_API_KEY: ${MEM0_PROXY_API_KEY:?Set MEM0_PROXY_API_KEY in .env}
+      OPENAI_BASE_URL: ${MEM0_OPENAI_BASE_URL:?Set MEM0_OPENAI_BASE_URL in .env}
+      POSTGRES_COLLECTION_NAME: ${MEM0_COLLECTION_NAME:?Set MEM0_COLLECTION_NAME in .env}
+      POSTGRES_DB: postgres
+      POSTGRES_HOST: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      POSTGRES_PORT: "5432"
+      POSTGRES_USER: postgres
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=64m,mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - >-
+          import json, urllib.request;
+          data = json.load(urllib.request.urlopen('http://127.0.0.1:8000/openapi.json', timeout=5));
+          assert data['info']['version'] == '1.0.0'
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+    volumes:
+      - mem0_history:/app/history
+
+  postgres:
+    platform: linux/amd64
+    image: docker.io/pgvector/pgvector:0.8.0-pg17-bookworm@sha256:40b404964359299eefdd5f8518facf1886c562848cf4de13b6eaf91cb70c2b87
+    environment:
+      POSTGRES_DB: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      POSTGRES_USER: postgres
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -q -d postgres -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+    shm_size: "128mb"
+    volumes:
+      - mem0_postgres:/var/lib/postgresql/data
+      - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
+
+volumes:
+  mem0_history:
+  mem0_postgres:
