@@ -18,11 +18,11 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Mapping, Optional, Tuple
-from urllib.parse import urlsplit, urlunsplit
 
 from contextual_retrieval.artifacts import (
     canonical_digest,
     load_artifact,
+    public_endpoint_identity,
     text_digest,
     write_artifact,
 )
@@ -95,20 +95,10 @@ def context_config_from_env() -> Dict[str, Any]:
     }
 
 
-def _endpoint_identity(value: str) -> str:
-    parsed = urlsplit(value)
-    if not parsed.scheme or not parsed.hostname:
-        return value.split("?", 1)[0]
-    host = parsed.hostname
-    if parsed.port:
-        host = f"{host}:{parsed.port}"
-    return urlunsplit((parsed.scheme, host, parsed.path.rstrip("/"), "", ""))
-
-
 def _public_config(config: Mapping[str, Any]) -> Dict[str, Any]:
     return {
         "model": config["model"],
-        "endpoint": _endpoint_identity(str(config["base_url"])),
+        "endpoint": public_endpoint_identity(str(config["base_url"])),
         "header_names": sorted((config.get("headers") or {}).keys()),
         "max_tokens": int(config["max_tokens"]),
         "timeout_seconds": float(config.get("timeout_seconds", 300)),
@@ -219,22 +209,14 @@ def _redacted_error(
     error: BaseException,
     config: Mapping[str, Any],
 ) -> str:
-    message = f"{type(error).__name__}: {error}"
-    secret_values = [
-        str(config.get("api_key") or ""),
-        *[
-            str(value)
-            for value in (config.get("headers") or {}).values()
-            if value
-        ],
-    ]
-    for value in secret_values:
-        if value:
-            message = message.replace(value, "[REDACTED]")
-    base_url = str(config.get("base_url") or "")
-    if base_url:
-        message = message.replace(base_url, _endpoint_identity(base_url))
-    return message[:4000]
+    try:
+        endpoint = public_endpoint_identity(str(config.get("base_url") or ""))
+    except ValueError:
+        endpoint = "unavailable"
+    return (
+        f"{type(error).__name__}: context generation failed; "
+        f"endpoint={endpoint}"
+    )
 
 
 def _generate_one(

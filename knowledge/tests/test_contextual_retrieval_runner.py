@@ -12,10 +12,17 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from contextual_retrieval.artifacts import load_artifact, text_digest, write_artifact
+from contextual_retrieval.artifacts import (
+    load_artifact,
+    public_endpoint_identity,
+    text_digest,
+    write_artifact,
+)
 from contextual_retrieval.dataset import CASE_SCHEMA, CHUNK_SCHEMA
 from contextual_retrieval.runner import (
     RETRIEVAL_SAMPLES_SCHEMA,
+    _get_json,
+    _public_runtime_config,
     run_retrieval_ab,
     validate_service_pair,
 )
@@ -29,7 +36,9 @@ class ContextualRetrievalRunnerTest(unittest.TestCase):
             "vectorstore": "pgvector",
             "pg_table": table,
             "embedding_model": "bge-m3",
-            "embedding_endpoint": "https://embedding.test/v1",
+            "embedding_endpoint": public_endpoint_identity(
+                "https://embedding.test/v1"
+            ),
             "embedding_dimensions": 1024,
             "embedding_header_names": [],
             "use_rrf": False,
@@ -43,6 +52,9 @@ class ContextualRetrievalRunnerTest(unittest.TestCase):
             "manifest_chunks_count": 2,
             "index_document_count": 2,
             "context_cache_identity": context_identity,
+            "context_set_digest": (
+                "context-set-id" if context_identity else None
+            ),
         }
 
     def _formal_fixture(self, root):
@@ -124,11 +136,118 @@ class ContextualRetrievalRunnerTest(unittest.TestCase):
             {"artifact_digest": "chunks-digest", "chunks_count": 2},
         )
 
+    def test_public_runtime_config_sanitizes_service_endpoint(self):
+        config = self._config("baseline", "fixture_lane_a_docs")
+        config["embedding_endpoint"] = (
+            "https://user:password@embedding.test/private/v1"
+            "?token=value#fragment"
+        )
+        public = _public_runtime_config(config)
+        serialized = str(public)
+        self.assertEqual(
+            "https://embedding.test|path_sha256="
+            + text_digest("/private/v1"),
+            public["embedding_endpoint"],
+        )
+        for secret in ("user", "password", "private", "token=value"):
+            self.assertNotIn(secret, serialized)
+
+    def test_public_runtime_config_rejects_invalid_service_endpoint(self):
+        config = self._config("baseline", "fixture_lane_a_docs")
+        config["embedding_endpoint"] = "unix:///var/run/service.sock"
+        with self.assertRaisesRegex(ValueError, "valid HTTP"):
+            _public_runtime_config(config)
+
+    def test_public_runtime_config_rejects_unknown_control_fields(self):
+        config = self._config("baseline", "fixture_lane_a_docs")
+        config["reranker_enabled"] = True
+        with self.assertRaisesRegex(ValueError, "unsupported fields"):
+            _public_runtime_config(config)
+
+    def test_config_fetch_failure_does_not_expose_endpoint_secrets(self):
+        class FailingSession:
+            def get(self, url, timeout):
+                del timeout
+                raise RuntimeError(f"failed to request {url}")
+
+        with self.assertRaises(RuntimeError) as caught:
+            _get_json(
+                FailingSession(),
+                "https://user:password@service.test/private/config"
+                "?token=value#fragment",
+                30,
+            )
+        message = str(caught.exception)
+        self.assertIn("https://service.test|path_sha256=", message)
+        for secret in ("user", "password", "private", "token=value"):
+            self.assertNotIn(secret, message)
+        self.assertIsNone(caught.exception.__cause__)
+
+    def test_run_artifacts_do_not_serialize_endpoint_secrets(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            delegate = self._formal_fixture(root)
+
+            class SecretBearingConfigSession:
+                def get(self, url, timeout):
+                    response = delegate.get(url, timeout)
+                    response.payload = dict(response.payload)
+                    response.payload["embedding_endpoint"] = (
+                        "https://service-user:service-password@embedding.test/"
+                        "service-secret/v1?service-token=value#private"
+                    )
+                    return response
+
+                def post(self, url, json, timeout):
+                    return delegate.post(url, json, timeout)
+
+            run_retrieval_ab(
+                str(root / "cases.json"),
+                str(root / "chunks.json"),
+                "http://lane-user:lane-password@baseline.test/"
+                "lane-secret/a?lane-token=value#private",
+                "http://lane-user:lane-password@contextual.test/"
+                "lane-secret/b?lane-token=value#private",
+                str(root / "formal.json"),
+                bootstrap_resamples=20,
+                http_session=SecretBearingConfigSession(),
+            )
+            serialized = "\n".join(
+                path.read_text(encoding="utf-8")
+                for path in root.glob("formal*.json")
+            )
+
+        for secret in (
+            "service-user",
+            "service-password",
+            "service-secret",
+            "service-token=value",
+            "lane-user",
+            "lane-password",
+            "lane-secret",
+            "lane-token=value",
+        ):
+            self.assertNotIn(secret, serialized)
+
     def test_shared_table_is_rejected(self):
         with self.assertRaisesRegex(ValueError, "different PG tables"):
             validate_service_pair(
                 self._config("baseline", "shared"),
                 self._config("contextual", "shared", "cache-id"),
+                {"artifact_digest": "chunks-digest", "chunks_count": 2},
+            )
+
+    def test_contextual_service_requires_context_set_digest(self):
+        contextual = self._config(
+            "contextual",
+            "contextual_table",
+            "cache-id",
+        )
+        contextual["context_set_digest"] = None
+        with self.assertRaisesRegex(ValueError, "Context set digest"):
+            validate_service_pair(
+                self._config("baseline", "baseline_table"),
+                contextual,
                 {"artifact_digest": "chunks-digest", "chunks_count": 2},
             )
 

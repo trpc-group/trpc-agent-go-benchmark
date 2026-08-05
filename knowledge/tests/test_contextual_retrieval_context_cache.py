@@ -282,7 +282,8 @@ class ContextCacheTest(unittest.TestCase):
                 del kwargs
                 raise RuntimeError(
                     "api-secret routing-secret "
-                    "https://context.test/v1?token=url-secret"
+                    "https://context.test/third-party-secret-path "
+                    "url-secret"
                 )
 
         client = type(
@@ -311,9 +312,17 @@ class ContextCacheTest(unittest.TestCase):
         )
 
         self.assertEqual("error", result["status"])
-        for secret in ("api-secret", "routing-secret", "url-secret"):
+        for secret in (
+            "api-secret",
+            "routing-secret",
+            "third-party-secret-path",
+            "url-secret",
+        ):
             self.assertNotIn(secret, result["error"])
-        self.assertIn("https://context.test/v1", result["error"])
+        self.assertIn(
+            "https://context.test|path_sha256=" + text_digest("/v1"),
+            result["error"],
+        )
 
     def test_probe_is_deterministic_and_does_not_create_cache(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -345,7 +354,10 @@ class ContextCacheTest(unittest.TestCase):
         self.assertEqual("valid", report["status"])
         self.assertEqual(2, len(report["results"]))
         self.assertEqual("unspecified", report["config"]["reasoning"])
-        self.assertEqual("https://context.test/v1", report["config"]["endpoint"])
+        self.assertEqual(
+            "https://context.test|path_sha256=" + text_digest("/v1"),
+            report["config"]["endpoint"],
+        )
 
     def test_generation_retries_and_emits_progress(self):
         with tempfile.TemporaryDirectory() as directory:

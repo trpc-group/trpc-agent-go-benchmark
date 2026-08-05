@@ -13,9 +13,11 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 import tempfile
 from pathlib import Path
 from typing import Any, Dict, Optional
+from urllib.parse import urlsplit
 
 
 def atomic_write_json(path: str, payload: Dict[str, Any]) -> None:
@@ -71,6 +73,57 @@ def file_digest(path: str) -> str:
 def text_digest(value: str) -> str:
     """Return the SHA-256 digest of UTF-8 text."""
     return hashlib.sha256(value.encode("utf-8")).hexdigest()
+
+
+def endpoint_identity(raw_value: str) -> str:
+    """Return a secret-free endpoint identity that remains path-sensitive."""
+    value = raw_value.strip()
+    if not value:
+        return ""
+    lower_value = value.lower()
+    has_scheme = lower_value.startswith(("http://", "https://"))
+    if "://" in value and not has_scheme:
+        return "invalid_endpoint"
+    parse_value = value if has_scheme else f"https://{value}"
+    try:
+        parsed = urlsplit(parse_value)
+        host = parsed.hostname
+        port = parsed.port
+    except ValueError:
+        return "invalid_endpoint"
+    if not host or parsed.scheme not in ("http", "https"):
+        return "invalid_endpoint"
+    if ":" in host:
+        host = f"[{host}]"
+    if port is not None:
+        host = f"{host}:{port}"
+    identity = f"{parsed.scheme}://{host}" if has_scheme else host
+    if parsed.path and parsed.path != "/":
+        identity += f"|path_sha256={text_digest(parsed.path)}"
+    return identity
+
+
+def public_endpoint_identity(raw_value: str) -> str:
+    """Normalize a raw endpoint or validate an existing public identity."""
+    value = raw_value.strip()
+    marker = "|path_sha256="
+    if marker not in value:
+        identity = endpoint_identity(value)
+        if identity in ("", "invalid_endpoint"):
+            raise ValueError("endpoint must be a valid HTTP(S) URL or host")
+        return identity
+    if value.count(marker) != 1:
+        raise ValueError("endpoint identity has an invalid path digest")
+    origin, path_hash = value.rsplit(marker, 1)
+    if not re.fullmatch(r"[0-9a-fA-F]{64}", path_hash):
+        raise ValueError("endpoint identity has an invalid path digest")
+    normalized_origin = endpoint_identity(origin)
+    if (
+        normalized_origin in ("", "invalid_endpoint")
+        or marker in normalized_origin
+    ):
+        raise ValueError("endpoint identity has an invalid origin")
+    return f"{normalized_origin}{marker}{path_hash.lower()}"
 
 
 def seal_artifact(payload: Dict[str, Any]) -> Dict[str, Any]:

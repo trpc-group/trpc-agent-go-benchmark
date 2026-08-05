@@ -27,6 +27,7 @@ from urllib.request import Request, urlopen
 from contextual_retrieval.artifacts import (
     canonical_digest,
     load_artifact,
+    public_endpoint_identity,
     write_artifact,
 )
 from contextual_retrieval.context_cache import summarize_context_cache
@@ -46,10 +47,9 @@ CONTROLLER_MANIFEST_SCHEMA = "contextual-retrieval/controller-manifest/v1"
 CONTROLLER_REPORT_SCHEMA = "contextual-retrieval/controller-report/v1"
 INDEX_STATE_SCHEMA = "contextual-retrieval/index-state/v2"
 LOAD_RESULT_SCHEMA = "contextual-retrieval/load-result/v1"
-SERVICE_CONFIG_SCHEMA = "contextual-retrieval/service-config/v1"
+SERVICE_CONFIG_SCHEMA = "contextual-retrieval/service-config/v2"
 TABLE_PATTERN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 ROOT_CONTROL_PLANE_PATHS = {
-    "..dev/contextual-embedding-validation-requirements.md",
     "benchmark",
 }
 BENCHMARK_CONTROL_PLANE_PATHS = {
@@ -61,6 +61,39 @@ BENCHMARK_CONTROL_PLANE_PREFIXES = (
     "knowledge/contextual_retrieval/results/",
     "knowledge/tests/test_contextual_retrieval_",
 )
+SERVICE_CONFIG_FIELDS = (
+    "model_name",
+    "vectorstore",
+    "search_mode",
+    "use_rrf",
+    "hybrid_vector_weight",
+    "hybrid_text_weight",
+    "pg_table",
+    "embedding_model",
+    "llm_endpoint",
+    "embedding_endpoint",
+    "embedding_dimensions",
+    "chunk_size",
+    "chunk_overlap",
+    "agent_search_mode_enforced",
+    "agent_search_mode_effective",
+    "tool_argument_policy",
+    "max_argument_repairs",
+    "silent_argument_rewrite",
+    "provider_strict",
+    "index_variant",
+    "llm_header_names",
+    "embedding_header_names",
+    "framework_module",
+    "chunk_manifest_digest",
+    "parent_manifest_digest",
+    "manifest_chunks_count",
+    "context_cache_identity",
+    "context_set_digest",
+    "index_document_count",
+    "index_document_count_error",
+)
+PRIVATE_SERVICE_CONFIG_FIELDS = frozenset(("pg_connection",))
 
 
 def validate_table_name(value: str) -> str:
@@ -329,6 +362,42 @@ def _index_identity(config: Mapping[str, Any]) -> Dict[str, Any]:
     return {field: config.get(field) for field in fields}
 
 
+def _sanitize_service_config(config: Mapping[str, Any]) -> Dict[str, Any]:
+    """Copy a service config after normalizing its public endpoint fields."""
+    unknown_fields = sorted(
+        set(config) - set(SERVICE_CONFIG_FIELDS) - PRIVATE_SERVICE_CONFIG_FIELDS
+    )
+    if unknown_fields:
+        raise ValueError(
+            "service config contains unsupported fields: "
+            + ", ".join(unknown_fields)
+        )
+    sanitized = {
+        field: config[field]
+        for field in SERVICE_CONFIG_FIELDS
+        if field in config
+    }
+    for field in ("llm_endpoint", "embedding_endpoint"):
+        value = sanitized.get(field)
+        if value not in (None, ""):
+            sanitized[field] = public_endpoint_identity(str(value))
+    return sanitized
+
+
+def _load_service_config_artifact(path: Path) -> Dict[str, Any]:
+    """Load only a canonical, public service-config artifact."""
+    artifact = load_artifact(str(path), SERVICE_CONFIG_SCHEMA)
+    config = {
+        field: value
+        for field, value in artifact.items()
+        if field not in ("schema_version", "artifact_digest")
+    }
+    sanitized = _sanitize_service_config(config)
+    if sanitized != config:
+        raise ValueError("service config artifact is not canonical and public")
+    return artifact
+
+
 def decide_index_action(
     current_count: int,
     expected_count: int,
@@ -368,6 +437,16 @@ def _validate_lane_config(
     chunks: Mapping[str, Any],
 ) -> None:
     errors = []
+    for field in ("llm_endpoint", "embedding_endpoint"):
+        value = config.get(field)
+        if value in (None, ""):
+            errors.append(field)
+            continue
+        try:
+            if public_endpoint_identity(str(value)) != value:
+                errors.append(field)
+        except ValueError:
+            errors.append(field)
     if config.get("index_variant") != variant:
         errors.append("index_variant")
     if config.get("pg_table") != table:
@@ -475,7 +554,9 @@ def _ensure_index(
                 "message": response.get("message"),
             },
         )
-    final_config = _request_json(base_url + "/config", timeout=30)
+    final_config = _sanitize_service_config(
+        _request_json(base_url + "/config", timeout=30)
+    )
     final_count = final_config.get("index_document_count")
     if final_count != expected_count:
         raise RuntimeError(
@@ -663,13 +744,11 @@ def _load_promoted_smoke_lineage(
         str(smoke_dir / "smoke.json"),
         RETRIEVAL_REPORT_SCHEMA,
     )
-    baseline_config = load_artifact(
-        str(smoke_dir / "baseline.config.json"),
-        SERVICE_CONFIG_SCHEMA,
+    baseline_config = _load_service_config_artifact(
+        smoke_dir / "baseline.config.json"
     )
-    contextual_config = load_artifact(
-        str(smoke_dir / "contextual.config.json"),
-        SERVICE_CONFIG_SCHEMA,
+    contextual_config = _load_service_config_artifact(
+        smoke_dir / "contextual.config.json"
     )
     baseline_state = load_artifact(
         str(smoke_dir / "baseline.index-state.json"),
@@ -1062,7 +1141,9 @@ def run_server_smoke(
                 service_start_timeout,
             )
         baseline_url = f"http://127.0.0.1:{baseline_port}"
-        baseline_config = _request_json(baseline_url + "/config", timeout=30)
+        baseline_config = _sanitize_service_config(
+            _request_json(baseline_url + "/config", timeout=30)
+        )
         _validate_lane_config(
             baseline_config,
             "baseline",
@@ -1081,7 +1162,9 @@ def run_server_smoke(
             repository_snapshot=repository_snapshot,
             benchmark_repository_snapshot=benchmark_repository_snapshot,
         )
-        baseline_config = _request_json(baseline_url + "/config", timeout=30)
+        baseline_config = _sanitize_service_config(
+            _request_json(baseline_url + "/config", timeout=30)
+        )
         write_artifact(
             str(target / "baseline.config.json"),
             {
@@ -1091,9 +1174,11 @@ def run_server_smoke(
         )
         if not baseline_only:
             contextual_url = f"http://127.0.0.1:{contextual_port}"
-            contextual_config = _request_json(
-                contextual_url + "/config",
-                timeout=30,
+            contextual_config = _sanitize_service_config(
+                _request_json(
+                    contextual_url + "/config",
+                    timeout=30,
+                )
             )
             _validate_lane_config(
                 contextual_config,
@@ -1117,9 +1202,11 @@ def run_server_smoke(
                 repository_snapshot=repository_snapshot,
                 benchmark_repository_snapshot=benchmark_repository_snapshot,
             )
-            contextual_config = _request_json(
-                contextual_url + "/config",
-                timeout=30,
+            contextual_config = _sanitize_service_config(
+                _request_json(
+                    contextual_url + "/config",
+                    timeout=30,
+                )
             )
             write_artifact(
                 str(target / "contextual.config.json"),
@@ -1380,13 +1467,17 @@ def run_server_formal(
 
         baseline_url = f"http://127.0.0.1:{selected_baseline_port}"
         contextual_url = f"http://127.0.0.1:{selected_contextual_port}"
-        runtime_baseline_config = _request_json(
-            baseline_url + "/config",
-            timeout=30,
+        runtime_baseline_config = _sanitize_service_config(
+            _request_json(
+                baseline_url + "/config",
+                timeout=30,
+            )
         )
-        runtime_contextual_config = _request_json(
-            contextual_url + "/config",
-            timeout=30,
+        runtime_contextual_config = _sanitize_service_config(
+            _request_json(
+                contextual_url + "/config",
+                timeout=30,
+            )
         )
         validate_reused_index(
             runtime_baseline_config,

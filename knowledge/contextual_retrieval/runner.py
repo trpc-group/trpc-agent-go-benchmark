@@ -17,7 +17,6 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
-from urllib.parse import urlsplit, urlunsplit
 from urllib.request import Request, urlopen
 
 from contextual_retrieval import (
@@ -27,6 +26,7 @@ from contextual_retrieval import (
 from contextual_retrieval.artifacts import (
     canonical_digest,
     load_artifact,
+    public_endpoint_identity,
     text_digest,
     write_artifact,
 )
@@ -49,6 +49,43 @@ RETRIEVAL_SAMPLES_SCHEMA = "contextual-retrieval/run-samples/v1"
 RETRIEVAL_REPORT_SCHEMA = "contextual-retrieval/run-report/v1"
 EXPERIMENT_META_PREFIX = "contextual_retrieval_"
 FORMAL_SEARCH_K = 20
+PUBLIC_RUNTIME_CONFIG_FIELDS = (
+    "embedding_model",
+    "embedding_endpoint",
+    "embedding_dimensions",
+    "embedding_header_names",
+    "vectorstore",
+    "search_mode",
+    "use_rrf",
+    "hybrid_vector_weight",
+    "hybrid_text_weight",
+    "chunk_size",
+    "chunk_overlap",
+    "pg_table",
+    "framework_module",
+    "index_variant",
+    "chunk_manifest_digest",
+    "parent_manifest_digest",
+    "manifest_chunks_count",
+    "context_cache_identity",
+    "context_set_digest",
+    "index_document_count",
+)
+IGNORED_RUNTIME_CONFIG_FIELDS = frozenset(
+    (
+        "model_name",
+        "pg_connection",
+        "llm_endpoint",
+        "agent_search_mode_enforced",
+        "agent_search_mode_effective",
+        "tool_argument_policy",
+        "max_argument_repairs",
+        "silent_argument_rewrite",
+        "provider_strict",
+        "llm_header_names",
+        "index_document_count_error",
+    )
+)
 
 
 class _UrllibResponse:
@@ -88,16 +125,6 @@ class _UrllibSession:
             return _UrllibResponse(response.status, response.read())
 
 
-def _endpoint_identity(value: str) -> str:
-    parsed = urlsplit(value)
-    if not parsed.scheme or not parsed.hostname:
-        return value.split("?", 1)[0].rstrip("/")
-    host = parsed.hostname
-    if parsed.port:
-        host = f"{host}:{parsed.port}"
-    return urlunsplit((parsed.scheme, host, parsed.path.rstrip("/"), "", ""))
-
-
 def _output_paths(output_path: str) -> Dict[str, str]:
     target = Path(output_path)
     stem = target.with_suffix("") if target.suffix else target
@@ -113,37 +140,41 @@ def _get_json(
     url: str,
     timeout: float,
 ) -> Dict[str, Any]:
-    response = session.get(url, timeout=timeout)
-    response.raise_for_status()
-    payload = response.json()
-    if not isinstance(payload, dict):
-        raise ValueError(f"{url} did not return a JSON object")
-    return payload
+    try:
+        endpoint = public_endpoint_identity(url)
+    except ValueError:
+        endpoint = "invalid_endpoint"
+    try:
+        response = session.get(url, timeout=timeout)
+        response.raise_for_status()
+        payload = response.json()
+        if not isinstance(payload, dict):
+            raise ValueError("response was not a JSON object")
+        return payload
+    except Exception as error:
+        raise RuntimeError(
+            f"{type(error).__name__} while requesting {endpoint}"
+        ) from None
 
 
 def _public_runtime_config(config: Mapping[str, Any]) -> Dict[str, Any]:
-    allowed = (
-        "embedding_model",
-        "embedding_endpoint",
-        "embedding_dimensions",
-        "embedding_header_names",
-        "vectorstore",
-        "search_mode",
-        "use_rrf",
-        "hybrid_vector_weight",
-        "hybrid_text_weight",
-        "chunk_size",
-        "chunk_overlap",
-        "pg_table",
-        "framework_module",
-        "index_variant",
-        "chunk_manifest_digest",
-        "parent_manifest_digest",
-        "manifest_chunks_count",
-        "context_cache_identity",
-        "index_document_count",
+    unknown_fields = sorted(
+        set(config)
+        - set(PUBLIC_RUNTIME_CONFIG_FIELDS)
+        - IGNORED_RUNTIME_CONFIG_FIELDS
     )
-    return {field: config.get(field) for field in allowed}
+    if unknown_fields:
+        raise ValueError(
+            "service config contains unsupported fields: "
+            + ", ".join(unknown_fields)
+        )
+    public = {
+        field: config.get(field) for field in PUBLIC_RUNTIME_CONFIG_FIELDS
+    }
+    public["embedding_endpoint"] = public_endpoint_identity(
+        str(config.get("embedding_endpoint") or "")
+    )
+    return public
 
 
 def validate_service_pair(
@@ -201,6 +232,10 @@ def validate_service_pair(
         errors.append("baseline service unexpectedly has a context cache")
     if not contextual.get("context_cache_identity"):
         errors.append("contextual service context cache identity is missing")
+    if baseline.get("context_set_digest") not in (None, ""):
+        errors.append("baseline service unexpectedly has a Context set")
+    if not contextual.get("context_set_digest"):
+        errors.append("contextual service Context set digest is missing")
     if errors:
         raise ValueError("invalid retrieval A/B services: " + "; ".join(errors))
 
@@ -243,7 +278,7 @@ def _search(
                     "attempt": attempt,
                     "status": "error",
                     "elapsed_ms": round((time.monotonic() - started) * 1000, 3),
-                    "error": f"{type(error).__name__}: {error}"[:4000],
+                    "error": f"{type(error).__name__}: request failed",
                 }
             )
     return None, attempts
@@ -465,8 +500,8 @@ def run_retrieval_ab(
         "case_manifest_digest": cases_artifact["artifact_digest"],
         "chunk_manifest_digest": chunks_artifact["artifact_digest"],
         "case_ids": [case["case_id"] for case in cases],
-        "baseline_url": _endpoint_identity(baseline_url),
-        "contextual_url": _endpoint_identity(contextual_url),
+        "baseline_url": public_endpoint_identity(baseline_url),
+        "contextual_url": public_endpoint_identity(contextual_url),
         "baseline_config": public_baseline,
         "contextual_config": public_contextual,
         "search_k": FORMAL_SEARCH_K,
@@ -499,8 +534,8 @@ def run_retrieval_ab(
         "request_attempts": request_attempts,
         "timeout_seconds": timeout,
         "request_order": "alternating_baseline_first_on_even_cases",
-        "baseline_url": _endpoint_identity(baseline_url),
-        "contextual_url": _endpoint_identity(contextual_url),
+        "baseline_url": public_endpoint_identity(baseline_url),
+        "contextual_url": public_endpoint_identity(contextual_url),
         "baseline_config": public_baseline,
         "contextual_config": public_contextual,
         "bootstrap": {

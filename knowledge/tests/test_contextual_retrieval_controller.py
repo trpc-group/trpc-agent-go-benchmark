@@ -13,7 +13,11 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from contextual_retrieval.artifacts import write_artifact
+from contextual_retrieval.artifacts import (
+    public_endpoint_identity,
+    text_digest,
+    write_artifact,
+)
 from contextual_retrieval.controller import (
     CONTROLLER_MANIFEST_SCHEMA,
     CONTROLLER_REPORT_SCHEMA,
@@ -22,6 +26,8 @@ from contextual_retrieval.controller import (
     _ensure_index,
     _index_identity,
     _load_promoted_smoke_lineage,
+    _load_service_config_artifact,
+    _sanitize_service_config,
     classify_source_compatibility,
     decide_index_action,
     run_server_formal,
@@ -38,10 +44,15 @@ from contextual_retrieval.runner import (
 class ContextualRetrievalControllerTest(unittest.TestCase):
     def _config(self, count=0):
         return {
-            "pg_table": "contextual_a_001",
+            "pg_table": "fixture_lane_a_docs",
             "index_variant": "baseline",
             "embedding_model": "bge-m3",
-            "embedding_endpoint": "https://embedding.test/v1",
+            "embedding_endpoint": public_endpoint_identity(
+                "https://embedding.test/v1"
+            ),
+            "llm_endpoint": public_endpoint_identity(
+                "https://llm.test/v1"
+            ),
             "embedding_dimensions": 1024,
             "embedding_header_names": [],
             "vectorstore": "pgvector",
@@ -61,11 +72,106 @@ class ContextualRetrievalControllerTest(unittest.TestCase):
         }
 
     def test_table_name_rejects_sql_or_qualified_names(self):
-        self.assertEqual("contextual_a_001", validate_table_name("contextual_a_001"))
+        self.assertEqual(
+            "fixture_lane_a_docs",
+            validate_table_name("fixture_lane_a_docs"),
+        )
         for invalid in ("public.table", "table;drop", "quoted-name", "1table"):
             with self.subTest(invalid=invalid):
                 with self.assertRaises(ValueError):
                     validate_table_name(invalid)
+
+    def test_service_config_sanitizes_public_endpoint_fields(self):
+        config = self._config()
+        config["embedding_endpoint"] = (
+            "https://user:password@embedding.test/private/v1"
+            "?token=value#fragment"
+        )
+        config["llm_endpoint"] = "https://llm.test/private/chat"
+        config["pg_connection"] = {
+            "host": "internal-db-host",
+            "user": "internal-db-user",
+            "database": "internal-db-name",
+        }
+        sanitized = _sanitize_service_config(config)
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "service-config.json"
+            write_artifact(
+                str(path),
+                {
+                    "schema_version": SERVICE_CONFIG_SCHEMA,
+                    **sanitized,
+                },
+            )
+            serialized = path.read_text(encoding="utf-8")
+        self.assertEqual(
+            "https://embedding.test|path_sha256="
+            + text_digest("/private/v1"),
+            sanitized["embedding_endpoint"],
+        )
+        self.assertEqual(
+            "https://llm.test|path_sha256="
+            + text_digest("/private/chat"),
+            sanitized["llm_endpoint"],
+        )
+        for secret in (
+            "user",
+            "password",
+            "private",
+            "token=value",
+            "internal-db-host",
+            "internal-db-name",
+        ):
+            self.assertNotIn(secret, serialized)
+        self.assertIn("password", config["embedding_endpoint"])
+        self.assertNotIn("pg_connection", sanitized)
+
+    def test_service_config_rejects_invalid_endpoint(self):
+        config = self._config()
+        config["embedding_endpoint"] = "unix:///var/run/service.sock"
+        with self.assertRaisesRegex(ValueError, "valid HTTP"):
+            _sanitize_service_config(config)
+
+    def test_service_config_rejects_unknown_fields(self):
+        for field, value in (
+            ("reranker_enabled", True),
+            ("api_key", "unexpected-api-key"),
+        ):
+            with self.subTest(field=field):
+                config = self._config()
+                config[field] = value
+                with self.assertRaisesRegex(ValueError, "unsupported fields"):
+                    _sanitize_service_config(config)
+
+    def test_service_config_artifact_rejects_non_public_content(self):
+        cases = (
+            ("reranker_enabled", True, "unsupported fields"),
+            ("api_key", "unexpected-api-key", "unsupported fields"),
+            (
+                "pg_connection",
+                {"host": "internal-db-host"},
+                "not canonical and public",
+            ),
+            (
+                "embedding_endpoint",
+                "https://embedding.test/private/v1",
+                "not canonical and public",
+            ),
+        )
+        for field, value, error in cases:
+            with self.subTest(field=field):
+                with tempfile.TemporaryDirectory() as directory:
+                    path = Path(directory) / "service-config.json"
+                    write_artifact(
+                        str(path),
+                        {
+                            "schema_version": SERVICE_CONFIG_SCHEMA,
+                            **self._config(),
+                            field: value,
+                        },
+                    )
+                    with self.assertRaisesRegex(ValueError, error):
+                        _load_service_config_artifact(path)
 
     def test_partial_index_requires_explicit_resume(self):
         identity = _index_identity(self._config())
@@ -150,7 +256,7 @@ class ContextualRetrievalControllerTest(unittest.TestCase):
 
     def test_source_compatibility_allows_only_control_plane_changes(self):
         compatible = classify_source_compatibility(
-            ["benchmark", "..dev/contextual-embedding-validation-requirements.md"],
+            ["benchmark"],
             [
                 "knowledge/contextual_retrieval/controller.py",
                 "knowledge/tests/test_contextual_retrieval_controller.py",
@@ -162,6 +268,10 @@ class ContextualRetrievalControllerTest(unittest.TestCase):
         )
         self.assertTrue(compatible["compatible"])
         self.assertFalse(incompatible["compatible"])
+        self.assertEqual(
+            ["knowledge/default.go"],
+            incompatible["retrieval_sensitive_root_changes"],
+        )
         self.assertEqual(
             ["knowledge/contextual_retrieval/runner.py"],
             incompatible["retrieval_sensitive_benchmark_changes"],
@@ -191,7 +301,7 @@ class ContextualRetrievalControllerTest(unittest.TestCase):
             config,
             complete,
             "baseline",
-            "contextual_a_001",
+            "fixture_lane_a_docs",
             chunks,
         )
         with self.assertRaisesRegex(ValueError, "index_state_status"):
@@ -200,7 +310,7 @@ class ContextualRetrievalControllerTest(unittest.TestCase):
                 config,
                 {**complete, "status": "building"},
                 "baseline",
-                "contextual_a_001",
+                "fixture_lane_a_docs",
                 chunks,
             )
 
@@ -230,7 +340,7 @@ class ContextualRetrievalControllerTest(unittest.TestCase):
             baseline_config_value = self._config(count=2)
             contextual_config_value = {
                 **self._config(count=2),
-                "pg_table": "contextual_b_001",
+                "pg_table": "fixture_lane_b_docs",
                 "index_variant": "contextual",
                 "context_cache_identity": "cache-id",
                 "context_set_digest": "context-set-id",
@@ -344,9 +454,12 @@ class ContextualRetrievalControllerTest(unittest.TestCase):
                     "case_manifest_digest": cases["artifact_digest"],
                     "context_cache_identity": "cache-id",
                     "context_set_digest": "context-set-id",
-                    "baseline": {"table": "contextual_a_001", "port": 8765},
+                    "baseline": {
+                        "table": "fixture_lane_a_docs",
+                        "port": 8765,
+                    },
                     "contextual": {
-                        "table": "contextual_b_001",
+                        "table": "fixture_lane_b_docs",
                         "port": 8766,
                     },
                     "baseline_only": False,
@@ -398,8 +511,8 @@ class ContextualRetrievalControllerTest(unittest.TestCase):
                     root,
                 )
 
-        self.assertEqual("contextual_a_001", lineage["baseline_table"])
-        self.assertEqual("contextual_b_001", lineage["contextual_table"])
+        self.assertEqual("fixture_lane_a_docs", lineage["baseline_table"])
+        self.assertEqual("fixture_lane_b_docs", lineage["contextual_table"])
         self.assertEqual(
             "promote",
             lineage["smoke_report"]["smoke_promotion"]["decision"],
@@ -429,7 +542,7 @@ class ContextualRetrievalControllerTest(unittest.TestCase):
             baseline = self._config(count=2)
             contextual = {
                 **self._config(count=2),
-                "pg_table": "contextual_b_001",
+                "pg_table": "fixture_lane_b_docs",
                 "index_variant": "contextual",
                 "context_cache_identity": "cache-id",
                 "context_set_digest": "context-set-id",
@@ -458,8 +571,8 @@ class ContextualRetrievalControllerTest(unittest.TestCase):
                 "contextual_config": contextual,
                 "baseline_state": baseline_state,
                 "contextual_state": contextual_state,
-                "baseline_table": "contextual_a_001",
-                "contextual_table": "contextual_b_001",
+                "baseline_table": "fixture_lane_a_docs",
+                "contextual_table": "fixture_lane_b_docs",
                 "baseline_port": 8765,
                 "contextual_port": 8766,
                 "source_compatibility": {
