@@ -16,7 +16,6 @@ import re
 import signal
 import socket
 import subprocess
-import sys
 import time
 from collections import Counter
 from datetime import datetime, timezone
@@ -126,6 +125,19 @@ def _git_snapshot(path: Path) -> Dict[str, Any]:
     }
 
 
+def _source_repository_roots(
+    framework_repository_root: Optional[str] = None,
+) -> Tuple[Path, Path]:
+    """Resolve source roots without assuming a framework parent checkout."""
+    benchmark_root = Path(__file__).resolve().parents[2]
+    framework_root = (
+        Path(framework_repository_root).resolve()
+        if framework_repository_root
+        else benchmark_root
+    )
+    return framework_root, benchmark_root
+
+
 def _require_clean_snapshot(label: str, snapshot: Mapping[str, Any]) -> None:
     if not snapshot.get("commit"):
         raise ValueError(f"{label} commit is missing")
@@ -196,17 +208,24 @@ def _source_compatibility(
         if not snapshot.get("commit"):
             raise ValueError(f"{label} commit is missing")
         _require_clean_snapshot(label, snapshot)
-    compatibility = classify_source_compatibility(
-        _git_changed_paths(
+    same_repository = repository_root.resolve() == benchmark_root.resolve()
+    root_changes = (
+        []
+        if same_repository
+        else _git_changed_paths(
             repository_root,
             str(smoke_root["commit"]),
             str(current_root["commit"]),
-        ),
-        _git_changed_paths(
-            benchmark_root,
-            str(smoke_benchmark["commit"]),
-            str(current_benchmark["commit"]),
-        ),
+        )
+    )
+    benchmark_changes = _git_changed_paths(
+        benchmark_root,
+        str(smoke_benchmark["commit"]),
+        str(current_benchmark["commit"]),
+    )
+    compatibility = classify_source_compatibility(
+        root_changes,
+        benchmark_changes,
     )
     compatibility.update(
         {
@@ -239,30 +258,40 @@ def _request_json(
     payload: Optional[Mapping[str, Any]] = None,
     timeout: float = 30,
 ) -> Dict[str, Any]:
+    try:
+        endpoint = public_endpoint_identity(url)
+    except ValueError:
+        endpoint = "invalid_endpoint"
     data = None
     headers: Dict[str, str] = {}
     if payload is not None:
         data = json.dumps(payload).encode("utf-8")
         headers["Content-Type"] = "application/json"
-    request = Request(url, data=data, headers=headers, method=method)
     try:
+        request = Request(url, data=data, headers=headers, method=method)
         with urlopen(request, timeout=timeout) as response:
             if response.status < 200 or response.status >= 300:
-                raise RuntimeError(f"HTTP status {response.status} from {url}")
+                raise RuntimeError(
+                    f"HTTP status {response.status} from {endpoint}"
+                )
             body = response.read()
     except Exception as error:
         status = getattr(error, "code", None)
         if status is not None:
-            raise RuntimeError(f"HTTP status {status} from {url}") from error
+            raise RuntimeError(
+                f"HTTP status {status} from {endpoint}"
+            ) from None
         raise RuntimeError(
-            f"{type(error).__name__} while requesting {url}"
-        ) from error
+            f"{type(error).__name__} while requesting {endpoint}"
+        ) from None
     try:
         result = json.loads(body.decode("utf-8"))
-    except (UnicodeDecodeError, json.JSONDecodeError) as error:
-        raise RuntimeError(f"invalid JSON response from {url}") from error
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        raise RuntimeError(
+            f"invalid JSON response from {endpoint}"
+        ) from None
     if not isinstance(result, dict):
-        raise RuntimeError(f"non-object JSON response from {url}")
+        raise RuntimeError(f"non-object JSON response from {endpoint}")
     return result
 
 
@@ -271,11 +300,15 @@ def _wait_for_health(
     base_url: str,
     timeout: float,
 ) -> None:
+    try:
+        endpoint = public_endpoint_identity(base_url)
+    except ValueError:
+        endpoint = "invalid_endpoint"
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
         if process.poll() is not None:
             raise RuntimeError(
-                f"service exited before health check: {base_url}"
+                f"service exited before health check: {endpoint}"
             )
         try:
             health = _request_json(base_url + "/health", timeout=2)
@@ -284,7 +317,7 @@ def _wait_for_health(
         except RuntimeError:
             pass
         time.sleep(0.5)
-    raise RuntimeError(f"service health check timed out: {base_url}")
+    raise RuntimeError(f"service health check timed out: {endpoint}")
 
 
 def _stop_owned_process(process: subprocess.Popen) -> Dict[str, Any]:
@@ -607,7 +640,7 @@ def _build_service(go_service_dir: Path, output_dir: Path) -> Tuple[Path, Path]:
             env=os.environ.copy(),
         )
     if result.returncode != 0:
-        raise RuntimeError(f"Go service build failed; inspect {log_path}")
+        raise RuntimeError("Go service build failed; inspect build.log")
     return binary, log_path
 
 
@@ -660,18 +693,8 @@ def _start_service(
 
 
 def _redacted_error(error: BaseException) -> Dict[str, str]:
-    message = str(error)
-    for name in (
-        "OPENAI_API_KEY",
-        "EMBEDDING_API_KEY",
-        "PGVECTOR_PASSWORD",
-        "CONTEXT_API_KEY",
-        "EVAL_API_KEY",
-    ):
-        value = os.environ.get(name, "")
-        if value:
-            message = message.replace(value, "[REDACTED]")
-    return {"type": type(error).__name__, "message": message[:4000]}
+    """Return a stable artifact-safe error identity."""
+    return {"type": type(error).__name__}
 
 
 def _artifact_digest_if_exists(path: Path, schema: str) -> Optional[str]:
@@ -1016,6 +1039,7 @@ def run_server_smoke(
     load_timeout: float = 7200,
     resume_indexes: bool = False,
     baseline_only: bool = False,
+    framework_repository_root: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Build, index, run a paired smoke, and clean up only owned services."""
     baseline_table = validate_table_name(baseline_table)
@@ -1055,8 +1079,9 @@ def run_server_smoke(
     if not baseline_only and context_summary.get("status") != "valid":
         raise ValueError("context cache summary is not valid")
 
-    benchmark_root = Path(__file__).resolve().parents[2]
-    repository_root = benchmark_root.parent
+    repository_root, benchmark_root = _source_repository_roots(
+        framework_repository_root,
+    )
     repository_snapshot = _git_snapshot(repository_root)
     benchmark_repository_snapshot = _git_snapshot(benchmark_root)
     _require_clean_snapshot("root index builder", repository_snapshot)
@@ -1096,7 +1121,7 @@ def run_server_smoke(
             "baseline_only": baseline_only,
             "judge_initialized": False,
             "agent_initialized": False,
-            "invocation": [str(item) for item in sys.argv],
+            "invocation": {"command": "run-server-smoke"},
         },
     )
 
@@ -1134,7 +1159,7 @@ def run_server_smoke(
                 cache,
             )
             owned.append((process, log_handle))
-            service_logs[variant] = str(log_path)
+            service_logs[variant] = log_path.name
             _wait_for_health(
                 process,
                 f"http://127.0.0.1:{port}",
@@ -1268,7 +1293,7 @@ def run_server_smoke(
             "smoke_promotion": (
                 smoke_report.get("smoke_promotion") if smoke_report else None
             ),
-            "build_log": str(build_log) if build_log else None,
+            "build_log": build_log.name if build_log else None,
             "service_logs": service_logs,
             "cleanup": cleanup,
             "error": _redacted_error(failure) if failure else None,
@@ -1298,6 +1323,7 @@ def run_server_formal(
     service_start_timeout: float = 120,
     request_timeout: float = 120,
     request_attempts: int = 3,
+    framework_repository_root: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Reuse promoted smoke indexes and run the guarded formal 450-case A/B."""
     if conformance_smoke_per_type <= 0:
@@ -1341,8 +1367,9 @@ def run_server_formal(
         if context_summary.get("status") != "valid":
             raise ValueError("context cache summary is not valid")
 
-        benchmark_root = Path(__file__).resolve().parents[2]
-        repository_root = benchmark_root.parent
+        repository_root, benchmark_root = _source_repository_roots(
+            framework_repository_root,
+        )
         lineage = _load_promoted_smoke_lineage(
             smoke_root,
             chunks,
@@ -1424,7 +1451,7 @@ def run_server_formal(
                 "load_endpoint_allowed": False,
                 "judge_initialized": False,
                 "agent_initialized": False,
-                "invocation": [str(item) for item in sys.argv],
+                "invocation": {"command": "run-server-formal"},
             },
         )
 
@@ -1458,7 +1485,7 @@ def run_server_formal(
                 cache,
             )
             owned.append((process, log_handle))
-            service_logs[variant] = str(log_path)
+            service_logs[variant] = log_path.name
             _wait_for_health(
                 process,
                 f"http://127.0.0.1:{port}",
@@ -1608,7 +1635,7 @@ def run_server_formal(
                 formal_report.get("gate") if formal_report else None
             ),
             "load_endpoint_called": False,
-            "build_log": str(build_log) if build_log else None,
+            "build_log": build_log.name if build_log else None,
             "service_logs": service_logs,
             "cleanup": cleanup,
             "error": _redacted_error(failure) if failure else None,

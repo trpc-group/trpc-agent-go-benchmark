@@ -9,6 +9,22 @@ permissions:
   contents: read
 
 jobs:
+  test-contextual-retrieval-python:
+    name: contextual retrieval Python 3.11
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Run contextual retrieval tests
+        shell: bash
+        run: |
+          PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=knowledge python -m unittest discover \
+            -s knowledge/tests \
+            -p 'test_contextual_retrieval_*.py'
+
   discover-go-modules:
     name: discover go modules
     runs-on: ubuntu-latest

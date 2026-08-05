@@ -27,7 +27,11 @@ from contextual_retrieval.controller import (
     _index_identity,
     _load_promoted_smoke_lineage,
     _load_service_config_artifact,
+    _redacted_error,
+    _request_json,
     _sanitize_service_config,
+    _source_compatibility,
+    _source_repository_roots,
     classify_source_compatibility,
     decide_index_action,
     run_server_formal,
@@ -80,6 +84,112 @@ class ContextualRetrievalControllerTest(unittest.TestCase):
             with self.subTest(invalid=invalid):
                 with self.assertRaises(ValueError):
                     validate_table_name(invalid)
+
+    def test_request_errors_use_only_public_endpoint_identity(self):
+        endpoint = (
+            "https://user:password@example.test/private/path"
+            "?token=secret#fragment"
+        )
+        with mock.patch(
+            "contextual_retrieval.controller.urlopen",
+            side_effect=RuntimeError("third-party secret response"),
+        ):
+            with self.assertRaises(RuntimeError) as raised:
+                _request_json(endpoint)
+        message = str(raised.exception)
+        self.assertIn("https://example.test|path_sha256=", message)
+        for secret in (
+            "user",
+            "password",
+            "/private/path",
+            "token",
+            "fragment",
+            "third-party secret response",
+        ):
+            self.assertNotIn(secret, message)
+
+    def test_request_construction_errors_are_also_redacted(self):
+        endpoint = (
+            "https://user:password@example.test/private/path"
+            "?token=secret#fragment"
+        )
+        with mock.patch(
+            "contextual_retrieval.controller.Request",
+            side_effect=ValueError("third-party secret response"),
+        ):
+            with self.assertRaises(RuntimeError) as raised:
+                _request_json(endpoint)
+        message = str(raised.exception)
+        self.assertIn("https://example.test|path_sha256=", message)
+        for secret in (
+            "user",
+            "password",
+            "/private/path",
+            "token",
+            "fragment",
+            "third-party secret response",
+        ):
+            self.assertNotIn(secret, message)
+
+    def test_artifact_error_identity_drops_arbitrary_message(self):
+        error = RuntimeError("secret endpoint and absolute /private/path")
+        self.assertEqual({"type": "RuntimeError"}, _redacted_error(error))
+
+    def test_source_roots_do_not_assume_a_parent_framework_checkout(self):
+        default_framework, benchmark = _source_repository_roots()
+        self.assertEqual(benchmark, default_framework)
+        with tempfile.TemporaryDirectory() as temporary:
+            explicit_framework, explicit_benchmark = _source_repository_roots(
+                temporary,
+            )
+        self.assertEqual(Path(temporary).resolve(), explicit_framework)
+        self.assertEqual(benchmark, explicit_benchmark)
+
+    def test_same_repository_compatibility_classifies_changes_once(self):
+        repository = Path("/standalone/benchmark")
+        old_snapshot = {
+            "commit": "old",
+            "tracked_dirty": False,
+            "untracked_dirty": False,
+            "worktree_dirty": False,
+        }
+        current_snapshot = {
+            **old_snapshot,
+            "commit": "current",
+        }
+        smoke_manifest = {
+            "repository": old_snapshot,
+            "benchmark_repository": old_snapshot,
+        }
+        with (
+            mock.patch(
+                "contextual_retrieval.controller._git_snapshot",
+                return_value=current_snapshot,
+            ),
+            mock.patch(
+                "contextual_retrieval.controller._git_changed_paths",
+                return_value=[
+                    "knowledge/contextual_retrieval/controller.py",
+                ],
+            ) as changed_paths,
+        ):
+            compatibility = _source_compatibility(
+                repository,
+                repository,
+                smoke_manifest,
+            )
+
+        self.assertTrue(compatibility["compatible"])
+        self.assertEqual([], compatibility["root_changed_paths"])
+        self.assertEqual(
+            ["knowledge/contextual_retrieval/controller.py"],
+            compatibility["benchmark_changed_paths"],
+        )
+        changed_paths.assert_called_once_with(
+            repository,
+            "old",
+            "current",
+        )
 
     def test_service_config_sanitizes_public_endpoint_fields(self):
         config = self._config()
