@@ -20,16 +20,29 @@ import (
 func TestRunConfigSupportsGenericNativeRunnerManifest(t *testing.T) {
 	dir := t.TempDir()
 	start := time.Date(2026, 7, 13, 1, 0, 0, 0, time.UTC)
+	caseListHash, err := selectedInstancesSHA256([]string{"case-a"})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	casesDir := filepath.Join(dir, "data")
 	casesManifestPath := filepath.Join(casesDir, "cases.manifest.json")
+	casesJSONLPath := filepath.Join(casesDir, "cases.jsonl")
+	if err := os.MkdirAll(casesDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(casesJSONLPath, []byte("{\"instance_id\":\"case-a\"}\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	casesSHA256 := testFileSHA256(t, casesJSONLPath)
 	if err := writeJSON(casesManifestPath, prepareDataManifest{
-		Dataset:         defaultDatasetName,
-		Split:           defaultSplit,
-		CaseCount:       1,
-		CaseListHash:    "hash",
-		HintsTextPolicy: "excluded",
-		OutputDir:       casesDir,
+		Dataset:          defaultDatasetName,
+		Split:            defaultSplit,
+		CaseCount:        1,
+		CaseListHash:     caseListHash,
+		CasesJSONLSHA256: casesSHA256,
+		HintsTextPolicy:  "excluded",
+		OutputDir:        casesDir,
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -38,15 +51,28 @@ func TestRunConfigSupportsGenericNativeRunnerManifest(t *testing.T) {
 	predictionsPath := filepath.Join(runnerDir, "preds.json")
 	runnerManifestPath := filepath.Join(runnerDir, "run-mini-looking-generic.json")
 	if err := writeJSON(runnerManifestPath, runnerManifest{
-		RunID:       "native-run",
-		RunnerType:  "trpc-agent-go-native",
-		StartedAt:   start,
-		FinishedAt:  start.Add(2 * time.Minute),
-		DurationMS:  int64((2 * time.Minute) / time.Millisecond),
-		OutputDir:   runnerDir,
-		CaseCount:   1,
-		Predictions: predictionsPath,
-		Status:      "completed",
+		RunID:                   "native-run",
+		RunnerType:              "trpc-agent-go-native",
+		ObservationCodec:        "xml",
+		FrameworkModule:         "trpc.group/trpc-go/trpc-agent-go",
+		FrameworkVersion:        "v1.10.1-0.20260728070417-4237accb70cb",
+		SourceRevision:          strings.Repeat("a", 40),
+		BinarySHA256:            strings.Repeat("b", 64),
+		CasesSHA256:             casesSHA256,
+		ModelConfigSHA256:       strings.Repeat("d", 64),
+		EnvironmentConfigSHA256: strings.Repeat("e", 64),
+		SelectedInstancesSHA256: caseListHash,
+		CommandTimeout:          "1m",
+		CaseTimeout:             "2h",
+		StartedAt:               start,
+		FinishedAt:              start.Add(2 * time.Minute),
+		DurationMS:              int64((2 * time.Minute) / time.Millisecond),
+		OutputDir:               runnerDir,
+		CaseCount:               1,
+		Workers:                 1,
+		Predictions:             predictionsPath,
+		Status:                  "completed",
+		ModelConfig:             map[string]string{"MODEL_NAME": "test-model"},
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -90,7 +116,7 @@ func TestRunConfigSupportsGenericNativeRunnerManifest(t *testing.T) {
 	}
 
 	outputPath := filepath.Join(dir, "run_config.json")
-	err := runRunConfig([]string{
+	err = runRunConfig([]string{
 		"--run-id", "native-run",
 		"--target", "native",
 		"--cases-manifest", casesManifestPath,
@@ -111,8 +137,8 @@ func TestRunConfigSupportsGenericNativeRunnerManifest(t *testing.T) {
 	if doc.Runner.Type != "trpc-agent-go-native" {
 		t.Fatalf("Runner.Type = %q, want trpc-agent-go-native", doc.Runner.Type)
 	}
-	if doc.Concurrency.AgentGenerationWorkers != 0 {
-		t.Fatalf("AgentGenerationWorkers = %d, want 0 for generic manifest", doc.Concurrency.AgentGenerationWorkers)
+	if doc.Concurrency.AgentGenerationWorkers != 1 {
+		t.Fatalf("AgentGenerationWorkers = %d, want 1 from native manifest", doc.Concurrency.AgentGenerationWorkers)
 	}
 	if doc.Artifacts.RunnerOutputDir != runnerDir {
 		t.Fatalf("RunnerOutputDir = %q, want %q", doc.Artifacts.RunnerOutputDir, runnerDir)
@@ -293,6 +319,7 @@ func TestValidateRunConfigInputsRejectsInvalidGenericMiniGoProvenance(t *testing
 		{name: "environment hash", edit: func(m *runnerManifest) { m.EnvironmentConfigSHA256 = "" }, want: "environment_config_sha256"},
 		{name: "command timeout", edit: func(m *runnerManifest) { m.CommandTimeout = "invalid" }, want: "command_timeout"},
 		{name: "case timeout", edit: func(m *runnerManifest) { m.CaseTimeout = "0s" }, want: "case_timeout"},
+		{name: "cases content hash", edit: func(m *runnerManifest) { m.CasesSHA256 = strings.Repeat("9", 64) }, want: "cases_sha256"},
 		{name: "selection hash", edit: func(m *runnerManifest) { m.SelectedInstancesSHA256 = strings.Repeat("9", 64) }, want: "selected_instances_sha256"},
 	}
 	for _, tt := range tests {
@@ -419,6 +446,7 @@ func validGenericMiniGoRunConfigInputs(t *testing.T) (prepareDataManifest, runne
 		t.Fatal(err)
 	}
 	cases.CaseListHash = caseListHash
+	cases.CasesJSONLSHA256 = strings.Repeat("c", 64)
 	generic.RunnerType = "mini-swe-agent-go"
 	generic.ObservationCodec = "xml"
 	generic.FrameworkModule = "trpc.group/trpc-go/trpc-agent-go"
@@ -432,4 +460,37 @@ func validGenericMiniGoRunConfigInputs(t *testing.T) (prepareDataManifest, runne
 	generic.CommandTimeout = "60s"
 	generic.CaseTimeout = "2h"
 	return cases, generic, verifier, summary
+}
+
+func TestValidateGenericRunnerModelName(t *testing.T) {
+	manifest := runnerManifest{
+		RunnerType:  "trpc-agent-go-native",
+		ModelConfig: map[string]string{"MODEL_NAME": "model-a"},
+	}
+	if err := validateGenericRunnerModelName(manifest, "model-a"); err != nil {
+		t.Fatal(err)
+	}
+	if err := validateGenericRunnerModelName(manifest, "model-b"); err == nil || !strings.Contains(err.Error(), "does not match") {
+		t.Fatalf("mismatch error = %v", err)
+	}
+	delete(manifest.ModelConfig, "MODEL_NAME")
+	if err := validateGenericRunnerModelName(manifest, "model-a"); err == nil || !strings.Contains(err.Error(), "no MODEL_NAME") {
+		t.Fatalf("missing error = %v", err)
+	}
+}
+
+func TestValidateCasesContent(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "cases.jsonl")
+	if err := os.WriteFile(path, []byte("case-a\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	manifest := prepareDataManifest{OutputDir: dir, CasesJSONLSHA256: testFileSHA256(t, path)}
+	if err := validateCasesContent(manifest); err != nil {
+		t.Fatal(err)
+	}
+	manifest.CasesJSONLSHA256 = strings.Repeat("0", 64)
+	if err := validateCasesContent(manifest); err == nil || !strings.Contains(err.Error(), "does not match") {
+		t.Fatalf("mismatch error = %v", err)
+	}
 }

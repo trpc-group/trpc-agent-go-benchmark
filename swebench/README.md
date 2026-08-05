@@ -14,6 +14,11 @@ It reuses tRPC-Agent-Go's public model and tool types, but intentionally keeps
 mini-SWE-agent's explicit control loop. It is therefore a reference lane, not
 the native `llmagent` runner.
 
+The native TAG lane applies the same pinned model-facing protocol through the
+public tRPC-Agent-Go lifecycle (`llmagent.New`, `runner.NewRunner`, and
+`runner.Run`). Its default tool set contains only `bash`; repository retrieval
+and loop-warning instrumentation are deliberately outside this layer.
+
 ## Scope
 
 The committed core includes:
@@ -24,6 +29,7 @@ The committed core includes:
 - an adapter for the external mini-SWE-agent reference implementation;
 - shared Docker-environment and XML-like/JSON/text observation codecs;
 - a golden-tested, source-aligned Mini-Go reference runner;
+- a framework-native tRPC-Agent-Go runner using only upstream public APIs;
 - the unmodified upstream local harness invocation;
 - batch planning, resumable shard inspection, and deterministic prediction
   merging.
@@ -41,6 +47,7 @@ swebench/
   internal/               # Artifact, contract, environment, and codec packages.
   mini-swe-agent-impl/    # External reference-runner instructions.
   mini-swe-agent-go-impl/ # Source-aligned Mini-Go reference runner.
+  trpc-agent-go-impl/     # Framework-native TAG runner.
   results/                # Ignored runtime outputs and future summaries.
 ```
 
@@ -112,12 +119,17 @@ go run ./evaluator prepare-data --python python
 For the canonical dataset and split, preparation fails closed unless the
 generated instance IDs match the committed list and checksum.
 
+Run `prepare-data` again for manifests created before the cases-content
+checksum was added. `run-config` intentionally rejects those older manifests
+instead of accepting unverifiable case contents.
+
 ### 5. Produce and verify predictions
 
 Choose either the
 [`external mini-SWE-agent runner`](mini-swe-agent-impl/README.md), the
-[`source-aligned Mini-Go runner`](mini-swe-agent-go-impl/README.md), or any
-other prediction producer that follows the shared contract.
+[`source-aligned Mini-Go runner`](mini-swe-agent-go-impl/README.md), the
+[`native tRPC-Agent-Go runner`](trpc-agent-go-impl/README.md), or any other
+prediction producer that follows the shared contract.
 
 ```bash
 go run ./evaluator verify \

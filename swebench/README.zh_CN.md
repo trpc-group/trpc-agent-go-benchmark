@@ -11,6 +11,10 @@ Core 层不绑定具体 Agent：它生成安全的 case manifest，接收外部 
 tRPC-Agent-Go 的公开 model 与 tool 类型，但刻意保留 mini-SWE-agent 的显式控制循环。因此
 它是参考实现路径，而不是原生 `llmagent` runner。
 
+Native TAG 路径通过 tRPC-Agent-Go 的公开生命周期（`llmagent.New`、
+`runner.NewRunner` 和 `runner.Run`）执行同一组固定的模型侧协议。默认只向模型提供 `bash`
+工具；仓库检索与 loop-warning instrumentation 不属于这一层。
+
 ## 范围
 
 当前 Core 包含：
@@ -21,6 +25,7 @@ tRPC-Agent-Go 的公开 model 与 tool 类型，但刻意保留 mini-SWE-agent �
 - 外部 mini-SWE-agent 参考实现的适配入口；
 - 共享 Docker environment 与 XML-like/JSON/text observation codec；
 - 经过 golden 测试的 source-aligned Mini-Go 参考 runner；
+- 只使用 upstream 公开 API 的 tRPC-Agent-Go 原生 runner；
 - 对未经修改的 upstream official local harness 的调用；
 - batch 规划、可恢复 shard 检查和确定性 predictions 合并。
 
@@ -37,6 +42,7 @@ swebench/
   internal/               # artifact、contract、environment 与 codec 包。
   mini-swe-agent-impl/    # 外部参考 runner 说明。
   mini-swe-agent-go-impl/ # source-aligned Mini-Go 参考 runner。
+  trpc-agent-go-impl/     # tRPC-Agent-Go 原生 runner。
   results/                # 被忽略的运行产物与后续结果摘要。
 ```
 
@@ -107,12 +113,16 @@ go run ./evaluator prepare-data --python python
 当使用固定 dataset 与 split 时，生成结果必须与提交的 case list 和 checksum 完全匹配，否则
 命令失败。
 
+如果 case manifest 生成于 cases 内容 checksum 引入之前，请重新执行 `prepare-data`。
+`run-config` 会拒绝这类旧 manifest，避免接受无法验证的 case 内容。
+
 ### 5. 生成并验证 predictions
 
 可以选择
 [`外部 mini-SWE-agent runner`](mini-swe-agent-impl/README.md)、
-[`source-aligned Mini-Go runner`](mini-swe-agent-go-impl/README.md)，或提供任何符合共享契约的
-其他 predictions 文件。
+[`source-aligned Mini-Go runner`](mini-swe-agent-go-impl/README.md)、
+[`tRPC-Agent-Go 原生 runner`](trpc-agent-go-impl/README.md)，或提供任何符合共享契约的其他
+predictions 文件。
 
 ```bash
 go run ./evaluator verify \

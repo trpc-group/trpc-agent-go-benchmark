@@ -32,17 +32,18 @@ type prepareDataOutput struct {
 }
 
 type prepareDataManifest struct {
-	Dataset         string    `json:"dataset"`
-	Split           string    `json:"split"`
-	Revision        string    `json:"revision,omitempty"`
-	CaseCount       int       `json:"case_count"`
-	CaseListHash    string    `json:"case_list_hash"`
-	IncludeHints    bool      `json:"include_hints"`
-	HintsTextPolicy string    `json:"hints_text_policy"`
-	OutputDir       string    `json:"output_dir"`
-	GeneratedAt     time.Time `json:"generated_at"`
-	SourceFields    []string  `json:"source_fields"`
-	ExcludedFields  []string  `json:"excluded_fields"`
+	Dataset          string    `json:"dataset"`
+	Split            string    `json:"split"`
+	Revision         string    `json:"revision,omitempty"`
+	CaseCount        int       `json:"case_count"`
+	CaseListHash     string    `json:"case_list_hash"`
+	CasesJSONLSHA256 string    `json:"cases_jsonl_sha256"`
+	IncludeHints     bool      `json:"include_hints"`
+	HintsTextPolicy  string    `json:"hints_text_policy"`
+	OutputDir        string    `json:"output_dir"`
+	GeneratedAt      time.Time `json:"generated_at"`
+	SourceFields     []string  `json:"source_fields"`
+	ExcludedFields   []string  `json:"excluded_fields"`
 }
 
 type expectedCaseFile struct {
@@ -104,26 +105,36 @@ func runPrepareData(ctx context.Context, args []string) error {
 	if err := artifact.WriteCasesJSONL(casesPath, loaded.Cases); err != nil {
 		return err
 	}
+	casesData, err := os.ReadFile(casesPath)
+	if err != nil {
+		return fmt.Errorf("read generated cases: %w", err)
+	}
+	casesDigest := sha256.Sum256(casesData)
+	casesSHA256 := hex.EncodeToString(casesDigest[:])
 	if err := artifact.WriteFileAtomic(filepath.Join(*output, "cases.sha256"), []byte(hash+"\n"), 0o644); err != nil {
 		return err
 	}
 	manifest := prepareDataManifest{
-		Dataset:         *dataset,
-		Split:           *split,
-		Revision:        loaded.Revision,
-		CaseCount:       len(loaded.Cases),
-		CaseListHash:    hash,
-		IncludeHints:    *includeHints,
-		HintsTextPolicy: hintsPolicy(*includeHints),
-		OutputDir:       absPath(*output),
-		GeneratedAt:     time.Now().UTC(),
-		SourceFields:    sourceFields(*includeHints),
-		ExcludedFields:  []string{"patch", "test_patch", "FAIL_TO_PASS", "PASS_TO_PASS"},
+		Dataset:          *dataset,
+		Split:            *split,
+		Revision:         loaded.Revision,
+		CaseCount:        len(loaded.Cases),
+		CaseListHash:     hash,
+		CasesJSONLSHA256: casesSHA256,
+		IncludeHints:     *includeHints,
+		HintsTextPolicy:  hintsPolicy(*includeHints),
+		OutputDir:        absPath(*output),
+		GeneratedAt:      time.Now().UTC(),
+		SourceFields:     sourceFields(*includeHints),
+		ExcludedFields:   []string{"patch", "test_patch", "FAIL_TO_PASS", "PASS_TO_PASS"},
 	}
 	if err := writeJSON(filepath.Join(*output, "cases.manifest.json"), manifest); err != nil {
 		return err
 	}
-	fmt.Printf("wrote %d cases\ncases=%s\nsha256=%s\n", len(loaded.Cases), casesPath, hash)
+	fmt.Printf(
+		"wrote %d cases\ncases=%s\ncase_list_sha256=%s\ncases_jsonl_sha256=%s\n",
+		len(loaded.Cases), casesPath, hash, casesSHA256,
+	)
 	return nil
 }
 

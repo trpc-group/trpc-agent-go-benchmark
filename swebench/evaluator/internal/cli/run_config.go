@@ -10,6 +10,7 @@
 package cli
 
 import (
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -39,14 +40,15 @@ type runConfigDocument struct {
 }
 
 type runConfigDataset struct {
-	Name            string   `json:"name"`
-	Split           string   `json:"split"`
-	Revision        string   `json:"revision,omitempty"`
-	CaseCount       int      `json:"case_count"`
-	CaseListHash    string   `json:"case_list_hash"`
-	HintsTextPolicy string   `json:"hints_text_policy"`
-	SourceFields    []string `json:"source_fields,omitempty"`
-	ExcludedFields  []string `json:"excluded_fields,omitempty"`
+	Name             string   `json:"name"`
+	Split            string   `json:"split"`
+	Revision         string   `json:"revision,omitempty"`
+	CaseCount        int      `json:"case_count"`
+	CaseListHash     string   `json:"case_list_hash"`
+	CasesJSONLSHA256 string   `json:"cases_jsonl_sha256"`
+	HintsTextPolicy  string   `json:"hints_text_policy"`
+	SourceFields     []string `json:"source_fields,omitempty"`
+	ExcludedFields   []string `json:"excluded_fields,omitempty"`
 }
 
 type runConfigModel struct {
@@ -203,6 +205,9 @@ func runRunConfig(args []string) error {
 	if err := readJSONFile(*casesManifestPath, &casesManifest); err != nil {
 		return fmt.Errorf("read cases manifest: %w", err)
 	}
+	if err := validateCasesContent(casesManifest); err != nil {
+		return err
+	}
 	var miniManifest runMiniManifest
 	hasShardsManifest := strings.TrimSpace(*shardsManifestPath) != ""
 	hasMiniManifest := strings.TrimSpace(*runMiniManifestPath) != ""
@@ -243,6 +248,9 @@ func runRunConfig(args []string) error {
 		hasMiniManifest,
 		hasShardsManifest,
 	); err != nil {
+		return err
+	}
+	if err := validateGenericRunnerModelName(genericManifest, *modelName); err != nil {
 		return err
 	}
 
@@ -319,14 +327,15 @@ func runRunConfig(args []string) error {
 		Target:      *target,
 		GeneratedAt: time.Now().UTC(),
 		Dataset: runConfigDataset{
-			Name:            casesManifest.Dataset,
-			Split:           casesManifest.Split,
-			Revision:        casesManifest.Revision,
-			CaseCount:       casesManifest.CaseCount,
-			CaseListHash:    casesManifest.CaseListHash,
-			HintsTextPolicy: casesManifest.HintsTextPolicy,
-			SourceFields:    casesManifest.SourceFields,
-			ExcludedFields:  casesManifest.ExcludedFields,
+			Name:             casesManifest.Dataset,
+			Split:            casesManifest.Split,
+			Revision:         casesManifest.Revision,
+			CaseCount:        casesManifest.CaseCount,
+			CaseListHash:     casesManifest.CaseListHash,
+			CasesJSONLSHA256: casesManifest.CasesJSONLSHA256,
+			HintsTextPolicy:  casesManifest.HintsTextPolicy,
+			SourceFields:     casesManifest.SourceFields,
+			ExcludedFields:   casesManifest.ExcludedFields,
 		},
 		Model: runConfigModel{
 			Strategy:        "single",
@@ -531,8 +540,12 @@ func validateRunConfigInputs(
 		if generic.Status != "" && generic.Status != "completed" && generic.Status != "completed_with_errors" {
 			return fmt.Errorf("runner status %q is not a supported terminal status", generic.Status)
 		}
-		if generic.RunnerType == "mini-swe-agent-go" {
-			if _, err := normalizeShardRunnerIdentity(miniGoShardRunnerIdentity(generic)); err != nil {
+		if generic.RunnerType == "mini-swe-agent-go" || generic.RunnerType == "trpc-agent-go-native" {
+			identity := miniGoShardRunnerIdentity(generic)
+			if generic.RunnerType == "trpc-agent-go-native" {
+				identity = nativeRunnerIdentity(generic)
+			}
+			if _, err := normalizeShardRunnerIdentity(identity); err != nil {
 				return fmt.Errorf("runner identity is invalid: %w", err)
 			}
 			if generic.SelectedInstancesSHA256 != cases.CaseListHash {
@@ -540,6 +553,16 @@ func validateRunConfigInputs(
 					"runner selected_instances_sha256 %q does not match case_list_hash %q",
 					generic.SelectedInstancesSHA256,
 					cases.CaseListHash,
+				)
+			}
+			if !isHexIdentifier(cases.CasesJSONLSHA256, 64) {
+				return fmt.Errorf("cases manifest cases_jsonl_sha256 %q is not a SHA-256 digest", cases.CasesJSONLSHA256)
+			}
+			if generic.CasesSHA256 != cases.CasesJSONLSHA256 {
+				return fmt.Errorf(
+					"runner cases_sha256 %q does not match cases manifest cases_jsonl_sha256 %q",
+					generic.CasesSHA256,
+					cases.CasesJSONLSHA256,
 				)
 			}
 		}
@@ -551,6 +574,40 @@ func validateRunConfigInputs(
 			runnerPredictions,
 			verifier.Config.Predictions,
 		)
+	}
+	return nil
+}
+
+func validateGenericRunnerModelName(manifest runnerManifest, modelName string) error {
+	if manifest.RunnerType != "trpc-agent-go-native" {
+		return nil
+	}
+	actual := strings.TrimSpace(manifest.ModelConfig["MODEL_NAME"])
+	expected := strings.TrimSpace(modelName)
+	if actual == "" {
+		return fmt.Errorf("native runner manifest has no MODEL_NAME")
+	}
+	if actual != expected {
+		return fmt.Errorf("native runner MODEL_NAME %q does not match -model-name %q", actual, expected)
+	}
+	return nil
+}
+
+func validateCasesContent(manifest prepareDataManifest) error {
+	if strings.TrimSpace(manifest.CasesJSONLSHA256) == "" {
+		return nil
+	}
+	if strings.TrimSpace(manifest.OutputDir) == "" {
+		return fmt.Errorf("cases manifest has cases_jsonl_sha256 but no output_dir")
+	}
+	path := filepath.Join(manifest.OutputDir, "cases.jsonl")
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return fmt.Errorf("read cases.jsonl for content verification: %w", err)
+	}
+	actual := fmt.Sprintf("%x", sha256.Sum256(data))
+	if actual != manifest.CasesJSONLSHA256 {
+		return fmt.Errorf("cases.jsonl SHA-256 %q does not match cases manifest %q", actual, manifest.CasesJSONLSHA256)
 	}
 	return nil
 }
