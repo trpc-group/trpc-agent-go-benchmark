@@ -59,6 +59,8 @@ python3 main.py --kb=autogen
 
 Vertical evaluation runs tRPC-Agent-Go-only ablation experiments (hybrid search weight sweep, RRF mode). It automatically builds and manages the Go service for each experiment configuration.
 
+- [Controlled Contextual Retrieval A/B benchmark](contextual_retrieval/README.md)
+
 ```bash
 # Run hybrid weight ablation (11 weight combinations from pure text to pure vector)
 python3 -m vertical_eval.main --suite hybrid_weight

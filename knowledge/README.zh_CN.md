@@ -59,6 +59,8 @@ python3 main.py --kb=autogen
 
 纵向评测针对 tRPC-Agent-Go 进行专项消融实验（混合搜索权重梯度、RRF 模式），会自动编译并管理每组实验配置对应的 Go 服务。
 
+- [受控 Contextual Retrieval A/B 基准测试](contextual_retrieval/README.md)
+
 ```bash
 # 混合搜索权重消融（11 组权重配比，从纯文本到纯向量）
 python3 -m vertical_eval.main --suite hybrid_weight
