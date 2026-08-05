@@ -177,7 +177,7 @@ clean_repository() {
   local suffix=$2
   local prefix=$3
   shift 3
-  local ancestor_count temporary unreachable actual
+  local ancestor_count temporary unreachable actual fsck_output
 
   if ! git -C "$repository" diff --quiet || ! git -C "$repository" diff --cached --quiet; then
     echo "repository has tracked changes before clean-room sanitation: $repository" >&2
@@ -196,6 +196,10 @@ clean_repository() {
   mv "$temporary/.git" "$repository/.git"
   rm -rf "$temporary"
   git -C "$repository" remote remove origin
+  # Some Git versions leave a dangling refs/remotes/origin/HEAD symbolic ref
+  # after removing the clone remote. It is not reachable via for-each-ref but
+  # makes fsck fail, so remove the remote-ref namespace explicitly.
+  rm -rf "$repository/.git/refs/remotes"
   git -C "$repository" reset -q --mixed HEAD
   git -C "$repository" reflog expire --expire=now --all
   rm -rf "$repository/.git/logs"
@@ -226,8 +230,14 @@ clean_repository() {
     echo "clean-room repository contains alternates or reflogs: $repository" >&2
     exit 1
   fi
-  unreachable=$(git -C "$repository" fsck --unreachable --no-reflogs 2>&1 \
-    | grep -E '^(unreachable|dangling) ' || true)
+  fsck_output=$(mktemp)
+  if ! git -C "$repository" fsck --unreachable --no-reflogs >"$fsck_output" 2>&1; then
+    echo "clean-room repository failed Git object verification: $repository" >&2
+    cat "$fsck_output" >&2
+    exit 1
+  fi
+  unreachable=$(grep -E '^(unreachable|dangling) ' "$fsck_output" || true)
+  rm -f "$fsck_output"
   if [[ -n "$unreachable" ]]; then
     echo "clean-room repository contains unreachable objects: $repository" >&2
     echo "$unreachable" >&2
@@ -305,7 +315,7 @@ verify_repository() {
   local repository=$1
   local prefix=$2
   shift 2
-  local unreachable gitlinks record metadata mode expected stage submodule actual
+  local unreachable gitlinks record metadata mode expected stage submodule actual fsck_output
 
   if [[ -n "$(git -C "$repository" status --porcelain)" ]]; then
     echo "repository is not clean after clean-room setup: $repository" >&2
@@ -325,8 +335,14 @@ verify_repository() {
     echo "clean-room repository contains alternates or reflogs after setup: $repository" >&2
     exit 1
   fi
-  unreachable=$(git -C "$repository" fsck --unreachable --no-reflogs 2>&1 \
-    | grep -E '^(unreachable|dangling) ' || true)
+  fsck_output=$(mktemp)
+  if ! git -C "$repository" fsck --unreachable --no-reflogs >"$fsck_output" 2>&1; then
+    echo "clean-room repository failed Git object verification after setup: $repository" >&2
+    cat "$fsck_output" >&2
+    exit 1
+  fi
+  unreachable=$(grep -E '^(unreachable|dangling) ' "$fsck_output" || true)
+  rm -f "$fsck_output"
   if [[ -n "$unreachable" ]]; then
     echo "clean-room repository contains unreachable objects after setup: $repository" >&2
     echo "$unreachable" >&2

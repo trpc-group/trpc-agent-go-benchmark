@@ -120,6 +120,14 @@ func TestVerifyCleanGitRepositoryScriptRejectsPostSetupMutation(t *testing.T) {
 			},
 			wantErr: "unexpected refs after setup",
 		},
+		{
+			name: "dangling remote head",
+			mutate: func(t *testing.T, fixture nestedGitFixture) {
+				ref := filepath.Join(fixture.root, ".git", "refs", "remotes", "origin", "HEAD")
+				writeFile(t, ref, "ref: refs/remotes/origin/missing\n")
+			},
+			wantErr: "failed Git object verification after setup",
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
