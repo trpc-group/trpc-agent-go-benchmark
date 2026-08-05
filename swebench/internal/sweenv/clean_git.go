@@ -245,8 +245,11 @@ clean_repository() {
     echo "clean-room repository contains alternates or reflogs: $repository" >&2
     exit 1
   fi
+  # Requests history contains a reachable legacy +051800 timestamp. Ignore
+  # only that metadata diagnostic; retain full fsck and unreachable checks.
   fsck_output=$(mktemp)
-  if ! git -C "$repository" fsck --unreachable --no-reflogs >"$fsck_output" 2>&1; then
+  if ! git -C "$repository" -c fsck.badTimezone=ignore \
+    fsck --unreachable --no-reflogs >"$fsck_output" 2>&1; then
     echo "clean-room repository failed Git object verification: $repository" >&2
     cat "$fsck_output" >&2
     exit 1
@@ -350,8 +353,10 @@ verify_repository() {
     echo "clean-room repository contains alternates or reflogs after setup: $repository" >&2
     exit 1
   fi
+  # Match sanitation: tolerate only the legacy timezone metadata diagnostic.
   fsck_output=$(mktemp)
-  if ! git -C "$repository" fsck --unreachable --no-reflogs >"$fsck_output" 2>&1; then
+  if ! git -C "$repository" -c fsck.badTimezone=ignore \
+    fsck --unreachable --no-reflogs >"$fsck_output" 2>&1; then
     echo "clean-room repository failed Git object verification after setup: $repository" >&2
     cat "$fsck_output" >&2
     exit 1

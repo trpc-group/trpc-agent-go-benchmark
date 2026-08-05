@@ -11,6 +11,7 @@ package sweenv
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -210,6 +211,32 @@ func TestCleanGitRepositoryScriptRejectsNonOfficialCommitAfterBase(t *testing.T)
 	}
 }
 
+func TestCleanGitRepositoryScriptAllowsReachableLegacyBadTimezone(t *testing.T) {
+	fixture := newNestedGitFixture(t)
+	tree := strings.TrimSpace(runGit(t, fixture.root, "rev-parse", fixture.base+"^{tree}"))
+	legacyCommit := writeRawGitCommit(t, fixture.root, fmt.Sprintf(
+		"tree %s\nparent %s\n"+
+			"author SWE-Bench Test <swebench-test@example.invalid> 1313584730 +051800\n"+
+			"committer SWE-Bench Test <swebench-test@example.invalid> 1313584730 +051800\n\n"+
+			"legacy bad timezone\n",
+		tree, fixture.base,
+	))
+	fixture.base = strings.TrimSpace(runGit(t, fixture.root,
+		"commit-tree", tree, "-p", legacyCommit, "-m", "case base"))
+	runGit(t, fixture.root, "reset", "--hard", fixture.base)
+
+	cmd := exec.Command("git", "fsck", "--no-dangling", "--no-reflogs", "HEAD")
+	cmd.Dir = fixture.root
+	output, err := cmd.CombinedOutput()
+	if err == nil || !strings.Contains(string(output), "badTimezone") {
+		t.Fatalf("unconfigured fsck error = %v, output = %q", err, output)
+	}
+
+	runCleanGitScript(t, fixture.root, fixture.base)
+	assertSanitizedGitRepository(t, fixture.root)
+	runVerifyGitScript(t, fixture.root, fixture.base)
+}
+
 func TestCleanGitRepositoryScriptRejectsIgnoredSymlink(t *testing.T) {
 	fixture := newNestedGitFixture(t)
 	if err := os.Symlink("root.txt", filepath.Join(fixture.root, "bad.secret")); err != nil {
@@ -366,7 +393,8 @@ func assertSanitizedGitRepository(t *testing.T, repository string) {
 	if _, err := os.Lstat(filepath.Join(repository, ".git", "objects", "info", "alternates")); !os.IsNotExist(err) {
 		t.Fatalf("repository %s has alternates: %v", repository, err)
 	}
-	if got := strings.TrimSpace(runGit(t, repository, "fsck", "--unreachable", "--no-reflogs")); got != "" {
+	if got := strings.TrimSpace(runGit(t, repository, "-c", "fsck.badTimezone=ignore",
+		"fsck", "--unreachable", "--no-reflogs")); got != "" {
 		t.Fatalf("repository %s has unreachable objects: %q", repository, got)
 	}
 }
@@ -396,6 +424,18 @@ func writeGitObject(t *testing.T, repository, content string) {
 	if output, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("write unreachable object: %v\n%s", err, output)
 	}
+}
+
+func writeRawGitCommit(t *testing.T, repository, content string) string {
+	t.Helper()
+	cmd := exec.Command("git", "hash-object", "--literally", "-t", "commit", "-w", "--stdin")
+	cmd.Dir = repository
+	cmd.Stdin = strings.NewReader(content)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("write raw Git commit: %v\n%s", err, output)
+	}
+	return strings.TrimSpace(string(output))
 }
 
 func writeFile(t *testing.T, file, content string) {
