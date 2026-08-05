@@ -1,0 +1,14 @@
+model:
+  model_name: openai/<model-name>
+  cost_tracking: ignore_errors
+  model_kwargs:
+    api_base: "https://api.example.com/v1"
+    api_key: "sk-example"
+    timeout: 300
+    drop_params: true
+    parallel_tool_calls: true
+    reasoning_effort: high
+    allowed_openai_params:
+      - reasoning_effort
+    extra_headers:
+      X-Example-Header: "example-value"

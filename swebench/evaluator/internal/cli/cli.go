@@ -1,0 +1,92 @@
+//
+// Tencent is pleased to support the open source community by making
+// trpc-agent-go available.
+//
+// Copyright (C) 2025 Tencent.  All rights reserved.
+//
+// trpc-agent-go is licensed under the Apache License Version 2.0.
+//
+
+// Package cli provides SWE-Bench Verified benchmark orchestration commands.
+package cli
+
+import (
+	"context"
+	"flag"
+	"fmt"
+	"io"
+	"os"
+)
+
+// Run dispatches the SWE-Bench evaluator command line.
+func Run(args []string) error {
+	if len(args) < 2 {
+		return fmt.Errorf("missing command; use help to list commands")
+	}
+
+	ctx := context.Background()
+	switch args[1] {
+	case "doctor":
+		return runDoctor(ctx, args[2:])
+	case "prepare-data":
+		return runPrepareData(ctx, args[2:])
+	case "run-mini":
+		return runMini(ctx, args[2:])
+	case "verify":
+		return runVerify(ctx, args[2:])
+	case "import":
+		return runImport(args[2:])
+	case "run-config":
+		return runRunConfig(args[2:])
+	case "plan-batches":
+		return runPlanBatches(args[2:])
+	case "summarize-shards":
+		return runSummarizeShards(args[2:])
+	case "merge-predictions":
+		return runMergePredictions(args[2:])
+	case "help", "-h", "--help":
+		usage()
+		return nil
+	default:
+		return fmt.Errorf("unknown command %q", args[1])
+	}
+}
+
+func newFlagSet(name string) *flag.FlagSet {
+	fs := flag.NewFlagSet(name, flag.ContinueOnError)
+	fs.SetOutput(io.Discard)
+	return fs
+}
+
+func usage() {
+	fmt.Fprintf(os.Stderr, `Usage:
+  swebench doctor   [flags]
+  swebench prepare-data [flags]
+  swebench run-mini [flags]
+  swebench verify   [flags]
+  swebench import   [flags]
+  swebench run-config [flags]
+  swebench plan-batches [flags]
+  swebench summarize-shards [flags]
+  swebench merge-predictions [flags]
+
+Commands:
+  doctor    Probe local benchmark environment and model endpoint.
+  prepare-data  Download/load SWE-Bench Verified and generate safe metadata.
+  run-mini  Run mini-SWE-agent batch runner for a filter/slice.
+  verify    Run SWE-Bench official local harness for predictions.
+  import    Normalize mini predictions, trajectories, and harness report.
+  run-config  Write a run-level manifest from generated artifacts.
+  plan-batches  Create fixed case batches and mini-SWE-agent filters.
+  summarize-shards  Summarize shard outputs and accepted case coverage.
+  merge-predictions  Merge accepted shard predictions into one preds.json.
+
+`)
+}
+
+func required(fs *flag.FlagSet, name, value string) error {
+	if value != "" {
+		return nil
+	}
+	return fmt.Errorf("missing required flag -%s", name)
+}
