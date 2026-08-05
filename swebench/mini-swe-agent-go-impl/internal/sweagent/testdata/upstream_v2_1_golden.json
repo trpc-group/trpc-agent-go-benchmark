@@ -1,0 +1,59 @@
+{
+  "upstream_commit": "3a9b8e874d322a9cfb1f391ff4f4df67721c108c",
+  "task": "fix 100% behavior\nsecond line",
+  "system": {
+    "length": 95,
+    "sha256": "f554fe1eeb6b4f3ce9021cf87edbafc12ceee37b8b3a6838b0aebb4125ab3714"
+  },
+  "instance": {
+    "length": 4520,
+    "sha256": "007c6e7e66c34b5ff2b8d2826fe0962625d40f0bb04535185ba31d3b530c4319"
+  },
+  "observations": [
+    {
+      "output_chars": 0,
+      "exception_info": "",
+      "returncode": 0,
+      "length": 45,
+      "sha256": "b305162f23f3ad8cce0f7334ca5499b308b0b1536ec53c65a56af4ee0810033e"
+    },
+    {
+      "output_chars": 9999,
+      "exception_info": "",
+      "returncode": 7,
+      "length": 10044,
+      "sha256": "9fbdf727475341ac40dbcdd3e49df65ed7e753e33e9b18a1d9e76ffad9245ec2"
+    },
+    {
+      "output_chars": 10000,
+      "exception_info": "boom",
+      "returncode": 0,
+      "length": 10637,
+      "sha256": "77ce9d3e29fdcb50da4f05ee962612c2d8b4d8299f15f1b440e91667466017b6"
+    },
+    {
+      "output_chars": 10001,
+      "exception_info": "",
+      "returncode": 1,
+      "length": 10609,
+      "sha256": "9d57c80a9d1512e14db32874271e36a2742f0394a3b55261ce150e56e4abb19e"
+    }
+  ],
+  "format_errors": [
+    {
+      "error": "No tool calls found in the response. Every response MUST include at least one tool call.",
+      "length": 554,
+      "sha256": "1a74a233aaaf5a8254b94cd91236e30d6eb2af98435fee5e8608bd612266456a"
+    },
+    {
+      "error": "Unknown tool 'other'.Missing 'command' argument in bash tool call.",
+      "length": 532,
+      "sha256": "3dc1cc45d59c00e00a715dbf6a984984717c9e639fc3dc91d6862ce066a73c4f"
+    },
+    {
+      "error": "Error parsing tool call arguments: Expecting value: line 1 column 12 (char 11). Missing 'command' argument in bash tool call.",
+      "length": 591,
+      "sha256": "55ea2138a42693d0b6e3aa6a6f1e28f32d99c388ef3bfa0a975c9b7273347609"
+    }
+  ]
+}

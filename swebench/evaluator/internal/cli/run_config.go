@@ -121,16 +121,29 @@ type runConfigSourceFiles struct {
 }
 
 type runnerManifest struct {
-	RunID       string            `json:"run_id"`
-	RunnerType  string            `json:"runner_type"`
-	StartedAt   time.Time         `json:"started_at"`
-	FinishedAt  time.Time         `json:"finished_at"`
-	DurationMS  int64             `json:"duration_ms"`
-	OutputDir   string            `json:"output_dir"`
-	CaseCount   int               `json:"case_count"`
-	Predictions string            `json:"predictions"`
-	ModelConfig map[string]string `json:"model_config,omitempty"`
-	Status      string            `json:"status,omitempty"`
+	RunID                   string            `json:"run_id"`
+	RunnerType              string            `json:"runner_type"`
+	ObservationCodec        string            `json:"observation_codec,omitempty"`
+	FrameworkModule         string            `json:"framework_module,omitempty"`
+	FrameworkVersion        string            `json:"framework_version,omitempty"`
+	SourceRevision          string            `json:"source_revision,omitempty"`
+	SourceModified          bool              `json:"source_modified"`
+	BinarySHA256            string            `json:"binary_sha256,omitempty"`
+	CasesSHA256             string            `json:"cases_sha256,omitempty"`
+	ModelConfigSHA256       string            `json:"model_config_sha256,omitempty"`
+	EnvironmentConfigSHA256 string            `json:"environment_config_sha256,omitempty"`
+	SelectedInstancesSHA256 string            `json:"selected_instances_sha256,omitempty"`
+	CommandTimeout          string            `json:"command_timeout,omitempty"`
+	CaseTimeout             string            `json:"case_timeout,omitempty"`
+	StartedAt               time.Time         `json:"started_at"`
+	FinishedAt              time.Time         `json:"finished_at"`
+	DurationMS              int64             `json:"duration_ms"`
+	OutputDir               string            `json:"output_dir"`
+	CaseCount               int               `json:"case_count"`
+	Workers                 int               `json:"workers,omitempty"`
+	Predictions             string            `json:"predictions"`
+	ModelConfig             map[string]string `json:"model_config,omitempty"`
+	Status                  string            `json:"status,omitempty"`
 }
 
 func runRunConfig(args []string) error {
@@ -276,6 +289,7 @@ func runRunConfig(args []string) error {
 		runnerStartedAt = formatTime(genericManifest.StartedAt)
 		runnerFinishedAt = formatTime(genericManifest.FinishedAt)
 		runnerDurationMS = genericManifest.DurationMS
+		agentWorkers = genericManifest.Workers
 		predictionsPath = genericManifest.Predictions
 		outputDir = genericManifest.OutputDir
 		serviceFindings = runConfigServiceFindings{}
@@ -465,6 +479,10 @@ func validateRunConfigInputs(
 		}
 		runnerPredictions = filepath.Join(mini.Config.OutputDir, "preds.json")
 	case hasShards:
+		canonicalIdentity, err := normalizeShardRunnerIdentity(shards.RunnerIdentity)
+		if err != nil {
+			return fmt.Errorf("shards runner identity is invalid: %w", err)
+		}
 		if shards.ExpectedCases != cases.CaseCount {
 			return fmt.Errorf("shards expected cases %d does not match case count %d", shards.ExpectedCases, cases.CaseCount)
 		}
@@ -482,6 +500,25 @@ func validateRunConfigInputs(
 			if shard.Status != "accepted" || shard.FailureReason != "" {
 				return fmt.Errorf("shard %q is not accepted: status=%q reason=%q", shard.RunID, shard.Status, shard.FailureReason)
 			}
+			shardIdentity, err := normalizeShardRunnerIdentity(shard.RunnerIdentity)
+			if err != nil {
+				return fmt.Errorf("shard %q runner identity is invalid: %w", shard.RunID, err)
+			}
+			if mismatch := shardRunnerIdentityMismatch(canonicalIdentity, shardIdentity); mismatch != "" {
+				return fmt.Errorf("shard %q runner identity mismatch: %s", shard.RunID, mismatch)
+			}
+			selectedSHA256, err := selectedInstancesSHA256(shard.ExpectedIDs)
+			if err != nil {
+				return fmt.Errorf("shard %q selected instances are invalid: %w", shard.RunID, err)
+			}
+			if shard.SelectedInstancesSHA256 != selectedSHA256 {
+				return fmt.Errorf(
+					"shard %q selected_instances_sha256 %q does not match expected %q",
+					shard.RunID,
+					shard.SelectedInstancesSHA256,
+					selectedSHA256,
+				)
+			}
 		}
 		runnerPredictions = verifier.Config.Predictions
 	default:
@@ -491,8 +528,20 @@ func validateRunConfigInputs(
 		if generic.CaseCount != cases.CaseCount {
 			return fmt.Errorf("runner case count %d does not match %d", generic.CaseCount, cases.CaseCount)
 		}
-		if generic.Status != "" && generic.Status != "completed" {
-			return fmt.Errorf("runner status %q is not completed", generic.Status)
+		if generic.Status != "" && generic.Status != "completed" && generic.Status != "completed_with_errors" {
+			return fmt.Errorf("runner status %q is not a supported terminal status", generic.Status)
+		}
+		if generic.RunnerType == "mini-swe-agent-go" {
+			if _, err := normalizeShardRunnerIdentity(miniGoShardRunnerIdentity(generic)); err != nil {
+				return fmt.Errorf("runner identity is invalid: %w", err)
+			}
+			if generic.SelectedInstancesSHA256 != cases.CaseListHash {
+				return fmt.Errorf(
+					"runner selected_instances_sha256 %q does not match case_list_hash %q",
+					generic.SelectedInstancesSHA256,
+					cases.CaseListHash,
+				)
+			}
 		}
 		runnerPredictions = generic.Predictions
 	}
