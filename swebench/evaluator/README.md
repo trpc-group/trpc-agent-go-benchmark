@@ -31,11 +31,23 @@ source code.
   inputs, duplicate/empty IDs, and map-key mismatches.
 - JSON, JSONL, patch, trace, and summary artifacts are replaced atomically.
 - `verify` runs `swebench.harness.run_evaluation` from the installed upstream
-  package. It does not patch Python source or start auxiliary services.
-- `import` writes schema version 1 with one explicit target and result per row.
+  package. It does not patch Python source or start auxiliary services. On a
+  successful command it also binds the unique top-level official report to the
+  verifier manifest by harness run ID, path, and SHA-256. File-backed
+  predictions are atomically snapshotted before execution; the manifest binds
+  the source path, snapshot path, exact-byte SHA-256, and harness `-p` argument.
+- `import` writes schema version 1 with one explicit target and result per row;
+  filtered or sliced runs can omit `--cases` so prediction IDs define the rows.
 - `run-config` accepts exactly one of `--run-mini-manifest`,
-  `--runner-manifest`, or `--shards-manifest`, then checks provenance across all
-  inputs before writing the final manifest.
+  `--runner-manifest`, or `--shards-manifest`, preserves the full prepared panel
+  under `dataset`, records the actual prediction-backed run under `selection`,
+  and cross-checks that selection against runner, verifier, and imported
+  artifacts before writing the final manifest. When a harness report is
+  supplied, it also checks the verifier output directory, report filename,
+  verify command run ID, and report digest before accepting per-case outcomes.
+  Native finalization additionally requires the current runner predictions to
+  match the verify-time snapshot digest. Legacy Mini manifests may omit this
+  newer attestation.
 - `summarize-shards` accepts both the external mini-SWE-agent manifest and the
   Mini-Go runner manifest, while applying the same fixed-plan coverage checks.
 
@@ -54,7 +66,15 @@ go run ./evaluator verify \
 ```
 
 The exact command, timeout, worker count, package version, discoverable Git
-revision, and package path are stored in `verifier_manifest.json`.
+revision, package path, and official report identity are stored in
+`verifier_manifest.json`. Use its `report.path` as `--harness-report` for both
+`import` and `run-config`. Native finalization rejects legacy verifier manifests
+that lack the verify-time report attestation; legacy Mini manifests remain
+readable and receive a finalization-time digest in `run_config.json`.
+
+This binding detects accidental cross-run splicing and report mutation after
+verification. It is provenance validation, not a cryptographic signature over
+an attacker-modified verifier manifest.
 
 Run the unit tests from this module:
 

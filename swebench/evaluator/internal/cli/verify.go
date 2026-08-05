@@ -11,6 +11,7 @@ package cli
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -19,6 +20,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"trpc.group/trpc-go/trpc-agent-go-benchmark/swebench/internal/artifact"
 )
 
 type harnessIdentity struct {
@@ -28,30 +31,41 @@ type harnessIdentity struct {
 }
 
 type verifyManifest struct {
-	RunID      string          `json:"run_id"`
-	Target     string          `json:"target"`
-	StartedAt  time.Time       `json:"started_at"`
-	FinishedAt time.Time       `json:"finished_at"`
-	DurationMS int64           `json:"duration_ms"`
-	Command    commandResult   `json:"command"`
-	Config     verifyConfig    `json:"config"`
-	Harness    harnessIdentity `json:"harness"`
+	RunID            string          `json:"run_id"`
+	Target           string          `json:"target"`
+	StartedAt        time.Time       `json:"started_at"`
+	FinishedAt       time.Time       `json:"finished_at"`
+	DurationMS       int64           `json:"duration_ms"`
+	Command          commandResult   `json:"command"`
+	Config           verifyConfig    `json:"config"`
+	Harness          harnessIdentity `json:"harness"`
+	Report           verifyReport    `json:"report,omitempty"`
+	ReportError      string          `json:"report_error,omitempty"`
+	PredictionsError string          `json:"predictions_error,omitempty"`
+}
+
+type verifyReport struct {
+	HarnessRunID string `json:"harness_run_id"`
+	Path         string `json:"path"`
+	SHA256       string `json:"sha256"`
 }
 
 type verifyConfig struct {
-	Dataset     string   `json:"dataset"`
-	Split       string   `json:"split"`
-	Instance    string   `json:"instance,omitempty"`
-	InstanceIDs []string `json:"instance_ids,omitempty"`
-	Predictions string   `json:"predictions"`
-	OutputDir   string   `json:"output_dir"`
-	Workers     int      `json:"workers"`
-	TimeoutSec  int      `json:"timeout_seconds"`
-	CacheLevel  string   `json:"cache_level"`
-	Clean       bool     `json:"clean"`
-	Python      string   `json:"python"`
-	DockerHost  string   `json:"docker_host"`
-	HFHome      string   `json:"hf_home,omitempty"`
+	Dataset             string   `json:"dataset"`
+	Split               string   `json:"split"`
+	Instance            string   `json:"instance,omitempty"`
+	InstanceIDs         []string `json:"instance_ids,omitempty"`
+	Predictions         string   `json:"predictions"`
+	PredictionsSnapshot string   `json:"predictions_snapshot,omitempty"`
+	PredictionsSHA256   string   `json:"predictions_sha256,omitempty"`
+	OutputDir           string   `json:"output_dir"`
+	Workers             int      `json:"workers"`
+	TimeoutSec          int      `json:"timeout_seconds"`
+	CacheLevel          string   `json:"cache_level"`
+	Clean               bool     `json:"clean"`
+	Python              string   `json:"python"`
+	DockerHost          string   `json:"docker_host"`
+	HFHome              string   `json:"hf_home,omitempty"`
 }
 
 func runVerify(ctx context.Context, args []string) error {
@@ -89,6 +103,10 @@ func runVerify(ctx context.Context, args []string) error {
 	if err := validateTargetLabel(*target); err != nil {
 		return err
 	}
+	harnessRunID := *runID + "-" + *target
+	if err := validateArtifactName("harness run id", harnessRunID); err != nil {
+		return err
+	}
 	if strings.TrimSpace(*instance) != "" {
 		if err := validateArtifactName("instance id", strings.TrimSpace(*instance)); err != nil {
 			return err
@@ -107,8 +125,13 @@ func runVerify(ctx context.Context, args []string) error {
 	if err := ensureDir(outputAbs); err != nil {
 		return err
 	}
+	predictionsSource := harnessPredictionsArg(*predictions)
+	predictionsArg, predictionsSHA256, err := snapshotHarnessPredictions(predictionsSource, outputAbs)
+	if err != nil {
+		return fmt.Errorf("snapshot harness predictions: %w", err)
+	}
 
-	instanceIDs, err := verifyInstanceIDs(*predictions, *instance, *instancesFromPredictions)
+	instanceIDs, err := verifyInstanceIDs(predictionsArg, *instance, *instancesFromPredictions)
 	if err != nil {
 		return err
 	}
@@ -117,8 +140,6 @@ func runVerify(ctx context.Context, args []string) error {
 		return err
 	}
 
-	predictionsArg := harnessPredictionsArg(*predictions)
-	harnessRunID := *runID + "-" + *target
 	cmdArgs := buildHarnessArgs(
 		*dataset,
 		*split,
@@ -137,29 +158,40 @@ func runVerify(ctx context.Context, args []string) error {
 	logPath := filepath.Join(outputAbs, "verify.log")
 	result := runLogged(ctx, outputAbs, env, logPath, *python, cmdArgs...)
 	finish := time.Now()
+	report := verifyReport{HarnessRunID: harnessRunID}
+	var reportErr error
+	if result.ExitCode == 0 {
+		report, reportErr = discoverHarnessReport(outputAbs, harnessRunID)
+	}
+	predictionsErr := validatePredictionsSnapshot(predictionsArg, predictionsSHA256)
 
 	manifest := verifyManifest{
-		RunID:      *runID,
-		Target:     *target,
-		StartedAt:  start.UTC(),
-		FinishedAt: finish.UTC(),
-		DurationMS: finish.Sub(start).Milliseconds(),
-		Command:    result,
-		Harness:    identity,
+		RunID:            *runID,
+		Target:           *target,
+		StartedAt:        start.UTC(),
+		FinishedAt:       finish.UTC(),
+		DurationMS:       finish.Sub(start).Milliseconds(),
+		Command:          result,
+		Harness:          identity,
+		Report:           report,
+		ReportError:      errorString(reportErr),
+		PredictionsError: errorString(predictionsErr),
 		Config: verifyConfig{
-			Dataset:     *dataset,
-			Split:       *split,
-			Instance:    *instance,
-			InstanceIDs: instanceIDs,
-			Predictions: predictionsArg,
-			OutputDir:   outputAbs,
-			Workers:     *workers,
-			TimeoutSec:  *timeoutSec,
-			CacheLevel:  *cacheLevel,
-			Clean:       *clean,
-			Python:      *python,
-			DockerHost:  *dockerHost,
-			HFHome:      *hfHome,
+			Dataset:             *dataset,
+			Split:               *split,
+			Instance:            *instance,
+			InstanceIDs:         instanceIDs,
+			Predictions:         predictionsSource,
+			PredictionsSnapshot: predictionsSnapshotPath(predictionsArg),
+			PredictionsSHA256:   predictionsSHA256,
+			OutputDir:           outputAbs,
+			Workers:             *workers,
+			TimeoutSec:          *timeoutSec,
+			CacheLevel:          *cacheLevel,
+			Clean:               *clean,
+			Python:              *python,
+			DockerHost:          *dockerHost,
+			HFHome:              *hfHome,
 		},
 	}
 	if err := writeJSON(filepath.Join(outputAbs, "verifier_manifest.json"), manifest); err != nil {
@@ -168,7 +200,124 @@ func runVerify(ctx context.Context, args []string) error {
 	if result.ExitCode != 0 {
 		return fmt.Errorf("swebench harness failed with exit code %d; see %s", result.ExitCode, logPath)
 	}
+	if reportErr != nil {
+		return fmt.Errorf("bind harness report: %w", reportErr)
+	}
+	if predictionsErr != nil {
+		return fmt.Errorf("bind harness predictions: %w", predictionsErr)
+	}
 	return nil
+}
+
+func predictionsSnapshotPath(predictionsArg string) string {
+	if predictionsArg == "gold" {
+		return ""
+	}
+	return predictionsArg
+}
+
+func snapshotHarnessPredictions(source, outputDir string) (string, string, error) {
+	if strings.TrimSpace(source) == "gold" {
+		return "gold", "", nil
+	}
+	data, err := readRegularArtifact(source)
+	if err != nil {
+		return "", "", err
+	}
+	extension := strings.ToLower(filepath.Ext(source))
+	if extension != ".jsonl" {
+		extension = ".json"
+	}
+	snapshotPath := filepath.Join(absPath(outputDir), "predictions.snapshot"+extension)
+	if sameArtifactPath(source, snapshotPath) {
+		return "", "", fmt.Errorf("predictions source and snapshot resolve to the same path %s", snapshotPath)
+	}
+	if err := artifact.WriteFileAtomic(snapshotPath, data, 0o644); err != nil {
+		return "", "", err
+	}
+	digest := fmt.Sprintf("%x", sha256.Sum256(data))
+	if err := validatePredictionsSnapshot(snapshotPath, digest); err != nil {
+		return "", "", err
+	}
+	return snapshotPath, digest, nil
+}
+
+func validatePredictionsSnapshot(path, expectedSHA256 string) error {
+	if path == "gold" && expectedSHA256 == "" {
+		return nil
+	}
+	if !isSHA256Hex(expectedSHA256) {
+		return fmt.Errorf("predictions sha256 %q is not a SHA-256 digest", expectedSHA256)
+	}
+	data, err := readRegularArtifact(path)
+	if err != nil {
+		return err
+	}
+	actual := fmt.Sprintf("%x", sha256.Sum256(data))
+	if actual != expectedSHA256 {
+		return fmt.Errorf(
+			"predictions snapshot SHA-256 %q does not match pre-run digest %q",
+			actual,
+			expectedSHA256,
+		)
+	}
+	return nil
+}
+
+func errorString(err error) string {
+	if err == nil {
+		return ""
+	}
+	return err.Error()
+}
+
+func discoverHarnessReport(outputDir, harnessRunID string) (verifyReport, error) {
+	if err := validateArtifactName("harness run id", harnessRunID); err != nil {
+		return verifyReport{}, err
+	}
+	outputAbs := absPath(outputDir)
+	entries, err := os.ReadDir(outputAbs)
+	if err != nil {
+		return verifyReport{}, fmt.Errorf("read report directory: %w", err)
+	}
+	suffix := "." + harnessRunID + ".json"
+	candidates := make([]string, 0, 1)
+	for _, entry := range entries {
+		if !strings.HasSuffix(entry.Name(), suffix) {
+			continue
+		}
+		path := filepath.Join(outputAbs, entry.Name())
+		info, err := os.Lstat(path)
+		if err != nil {
+			return verifyReport{}, fmt.Errorf("inspect harness report candidate %s: %w", path, err)
+		}
+		if info.Mode()&os.ModeSymlink != 0 || !info.Mode().IsRegular() {
+			return verifyReport{}, fmt.Errorf("harness report candidate %s is not a regular non-symlink file", path)
+		}
+		candidates = append(candidates, path)
+	}
+	sort.Strings(candidates)
+	if len(candidates) != 1 {
+		return verifyReport{}, fmt.Errorf(
+			"expected exactly one *%s harness report in %s, found %d: %v",
+			suffix,
+			outputAbs,
+			len(candidates),
+			candidates,
+		)
+	}
+	data, err := os.ReadFile(candidates[0])
+	if err != nil {
+		return verifyReport{}, fmt.Errorf("read harness report %s: %w", candidates[0], err)
+	}
+	if _, err := readHarnessReport(candidates[0]); err != nil {
+		return verifyReport{}, fmt.Errorf("validate harness report %s: %w", candidates[0], err)
+	}
+	return verifyReport{
+		HarnessRunID: harnessRunID,
+		Path:         candidates[0],
+		SHA256:       fmt.Sprintf("%x", sha256.Sum256(data)),
+	}, nil
 }
 
 func buildHarnessArgs(

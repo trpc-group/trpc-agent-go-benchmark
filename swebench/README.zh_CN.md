@@ -135,7 +135,11 @@ go run ./evaluator verify \
 ```
 
 默认只验证 predictions 中出现的 instance。verifier manifest 会记录实际 SWE-Bench
-version、可发现的 Git revision、package path、完整命令和运行配置。
+version、可发现的 Git revision、package path、完整命令、运行配置，以及官方 report 的
+harness run ID、绝对路径和 SHA-256。对于文件形式的 predictions，`verify` 会原子快照
+harness 实际使用的输入并记录其 SHA-256；Native finalization 强制核对 runner predictions、
+快照、digest 与 harness `-p` 参数。即使 harness 命令成功，只要无法唯一定位该 report，
+`verify` 仍会失败。
 
 `<target-label>` 是与 Agent 实现解耦的小写 slug，例如 `baseline`、`mini-go` 或
 `tag`。prediction reader 支持 SWE-Bench map JSON、array JSON 与 JSONL；空输入、重复 ID、
@@ -148,14 +152,15 @@ go run ./evaluator import \
   --target <target-label> \
   --cases data/generated/cases.jsonl \
   --predictions <path-to-preds.json> \
-  --harness-report <path-to-harness-report.json> \
+  --harness-report <verifier_manifest.report.path> \
   --output results/runs/<run-id>/imported
 ```
 
 generation、verification 和 import 都生成 manifest 后，再使用 `run-config` 汇总。完整 CLI
 见 [`evaluator/README.md`](evaluator/README.md)。
 
-import 会为每个固定 case 写入与 target 无关、带版本号的结构：
+import 会为每个输入 case 写入与 target 无关、带版本号的结构；提供 `--cases` 时输入是完整固定
+面板，否则输入是 predictions 中的实际选择集：
 
 ```json
 {
@@ -170,8 +175,12 @@ import 会为每个固定 case 写入与 target 无关、带版本号的结构�
 }
 ```
 
-`run-config` 只接受一个 runner provenance 来源，并强制核对 run ID、target、dataset、case
-数量、summary counts 与 predictions 路径；任一项不一致都会失败。
+对于经过 filter 或 slice 的运行，import 时省略 `--cases`，由 predictions 定义本次需要
+归一化的 case。`run-config` 仍接收完整的 `cases.manifest.json`：`dataset` 保留完整面板身份，
+`selection` 单独记录实际运行的 case。它只接受一个 runner provenance 来源，并强制核对 run
+ID、target、dataset、selection、summary counts、predictions 路径与 harness report；任一项
+不一致都会失败。`import` 与 `run-config` 必须使用 `verify` 记录的同一份 report；Native
+finalization 强制要求 verify 时记录的 path 与 SHA-256 见证。
 
 ## 验证
 

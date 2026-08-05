@@ -11,6 +11,7 @@ package cli
 
 import (
 	"bytes"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -47,7 +48,10 @@ type targetResult struct {
 
 type usageStats struct {
 	PromptTokens     int `json:"prompt_tokens"`
+	CachedTokens     int `json:"cached_tokens"`
+	UncachedTokens   int `json:"uncached_tokens"`
 	CompletionTokens int `json:"completion_tokens"`
+	ReasoningTokens  int `json:"reasoning_tokens"`
 	TotalTokens      int `json:"total_tokens"`
 	APICalls         int `json:"api_calls"`
 }
@@ -64,8 +68,8 @@ func runImport(args []string) error {
 	fs := newFlagSet("import")
 	target := fs.String("target", "baseline", "path-safe target label")
 	casesPath := fs.String("cases", "", "optional canonical cases.jsonl")
-	predsPath := fs.String("predictions", "", "mini preds.json path")
-	rawDir := fs.String("raw-dir", "", "mini raw output directory containing per-case trajectories")
+	predsPath := fs.String("predictions", "", "runner predictions JSON/JSONL path")
+	rawDir := fs.String("raw-dir", "", "runner raw output directory containing per-case trace artifacts")
 	shardsManifestPath := fs.String("shards-manifest", "", "optional summarize-shards output path for sharded trajectories")
 	harnessReport := fs.String("harness-report", "", "SWE-Bench harness report JSON path")
 	output := fs.String("output", "", "normalized output directory")
@@ -297,10 +301,12 @@ func readHarnessReport(path string) (contract.HarnessIndex, error) {
 		return nil
 	}
 	for key, dst := range map[string]map[string]bool{
-		"resolved_ids":   idx.Resolved,
-		"unresolved_ids": idx.Unresolved,
-		"error_ids":      idx.Errors,
-		"completed_ids":  idx.Completed,
+		"resolved_ids":    idx.Resolved,
+		"unresolved_ids":  idx.Unresolved,
+		"error_ids":       idx.Errors,
+		"empty_patch_ids": idx.EmptyPatch,
+		"incomplete_ids":  idx.Incomplete,
+		"completed_ids":   idx.Completed,
 	} {
 		if err := addIDs(key, dst); err != nil {
 			return idx, err
@@ -317,8 +323,8 @@ func readHarnessReport(path string) (contract.HarnessIndex, error) {
 			}
 		}
 	}
-	if len(idx.Resolved)+len(idx.Unresolved)+len(idx.Errors) == 0 {
-		return idx, fmt.Errorf("harness report %s contains no terminal outcomes", path)
+	if len(idx.Resolved)+len(idx.Unresolved)+len(idx.Errors)+len(idx.EmptyPatch)+len(idx.Incomplete) == 0 {
+		return idx, fmt.Errorf("harness report %s contains no outcomes", path)
 	}
 	return idx, nil
 }
@@ -328,33 +334,39 @@ func validateHarnessIndex(index contract.HarnessIndex, cases []contract.Case) er
 	for _, c := range cases {
 		known[c.InstanceID] = struct{}{}
 	}
-	for id := range index.Resolved {
-		if index.Unresolved[id] || index.Errors[id] {
-			return fmt.Errorf("instance %q appears in multiple terminal outcome sets", id)
-		}
-		if _, ok := known[id]; !ok {
-			return fmt.Errorf("resolved instance %q is not present in case manifest", id)
-		}
+	outcomes := []struct {
+		name string
+		ids  map[string]bool
+	}{
+		{name: "resolved", ids: index.Resolved},
+		{name: "unresolved", ids: index.Unresolved},
+		{name: "error", ids: index.Errors},
+		{name: "empty_patch", ids: index.EmptyPatch},
+		{name: "incomplete", ids: index.Incomplete},
 	}
-	for id := range index.Unresolved {
-		if index.Errors[id] {
-			return fmt.Errorf("instance %q appears in multiple terminal outcome sets", id)
-		}
-		if _, ok := known[id]; !ok {
-			return fmt.Errorf("unresolved instance %q is not present in case manifest", id)
-		}
-	}
-	for id := range index.Errors {
-		if _, ok := known[id]; !ok {
-			return fmt.Errorf("error instance %q is not present in case manifest", id)
+	seenOutcomes := make(map[string]string)
+	for _, outcome := range outcomes {
+		for id := range outcome.ids {
+			if previous := seenOutcomes[id]; previous != "" {
+				return fmt.Errorf(
+					"instance %q appears in multiple terminal outcome sets: %s and %s",
+					id,
+					previous,
+					outcome.name,
+				)
+			}
+			seenOutcomes[id] = outcome.name
+			if _, ok := known[id]; !ok {
+				return fmt.Errorf("%s instance %q is not present in case manifest", outcome.name, id)
+			}
 		}
 	}
 	for id := range index.Completed {
 		if _, ok := known[id]; !ok {
 			return fmt.Errorf("completed instance %q is not present in case manifest", id)
 		}
-		if !index.Resolved[id] && !index.Unresolved[id] {
-			return fmt.Errorf("completed instance %q has no resolved or unresolved outcome", id)
+		if !index.Resolved[id] && !index.Unresolved[id] && !index.Errors[id] {
+			return fmt.Errorf("completed instance %q has no resolved, unresolved, or error outcome", id)
 		}
 	}
 	return nil
@@ -380,17 +392,492 @@ func classify(instanceID string, hasPred bool, patch string, harness contract.Ha
 }
 
 func copyScrubbedTrace(rawDir, traceDir, instanceID string) (string, usageStats, error) {
-	src := filepath.Join(rawDir, instanceID, instanceID+".traj.json")
+	src, err := traceSourcePath(rawDir, instanceID)
+	if err != nil {
+		return "", usageStats{}, err
+	}
 	data, err := os.ReadFile(src)
 	if err != nil {
 		return "", usageStats{}, err
 	}
 	usage := extractUsage(data)
+	if strings.HasSuffix(src, ".native.json") {
+		usage, err = extractNativeUsage(data, instanceID)
+		if err != nil {
+			return "", usageStats{}, err
+		}
+	}
 	dst := filepath.Join(traceDir, instanceID+".json")
 	if err := artifact.WriteFileAtomic(dst, redactJSONBytes(data), 0o644); err != nil {
 		return "", usageStats{}, err
 	}
 	return dst, usage, nil
+}
+
+func traceSourcePath(rawDir, instanceID string) (string, error) {
+	caseDir := filepath.Join(rawDir, instanceID)
+	candidates := []string{
+		filepath.Join(caseDir, instanceID+".traj.json"),
+		filepath.Join(caseDir, instanceID+".native.json"),
+	}
+	found := make([]string, 0, len(candidates))
+	for _, candidate := range candidates {
+		if _, err := os.Stat(candidate); err == nil {
+			found = append(found, candidate)
+		} else if !os.IsNotExist(err) {
+			return "", fmt.Errorf("inspect trace candidate %s: %w", candidate, err)
+		}
+	}
+	switch len(found) {
+	case 0:
+		return "", fmt.Errorf(
+			"trace for %s not found: expected %s or %s",
+			instanceID,
+			candidates[0],
+			candidates[1],
+		)
+	case 1:
+		return found[0], nil
+	default:
+		return "", fmt.Errorf(
+			"ambiguous trace for %s: both %s and %s exist",
+			instanceID,
+			candidates[0],
+			candidates[1],
+		)
+	}
+}
+
+// nativeTraceEnvelope is the validated, framework-native CaseResult boundary.
+// Keep it package-private so run-config validation can reuse the exact same
+// artifact contract without importing another command's internal package.
+type nativeTraceEnvelope struct {
+	InstanceID      string
+	Info            nativeInfoEnvelope
+	ModelPatch      string
+	DurationMS      int64
+	LLMCalls        int
+	ToolCalls       int
+	Usage           nativeUsageEnvelope
+	ResponseCount   int
+	ResponsesSHA256 string
+}
+
+type nativeInfoEnvelope struct {
+	RunID                   string
+	ObservationCodec        string
+	SourceRevision          string
+	SourceModified          bool
+	BinarySHA256            string
+	ModelConfigSHA256       string
+	EnvironmentConfigSHA256 string
+	CasesSHA256             string
+	CommandTimeout          string
+	CaseTimeout             string
+	SelectedInstancesSHA256 string
+	Workers                 int
+	ExitStatus              string
+	Error                   string
+	ErrorCategory           string
+	Retryable               bool
+}
+
+type nativeUsageEnvelope struct {
+	PromptTokens      int
+	CompletionTokens  int
+	TotalTokens       int
+	PromptDetails     nativePromptDetailsEnvelope
+	CompletionDetails nativeCompletionDetailsEnvelope
+	TimingInfo        *nativeTimingEnvelope
+}
+
+type nativePromptDetailsEnvelope struct {
+	CachedTokens        int
+	CacheCreationTokens int
+	CacheReadTokens     int
+}
+
+type nativeCompletionDetailsEnvelope struct {
+	ReasoningTokens int
+}
+
+type nativeTimingEnvelope struct {
+	TimeToFirstToken  int64
+	ReasoningDuration int64
+}
+
+type nativeTraceJSON struct {
+	InstanceID      *string         `json:"instance_id"`
+	Info            json.RawMessage `json:"info"`
+	ModelPatch      *string         `json:"model_patch"`
+	DurationMS      *int64          `json:"duration_ms"`
+	LLMCalls        *int            `json:"llm_calls"`
+	ToolCalls       *int            `json:"tool_calls"`
+	Usage           json.RawMessage `json:"usage"`
+	ResponseCount   *int            `json:"response_count"`
+	ResponsesSHA256 *string         `json:"responses_sha256"`
+}
+
+type nativeInfoJSON struct {
+	RunID                   string  `json:"run_id,omitempty"`
+	ObservationCodec        string  `json:"observation_codec,omitempty"`
+	SourceRevision          string  `json:"source_revision,omitempty"`
+	SourceModified          bool    `json:"source_modified,omitempty"`
+	BinarySHA256            string  `json:"binary_sha256,omitempty"`
+	ModelConfigSHA256       string  `json:"model_config_sha256,omitempty"`
+	EnvironmentConfigSHA256 string  `json:"environment_config_sha256,omitempty"`
+	CasesSHA256             string  `json:"cases_sha256,omitempty"`
+	CommandTimeout          string  `json:"command_timeout,omitempty"`
+	CaseTimeout             string  `json:"case_timeout,omitempty"`
+	SelectedInstancesSHA256 string  `json:"selected_instances_sha256,omitempty"`
+	Workers                 *int    `json:"workers"`
+	ExitStatus              *string `json:"exit_status"`
+	Error                   string  `json:"error,omitempty"`
+	ErrorCategory           string  `json:"error_category,omitempty"`
+	Retryable               bool    `json:"retryable,omitempty"`
+}
+
+type nativeUsageJSON struct {
+	PromptTokens      *int            `json:"prompt_tokens"`
+	CompletionTokens  *int            `json:"completion_tokens"`
+	TotalTokens       *int            `json:"total_tokens"`
+	PromptDetails     json.RawMessage `json:"prompt_tokens_details"`
+	CompletionDetails json.RawMessage `json:"completion_tokens_details"`
+	TimingInfo        json.RawMessage `json:"timing_info,omitempty"`
+}
+
+type nativePromptDetailsJSON struct {
+	CachedTokens        *int `json:"cached_tokens"`
+	CacheCreationTokens *int `json:"cache_creation_tokens,omitempty"`
+	CacheReadTokens     *int `json:"cache_read_tokens,omitempty"`
+}
+
+type nativeCompletionDetailsJSON struct {
+	ReasoningTokens *int `json:"reasoning_tokens,omitempty"`
+}
+
+type nativeTimingJSON struct {
+	TimeToFirstToken  *int64 `json:"time_to_first_token,omitempty"`
+	ReasoningDuration *int64 `json:"reasoning_duration,omitempty"`
+}
+
+func extractNativeUsage(data []byte, instanceID string) (usageStats, error) {
+	trace, err := parseNativeTraceEnvelope(data, instanceID)
+	if err != nil {
+		return usageStats{}, err
+	}
+	return usageStats{
+		PromptTokens:     trace.Usage.PromptTokens,
+		CachedTokens:     trace.Usage.PromptDetails.CachedTokens,
+		UncachedTokens:   trace.Usage.PromptTokens - trace.Usage.PromptDetails.CachedTokens,
+		CompletionTokens: trace.Usage.CompletionTokens,
+		ReasoningTokens:  trace.Usage.CompletionDetails.ReasoningTokens,
+		TotalTokens:      trace.Usage.TotalTokens,
+		APICalls:         trace.LLMCalls,
+	}, nil
+}
+
+func parseNativeTraceEnvelope(data []byte, instanceID string) (nativeTraceEnvelope, error) {
+	var raw nativeTraceJSON
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return nativeTraceEnvelope{}, fmt.Errorf("parse native trace for %s: %w", instanceID, err)
+	}
+	if raw.InstanceID == nil {
+		return nativeTraceEnvelope{}, missingNativeFieldError(instanceID, "instance_id")
+	}
+	if *raw.InstanceID != instanceID {
+		return nativeTraceEnvelope{}, fmt.Errorf(
+			"native trace instance_id %q does not match %q",
+			*raw.InstanceID,
+			instanceID,
+		)
+	}
+	for _, field := range []struct {
+		name    string
+		present bool
+	}{
+		{"model_patch", raw.ModelPatch != nil},
+		{"duration_ms", raw.DurationMS != nil},
+		{"llm_calls", raw.LLMCalls != nil},
+		{"tool_calls", raw.ToolCalls != nil},
+		{"response_count", raw.ResponseCount != nil},
+		{"responses_sha256", raw.ResponsesSHA256 != nil},
+	} {
+		if !field.present {
+			return nativeTraceEnvelope{}, missingNativeFieldError(instanceID, field.name)
+		}
+	}
+	if err := requireNativeJSONObject(raw.Info, instanceID, "info"); err != nil {
+		return nativeTraceEnvelope{}, err
+	}
+	if err := requireNativeJSONObject(raw.Usage, instanceID, "usage"); err != nil {
+		return nativeTraceEnvelope{}, err
+	}
+
+	info, err := parseNativeInfo(raw.Info, instanceID)
+	if err != nil {
+		return nativeTraceEnvelope{}, err
+	}
+	usage, err := parseNativeUsage(raw.Usage, instanceID)
+	if err != nil {
+		return nativeTraceEnvelope{}, err
+	}
+
+	intValues := []struct {
+		name  string
+		value int
+	}{
+		{"info.workers", info.Workers},
+		{"llm_calls", *raw.LLMCalls},
+		{"tool_calls", *raw.ToolCalls},
+		{"response_count", *raw.ResponseCount},
+	}
+	for _, value := range intValues {
+		if err := rejectNegativeNativeInt(instanceID, value.name, value.value); err != nil {
+			return nativeTraceEnvelope{}, err
+		}
+	}
+	if *raw.DurationMS < 0 {
+		return nativeTraceEnvelope{}, fmt.Errorf(
+			"native trace for %s has negative duration_ms %d",
+			instanceID,
+			*raw.DurationMS,
+		)
+	}
+	if !isSHA256Hex(*raw.ResponsesSHA256) {
+		return nativeTraceEnvelope{}, fmt.Errorf(
+			"native trace for %s has invalid responses_sha256 %q: want 64 hexadecimal characters",
+			instanceID,
+			*raw.ResponsesSHA256,
+		)
+	}
+	return nativeTraceEnvelope{
+		InstanceID:      *raw.InstanceID,
+		Info:            info,
+		ModelPatch:      *raw.ModelPatch,
+		DurationMS:      *raw.DurationMS,
+		LLMCalls:        *raw.LLMCalls,
+		ToolCalls:       *raw.ToolCalls,
+		Usage:           usage,
+		ResponseCount:   *raw.ResponseCount,
+		ResponsesSHA256: *raw.ResponsesSHA256,
+	}, nil
+}
+
+func parseNativeInfo(data json.RawMessage, instanceID string) (nativeInfoEnvelope, error) {
+	var raw nativeInfoJSON
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return nativeInfoEnvelope{}, fmt.Errorf("parse native trace info for %s: %w", instanceID, err)
+	}
+	if raw.Workers == nil {
+		return nativeInfoEnvelope{}, missingNativeFieldError(instanceID, "info.workers")
+	}
+	if raw.ExitStatus == nil {
+		return nativeInfoEnvelope{}, missingNativeFieldError(instanceID, "info.exit_status")
+	}
+	if *raw.Workers < 1 {
+		return nativeInfoEnvelope{}, fmt.Errorf(
+			"native trace for %s has non-positive info.workers %d",
+			instanceID,
+			*raw.Workers,
+		)
+	}
+	if strings.TrimSpace(*raw.ExitStatus) == "" {
+		return nativeInfoEnvelope{}, fmt.Errorf(
+			"native trace for %s has empty info.exit_status",
+			instanceID,
+		)
+	}
+	return nativeInfoEnvelope{
+		RunID:                   raw.RunID,
+		ObservationCodec:        raw.ObservationCodec,
+		SourceRevision:          raw.SourceRevision,
+		SourceModified:          raw.SourceModified,
+		BinarySHA256:            raw.BinarySHA256,
+		ModelConfigSHA256:       raw.ModelConfigSHA256,
+		EnvironmentConfigSHA256: raw.EnvironmentConfigSHA256,
+		CasesSHA256:             raw.CasesSHA256,
+		CommandTimeout:          raw.CommandTimeout,
+		CaseTimeout:             raw.CaseTimeout,
+		SelectedInstancesSHA256: raw.SelectedInstancesSHA256,
+		Workers:                 *raw.Workers,
+		ExitStatus:              *raw.ExitStatus,
+		Error:                   raw.Error,
+		ErrorCategory:           raw.ErrorCategory,
+		Retryable:               raw.Retryable,
+	}, nil
+}
+
+func parseNativeUsage(data json.RawMessage, instanceID string) (nativeUsageEnvelope, error) {
+	var raw nativeUsageJSON
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return nativeUsageEnvelope{}, fmt.Errorf("parse native trace usage for %s: %w", instanceID, err)
+	}
+	for _, field := range []struct {
+		name    string
+		present bool
+	}{
+		{"usage.prompt_tokens", raw.PromptTokens != nil},
+		{"usage.completion_tokens", raw.CompletionTokens != nil},
+		{"usage.total_tokens", raw.TotalTokens != nil},
+	} {
+		if !field.present {
+			return nativeUsageEnvelope{}, missingNativeFieldError(instanceID, field.name)
+		}
+	}
+	if err := requireNativeJSONObject(
+		raw.PromptDetails,
+		instanceID,
+		"usage.prompt_tokens_details",
+	); err != nil {
+		return nativeUsageEnvelope{}, err
+	}
+	if err := requireNativeJSONObject(
+		raw.CompletionDetails,
+		instanceID,
+		"usage.completion_tokens_details",
+	); err != nil {
+		return nativeUsageEnvelope{}, err
+	}
+
+	var promptRaw nativePromptDetailsJSON
+	if err := json.Unmarshal(raw.PromptDetails, &promptRaw); err != nil {
+		return nativeUsageEnvelope{}, fmt.Errorf(
+			"parse native trace prompt token details for %s: %w",
+			instanceID,
+			err,
+		)
+	}
+	if promptRaw.CachedTokens == nil {
+		return nativeUsageEnvelope{}, missingNativeFieldError(
+			instanceID,
+			"usage.prompt_tokens_details.cached_tokens",
+		)
+	}
+	var completionRaw nativeCompletionDetailsJSON
+	if err := json.Unmarshal(raw.CompletionDetails, &completionRaw); err != nil {
+		return nativeUsageEnvelope{}, fmt.Errorf(
+			"parse native trace completion token details for %s: %w",
+			instanceID,
+			err,
+		)
+	}
+
+	prompt := nativePromptDetailsEnvelope{CachedTokens: *promptRaw.CachedTokens}
+	if promptRaw.CacheCreationTokens != nil {
+		prompt.CacheCreationTokens = *promptRaw.CacheCreationTokens
+	}
+	if promptRaw.CacheReadTokens != nil {
+		prompt.CacheReadTokens = *promptRaw.CacheReadTokens
+	}
+	completion := nativeCompletionDetailsEnvelope{}
+	if completionRaw.ReasoningTokens != nil {
+		completion.ReasoningTokens = *completionRaw.ReasoningTokens
+	}
+	usage := nativeUsageEnvelope{
+		PromptTokens:      *raw.PromptTokens,
+		CompletionTokens:  *raw.CompletionTokens,
+		TotalTokens:       *raw.TotalTokens,
+		PromptDetails:     prompt,
+		CompletionDetails: completion,
+	}
+	if len(raw.TimingInfo) > 0 {
+		if err := requireNativeJSONObject(raw.TimingInfo, instanceID, "usage.timing_info"); err != nil {
+			return nativeUsageEnvelope{}, err
+		}
+		var timingRaw nativeTimingJSON
+		if err := json.Unmarshal(raw.TimingInfo, &timingRaw); err != nil {
+			return nativeUsageEnvelope{}, fmt.Errorf(
+				"parse native trace timing info for %s: %w",
+				instanceID,
+				err,
+			)
+		}
+		timing := &nativeTimingEnvelope{}
+		if timingRaw.TimeToFirstToken != nil {
+			timing.TimeToFirstToken = *timingRaw.TimeToFirstToken
+		}
+		if timingRaw.ReasoningDuration != nil {
+			timing.ReasoningDuration = *timingRaw.ReasoningDuration
+		}
+		for _, value := range []struct {
+			name  string
+			value int64
+		}{
+			{"usage.timing_info.time_to_first_token", timing.TimeToFirstToken},
+			{"usage.timing_info.reasoning_duration", timing.ReasoningDuration},
+		} {
+			if value.value < 0 {
+				return nativeUsageEnvelope{}, fmt.Errorf(
+					"native trace for %s has negative %s %d",
+					instanceID,
+					value.name,
+					value.value,
+				)
+			}
+		}
+		usage.TimingInfo = timing
+	}
+
+	for _, value := range []struct {
+		name  string
+		value int
+	}{
+		{"usage.prompt_tokens", usage.PromptTokens},
+		{"usage.prompt_tokens_details.cached_tokens", usage.PromptDetails.CachedTokens},
+		{"usage.prompt_tokens_details.cache_creation_tokens", usage.PromptDetails.CacheCreationTokens},
+		{"usage.prompt_tokens_details.cache_read_tokens", usage.PromptDetails.CacheReadTokens},
+		{"usage.completion_tokens", usage.CompletionTokens},
+		{"usage.completion_tokens_details.reasoning_tokens", usage.CompletionDetails.ReasoningTokens},
+		{"usage.total_tokens", usage.TotalTokens},
+	} {
+		if err := rejectNegativeNativeInt(instanceID, value.name, value.value); err != nil {
+			return nativeUsageEnvelope{}, err
+		}
+	}
+	if usage.PromptDetails.CachedTokens > usage.PromptTokens {
+		return nativeUsageEnvelope{}, fmt.Errorf(
+			"native trace for %s has cached_tokens %d greater than prompt_tokens %d",
+			instanceID,
+			usage.PromptDetails.CachedTokens,
+			usage.PromptTokens,
+		)
+	}
+	return usage, nil
+}
+
+func rejectNegativeNativeInt(instanceID, field string, value int) error {
+	if value < 0 {
+		return fmt.Errorf("native trace for %s has negative %s %d", instanceID, field, value)
+	}
+	return nil
+}
+
+func isSHA256Hex(value string) bool {
+	if len(value) != 64 {
+		return false
+	}
+	decoded, err := hex.DecodeString(value)
+	return err == nil && len(decoded) == 32
+}
+
+func missingNativeFieldError(instanceID, field string) error {
+	return fmt.Errorf("native trace for %s is missing required field %s", instanceID, field)
+}
+
+func requireNativeJSONObject(data json.RawMessage, instanceID, field string) error {
+	if len(data) == 0 {
+		return missingNativeFieldError(instanceID, field)
+	}
+	trimmed := bytes.TrimSpace(data)
+	if len(trimmed) == 0 || trimmed[0] != '{' {
+		return fmt.Errorf(
+			"native trace for %s required field %s must be a JSON object",
+			instanceID,
+			field,
+		)
+	}
+	return nil
 }
 
 func extractUsage(data []byte) usageStats {
@@ -400,6 +887,10 @@ func extractUsage(data []byte) usageStats {
 	}
 	stats := usageStats{}
 	walkUsage(v, &stats)
+	stats.UncachedTokens = stats.PromptTokens - stats.CachedTokens
+	if stats.UncachedTokens < 0 {
+		stats.UncachedTokens = 0
+	}
 	return stats
 }
 
@@ -408,12 +899,16 @@ func walkUsage(v any, stats *usageStats) {
 	case map[string]any:
 		for k, val := range x {
 			switch strings.ToLower(k) {
-			case "api_calls":
+			case "api_calls", "llm_calls":
 				stats.APICalls = maxInt(stats.APICalls, jsonNumberToInt(val))
 			case "prompt_tokens":
 				stats.PromptTokens = maxInt(stats.PromptTokens, jsonNumberToInt(val))
+			case "cached_tokens":
+				stats.CachedTokens = maxInt(stats.CachedTokens, jsonNumberToInt(val))
 			case "completion_tokens":
 				stats.CompletionTokens = maxInt(stats.CompletionTokens, jsonNumberToInt(val))
+			case "reasoning_tokens":
+				stats.ReasoningTokens = maxInt(stats.ReasoningTokens, jsonNumberToInt(val))
 			case "total_tokens":
 				stats.TotalTokens = maxInt(stats.TotalTokens, jsonNumberToInt(val))
 			default:

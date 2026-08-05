@@ -61,6 +61,50 @@ native-runner-progress.json
 The manifest reads the linked tRPC-Agent-Go module version from Go build
 information. It does not hardcode a development revision.
 
+## Complete a filtered smoke run
+
+Use the predictions as the selected case set when normalizing a filtered or
+sliced run. The full prepared cases manifest is still passed to `run-config`,
+so the final provenance document retains both the complete source panel and the
+actual run selection without fabricating a subset manifest.
+
+```bash
+go run ./evaluator verify \
+  --run-id native-smoke \
+  --target tag \
+  --predictions results/runs/native-smoke/raw/native/preds.json \
+  --output results/runs/native-smoke/local-harness-report/tag \
+  --harness-workers 1 \
+  --instance-timeout-seconds 1800
+
+go run ./evaluator import \
+  --target tag \
+  --predictions results/runs/native-smoke/raw/native/preds.json \
+  --raw-dir results/runs/native-smoke/raw/native \
+  --harness-report <verifier_manifest.report.path> \
+  --output results/runs/native-smoke/imported
+
+go run ./evaluator run-config \
+  --run-id native-smoke \
+  --target tag \
+  --cases-manifest data/generated/cases.manifest.json \
+  --runner-manifest results/runs/native-smoke/raw/native/native-runner-manifest.json \
+  --verifier-manifest results/runs/native-smoke/local-harness-report/tag/verifier_manifest.json \
+  --import-summary results/runs/native-smoke/imported/summary/tag.json \
+  --harness-report <verifier_manifest.report.path> \
+  --model-name <model-name>
+```
+
+Both commands must receive the exact report path recorded by `verify`.
+`run-config` checks its SHA-256, harness run ID, output directory, filename, and
+verify command provenance before it accepts resolved/unresolved/error outcomes.
+`verify` also evaluates an atomic predictions snapshot; Native finalization
+requires its SHA-256 to match both the runner predictions and the harness `-p`
+input.
+
+For an unfiltered full-panel run, pass `--cases data/generated/cases.jsonl` to
+`import` to retain all canonical case metadata in the normalized rows.
+
 ## Validate
 
 ```bash

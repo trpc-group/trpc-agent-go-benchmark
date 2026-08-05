@@ -142,8 +142,14 @@ go run ./evaluator verify \
 ```
 
 By default the harness is restricted to instance IDs present in the prediction
-file. The verifier manifest records the installed SWE-Bench version, discoverable
-Git revision, package path, exact command, and runtime configuration.
+file. The verifier manifest records the installed SWE-Bench version,
+discoverable Git revision, package path, exact command, runtime configuration,
+and the official report's harness run ID, absolute path, and SHA-256. For
+file-backed predictions, `verify` atomically snapshots the exact input used by
+the harness and records its SHA-256; Native finalization requires the runner
+predictions, snapshot, digest, and harness `-p` argument to agree. A
+successful harness command is not accepted as a successful `verify` step when
+that report cannot be identified unambiguously.
 
 `<target-label>` is an agent-neutral lowercase slug such as `baseline`,
 `mini-go`, or `tag`. Prediction readers accept SWE-Bench map JSON, array JSON,
@@ -157,14 +163,15 @@ go run ./evaluator import \
   --target <target-label> \
   --cases data/generated/cases.jsonl \
   --predictions <path-to-preds.json> \
-  --harness-report <path-to-harness-report.json> \
+  --harness-report <verifier_manifest.report.path> \
   --output results/runs/<run-id>/imported
 ```
 
 Use `run-config` after generation, verification, and import have produced their
 manifests. See [`evaluator/README.md`](evaluator/README.md) for the complete CLI.
 
-The importer writes a target-neutral versioned row for every canonical case:
+The importer writes a target-neutral versioned row for every input case (the
+canonical panel when `--cases` is supplied, otherwise the prediction set):
 
 ```json
 {
@@ -179,8 +186,14 @@ The importer writes a target-neutral versioned row for every canonical case:
 }
 ```
 
-`run-config` accepts exactly one runner provenance source and rejects mismatched
-run IDs, targets, datasets, case counts, summary counts, or prediction paths.
+For filtered or sliced runs, omit `--cases` during import so predictions define
+the normalized rows. `run-config` still receives the full
+`cases.manifest.json`: its `dataset` field preserves the complete panel identity
+while `selection` records the cases actually run. The command accepts exactly
+one runner provenance source and rejects mismatched run IDs, targets, datasets,
+selection identities, summary counts, prediction paths, or harness reports.
+Pass the same report recorded by `verify` to both `import` and `run-config`;
+Native finalization requires that verify-time path and SHA-256 attestation.
 
 ## Validation
 
