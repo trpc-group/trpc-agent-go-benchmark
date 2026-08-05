@@ -7,6 +7,10 @@ Core 层不绑定具体 Agent：它生成安全的 case manifest，接收外部 
 未经修改的 upstream SWE-Bench 本地 harness，并统一整理产物。后续可以在不修改 evaluator
 契约的前提下增加 Agent 实现。
 
+可选的 Mini-Go 路径是 mini-SWE-agent v2.1.0 的 source-aligned Go 移植。它复用
+tRPC-Agent-Go 的公开 model 与 tool 类型，但刻意保留 mini-SWE-agent 的显式控制循环。因此
+它是参考实现路径，而不是原生 `llmagent` runner。
+
 ## 范围
 
 当前 Core 包含：
@@ -15,6 +19,8 @@ Core 层不绑定具体 Agent：它生成安全的 case manifest，接收外部 
 - 排除 gold patch 和测试元数据的安全数据投影；
 - prediction、runner manifest、verifier manifest 与结果契约；
 - 外部 mini-SWE-agent 参考实现的适配入口；
+- 共享 Docker environment 与 XML-like/JSON/text observation codec；
+- 经过 golden 测试的 source-aligned Mini-Go 参考 runner；
 - 对未经修改的 upstream official local harness 的调用；
 - batch 规划、可恢复 shard 检查和确定性 predictions 合并。
 
@@ -28,8 +34,9 @@ swebench/
   config/                 # 不包含真实凭据的模型与环境模板。
   data/                   # 固定 case list 和生成的安全元数据。
   evaluator/              # 数据准备、验证和导入 CLI。
-  internal/               # artifact 与 contract 包。
+  internal/               # artifact、contract、environment 与 codec 包。
   mini-swe-agent-impl/    # 外部参考 runner 说明。
+  mini-swe-agent-go-impl/ # source-aligned Mini-Go 参考 runner。
   results/                # 被忽略的运行产物与后续结果摘要。
 ```
 
@@ -102,8 +109,10 @@ go run ./evaluator prepare-data --python python
 
 ### 5. 生成并验证 predictions
 
-外部参考 runner 见 [`mini-swe-agent-impl/README.md`](mini-swe-agent-impl/README.md)。也可以
-提供任何符合共享契约的 predictions 文件。
+可以选择
+[`外部 mini-SWE-agent runner`](mini-swe-agent-impl/README.md)、
+[`source-aligned Mini-Go runner`](mini-swe-agent-go-impl/README.md)，或提供任何符合共享契约的
+其他 predictions 文件。
 
 ```bash
 go run ./evaluator verify \

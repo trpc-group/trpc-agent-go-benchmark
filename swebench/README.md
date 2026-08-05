@@ -9,6 +9,11 @@ runs external prediction producers, invokes the unmodified upstream SWE-Bench
 local harness, and normalizes the resulting artifacts. Agent implementations
 can be added without changing the evaluator contract.
 
+The optional Mini-Go lane is a source-aligned Go port of mini-SWE-agent v2.1.0.
+It reuses tRPC-Agent-Go's public model and tool types, but intentionally keeps
+mini-SWE-agent's explicit control loop. It is therefore a reference lane, not
+the native `llmagent` runner.
+
 ## Scope
 
 The committed core includes:
@@ -17,6 +22,8 @@ The committed core includes:
 - a safe dataset projection that excludes gold patches and test metadata;
 - prediction, runner-manifest, verifier-manifest, and result contracts;
 - an adapter for the external mini-SWE-agent reference implementation;
+- shared Docker-environment and XML-like/JSON/text observation codecs;
+- a golden-tested, source-aligned Mini-Go reference runner;
 - the unmodified upstream local harness invocation;
 - batch planning, resumable shard inspection, and deterministic prediction
   merging.
@@ -31,8 +38,9 @@ swebench/
   config/                 # Secret-safe model and environment templates.
   data/                   # Canonical case list and generated safe metadata.
   evaluator/              # Shared preparation, verification, and import CLI.
-  internal/               # Artifact and contract packages.
+  internal/               # Artifact, contract, environment, and codec packages.
   mini-swe-agent-impl/    # External reference-runner instructions.
+  mini-swe-agent-go-impl/ # Source-aligned Mini-Go reference runner.
   results/                # Ignored runtime outputs and future summaries.
 ```
 
@@ -106,9 +114,10 @@ generated instance IDs match the committed list and checksum.
 
 ### 5. Produce and verify predictions
 
-Follow [`mini-swe-agent-impl/README.md`](mini-swe-agent-impl/README.md) for the
-external reference runner, or provide any prediction file that follows the
-shared contract.
+Choose either the
+[`external mini-SWE-agent runner`](mini-swe-agent-impl/README.md), the
+[`source-aligned Mini-Go runner`](mini-swe-agent-go-impl/README.md), or any
+other prediction producer that follows the shared contract.
 
 ```bash
 go run ./evaluator verify \
