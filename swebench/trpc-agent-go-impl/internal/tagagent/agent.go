@@ -29,12 +29,17 @@ func New(
 	codec observation.ObservationCodec,
 	generationConfig model.GenerationConfig,
 	state *State,
+	cleanRoom bool,
 ) *llmagent.LLMAgent {
 	bash := &bashTool{environment: environment}
+	instruction := protocol.SystemPrompt
+	if cleanRoom {
+		instruction = protocol.OfflineSystemPrompt
+	}
 	return llmagent.New(
 		"swe-agent",
 		llmagent.WithModel(modelImpl),
-		llmagent.WithGlobalInstruction(protocol.SystemPrompt),
+		llmagent.WithGlobalInstruction(instruction),
 		llmagent.WithGenerationConfig(generationConfig),
 		llmagent.WithTools([]tool.Tool{bash}),
 		llmagent.WithMaxLLMCalls(MaxLLMCalls),

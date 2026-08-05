@@ -19,6 +19,14 @@ const UpstreamCommit = "3a9b8e874d322a9cfb1f391ff4f4df67721c108c"
 // SystemPrompt is rendered from v2.1.0 config/benchmarks/swebench.yaml.
 const SystemPrompt = "You are a helpful assistant that can interact with a computer shell to solve programming tasks."
 
+const offlineGuidance = "The shell has no public internet access; only declared local services are reachable. " +
+	"Use the PR description, repository and base-or-earlier local history, local tests, and locally available tools and dependencies. " +
+	"If an optional dependency is absent, continue with the available evidence."
+
+// OfflineSystemPrompt adds the minimum accurate capability notice for a
+// clean-room generation container.
+const OfflineSystemPrompt = SystemPrompt + " " + offlineGuidance
+
 const instancePrompt = `<pr_description>
 Consider the following PR description:
 {{task}}
@@ -129,5 +137,28 @@ If the command fails (nonzero exit status), it will not submit.
 
 // PromptForTask renders the source-aligned instance prompt.
 func PromptForTask(task string) string {
-	return strings.NewReplacer("{{task}}", task, "[[BACKTICK]]", "`").Replace(instancePrompt)
+	return renderPrompt(instancePrompt, task)
+}
+
+var offlinePromptReplacer = strings.NewReplacer(
+	"\n- If a tool isn't available, you can also install it\n",
+	"\n",
+)
+
+// PromptForTaskOffline removes the upstream installation suggestion that is
+// impossible inside a network-none generation container.
+func PromptForTaskOffline(task string) string {
+	return renderPrompt(offlinePromptReplacer.Replace(instancePrompt), task)
+}
+
+// PromptForTaskForMode selects the source-aligned or clean-room prompt.
+func PromptForTaskForMode(task string, cleanRoom bool) string {
+	if cleanRoom {
+		return PromptForTaskOffline(task)
+	}
+	return PromptForTask(task)
+}
+
+func renderPrompt(prompt, task string) string {
+	return strings.NewReplacer("{{task}}", task, "[[BACKTICK]]", "`").Replace(prompt)
 }

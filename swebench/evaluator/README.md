@@ -48,8 +48,12 @@ source code.
   Native finalization additionally requires the current runner predictions to
   match the verify-time snapshot digest. Legacy Mini manifests may omit this
   newer attestation.
-- `summarize-shards` accepts both the external mini-SWE-agent manifest and the
-  Mini-Go runner manifest, while applying the same fixed-plan coverage checks.
+- `summarize-shards` accepts external mini-SWE-agent, Mini-Go, and Native runner
+  manifests while applying the same fixed-plan coverage checks. For clean-room
+  Native shards, it also requires one consistent policy and offline asset-tree
+  identity, safely merges resolved image provenance, recomputes the image-set
+  hash, and validates every accepted case artifact's base-commit and
+  environment-image provenance.
 
 Target labels must be lowercase slugs. Run IDs and instance IDs are restricted
 to path-safe artifact names because they are used below ignored runtime roots.

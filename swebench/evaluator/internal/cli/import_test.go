@@ -18,6 +18,7 @@ import (
 	"testing"
 
 	"trpc.group/trpc-go/trpc-agent-go-benchmark/swebench/internal/contract"
+	"trpc.group/trpc-go/trpc-agent-go-benchmark/swebench/internal/sweenv"
 )
 
 func TestRunImportWritesTargetNeutralSchema(t *testing.T) {
@@ -313,6 +314,95 @@ func TestRunImportReadsNativeTraceUsageAndRedactsSecrets(t *testing.T) {
 	if strings.Contains(string(trace), "sk-native-secret") || scrubbed["api_key"] != "<redacted>" {
 		t.Fatalf("native trace was not redacted: %s", trace)
 	}
+	if row.CleanRoom || row.EnvironmentProvenance != nil {
+		t.Fatalf("legacy default-off native trace gained clean-room provenance: %+v", row)
+	}
+}
+
+func TestRunImportBindsCleanRoomNativeProvenance(t *testing.T) {
+	dir := t.TempDir()
+	instanceID := "psf__requests-2317"
+	repo := "psf/requests"
+	baseCommit := strings.Repeat("c", 40)
+	predictionsPath := filepath.Join(dir, "preds.json")
+	if err := writeJSON(predictionsPath, map[string]contract.Prediction{
+		instanceID: {InstanceID: instanceID, ModelNameOrPath: "model"},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	casesPath := filepath.Join(dir, "cases.jsonl")
+	caseData, err := json.Marshal(contract.Case{InstanceID: instanceID, Repo: repo, BaseCommit: baseCommit})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(casesPath, append(caseData, '\n'), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	rawDir := filepath.Join(dir, "raw")
+	caseDir := filepath.Join(rawDir, instanceID)
+	if err := os.MkdirAll(caseDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	artifact, _, _ := cleanRoomNativeArtifact(t, instanceID, repo, baseCommit)
+	if err := os.WriteFile(
+		filepath.Join(caseDir, instanceID+".native.json"),
+		marshalJSONObject(t, artifact),
+		0o600,
+	); err != nil {
+		t.Fatal(err)
+	}
+	output := filepath.Join(dir, "imported")
+	if err := runImport([]string{
+		"--target", "native",
+		"--cases", casesPath,
+		"--predictions", predictionsPath,
+		"--raw-dir", rawDir,
+		"--output", output,
+	}); err != nil {
+		t.Fatalf("runImport() error = %v", err)
+	}
+	rows, err := readAndValidateImportedCases(
+		filepath.Join(output, "cases.jsonl"),
+		importSummary{SchemaVersion: importSchemaVersion, Target: "native", Total: 1, Counts: map[string]int{"empty_patch": 1}},
+		"native",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rows) != 1 {
+		t.Fatalf("imported rows = %d, want 1", len(rows))
+	}
+	row := rows[0]
+	if !row.CleanRoom || row.Repo != repo || row.BaseCommit != baseCommit || row.VerifiedBaseCommit != baseCommit {
+		t.Fatalf("imported clean-room identity = %+v", row)
+	}
+	if !isSHA256Hex(row.CleanRoomPolicySHA256) || !isSHA256Hex(row.OfflineAssetsSHA256) ||
+		!isSHA256Hex(row.ImageSetSHA256) || row.EnvironmentProvenance == nil {
+		t.Fatalf("imported clean-room provenance = %+v", row)
+	}
+}
+
+func TestValidateCaseEnvironmentProvenanceFixesAuxiliaryRoles(t *testing.T) {
+	instanceID := "psf__requests-2317"
+	artifact, _, _ := cleanRoomNativeArtifact(t, instanceID, "psf/requests", strings.Repeat("c", 40))
+	base := artifact["info"].(map[string]any)["environment_provenance"].(sweenv.Provenance)
+
+	wrongHTTPBin := *cloneEnvironmentProvenance(&base)
+	wrongHTTPBin.AuxiliaryImages["httpbin"] = sweenv.ImageIdentity{
+		Reference: "example.test/not-httpbin:latest",
+		ID:        "sha256:" + strings.Repeat("d", 64),
+	}
+	if err := validateCaseEnvironmentProvenance(instanceID, wrongHTTPBin, nil); err == nil ||
+		!strings.Contains(err.Error(), "httpbin image reference") {
+		t.Fatalf("validateCaseEnvironmentProvenance() error = %v, want fixed httpbin reference rejection", err)
+	}
+
+	wrongHelper := *cloneEnvironmentProvenance(&base)
+	wrongHelper.AuxiliaryImages["network-helper"] = wrongHelper.AuxiliaryImages["httpbin"]
+	if err := validateCaseEnvironmentProvenance(instanceID, wrongHelper, nil); err == nil ||
+		!strings.Contains(err.Error(), "network-helper image") {
+		t.Fatalf("validateCaseEnvironmentProvenance() error = %v, want helper/testbed mismatch", err)
+	}
 }
 
 func TestCopyScrubbedTraceRejectsAmbiguousAgentArtifacts(t *testing.T) {
@@ -601,6 +691,53 @@ func validNativeArtifact() map[string]any {
 		"response_count":   0,
 		"responses_sha256": emptyResponsesSHA256,
 	}
+}
+
+func cleanRoomNativeArtifact(
+	t *testing.T,
+	instanceID string,
+	repo string,
+	baseCommit string,
+) (map[string]any, map[string]sweenv.ImageIdentity, *sweenv.OfflineAssetIdentity) {
+	t.Helper()
+	testbedReference := sweenv.ImageForInstance(instanceID)
+	testbed := sweenv.ImageIdentity{Reference: testbedReference, ID: "sha256:" + strings.Repeat("a", 64)}
+	httpbin := sweenv.ImageIdentity{
+		Reference: "docker.io/kennethreitz/httpbin:latest",
+		ID:        "sha256:" + strings.Repeat("b", 64),
+	}
+	images := map[string]sweenv.ImageIdentity{
+		testbed.Reference: testbed,
+		httpbin.Reference: httpbin,
+	}
+	imageSetSHA256, err := sweenv.ImageSetSHA256(images)
+	if err != nil {
+		t.Fatal(err)
+	}
+	offlineAssets := &sweenv.OfflineAssetIdentity{
+		Schema:         "swebench-offline-assets-v1",
+		SHA256:         strings.Repeat("1", 64),
+		ManifestSHA256: strings.Repeat("2", 64),
+		FileCount:      3,
+	}
+	artifact := validNativeArtifact()
+	artifact["instance_id"] = instanceID
+	info := artifact["info"].(map[string]any)
+	info["clean_room"] = true
+	info["clean_room_policy_sha256"] = strings.Repeat("3", 64)
+	info["offline_assets_sha256"] = offlineAssets.SHA256
+	info["image_set_sha256"] = imageSetSHA256
+	info["repo"] = repo
+	info["base_commit"] = baseCommit
+	info["verified_base_commit"] = baseCommit
+	info["environment_provenance"] = sweenv.Provenance{
+		Testbed: testbed,
+		AuxiliaryImages: map[string]sweenv.ImageIdentity{
+			"httpbin":        httpbin,
+			"network-helper": testbed,
+		},
+	}
+	return artifact, images, offlineAssets
 }
 
 func wrongNativeFieldType(path string) any {

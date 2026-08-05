@@ -19,7 +19,50 @@ import (
 
 	"trpc.group/trpc-go/trpc-agent-go-benchmark/swebench/internal/artifact"
 	"trpc.group/trpc-go/trpc-agent-go-benchmark/swebench/internal/contract"
+	"trpc.group/trpc-go/trpc-agent-go-benchmark/swebench/internal/sweenv"
 )
+
+func TestValidateCleanRoomIdentityBindsImageAndAssetDigests(t *testing.T) {
+	images := map[string]sweenv.ImageIdentity{
+		"example.test/image:tag": {
+			Reference: "example.test/image:tag",
+			ID:        "sha256:" + strings.Repeat("a", 64),
+		},
+	}
+	imageSetSHA256, err := sweenv.ImageSetSHA256(images)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assets := &sweenv.OfflineAssetIdentity{
+		Schema:         "swebench-offline-assets-v1",
+		SHA256:         strings.Repeat("1", 64),
+		ManifestSHA256: strings.Repeat("2", 64),
+		FileCount:      1,
+	}
+	if err := validateCleanRoomIdentity(
+		"test",
+		true,
+		strings.Repeat("3", 64),
+		assets,
+		imageSetSHA256,
+		images,
+	); err != nil {
+		t.Fatalf("validateCleanRoomIdentity() error = %v", err)
+	}
+	if err := validateCleanRoomIdentity("test", false, strings.Repeat("3", 64), nil, "", nil); err == nil {
+		t.Fatal("validateCleanRoomIdentity() accepted provenance with clean_room=false")
+	}
+	mutated := cloneDockerImages(images)
+	mutated["example.test/image:tag"] = sweenv.ImageIdentity{
+		Reference: "example.test/image:tag",
+		ID:        "sha256:" + strings.Repeat("b", 64),
+	}
+	if err := validateCleanRoomIdentity(
+		"test", true, strings.Repeat("3", 64), assets, imageSetSHA256, mutated,
+	); err == nil || !strings.Contains(err.Error(), "does not match") {
+		t.Fatalf("validateCleanRoomIdentity() error = %v, want image-set mismatch", err)
+	}
+}
 
 func TestRunConfigSupportsGenericNativeRunnerManifest(t *testing.T) {
 	dir := t.TempDir()
@@ -57,6 +100,8 @@ func TestRunConfigSupportsGenericNativeRunnerManifest(t *testing.T) {
 	nativeManifest := runnerManifest{
 		RunID:                   "native-run",
 		RunnerType:              "trpc-agent-go-native",
+		AgentProtocol:           "mini-swe-agent-v2.1-on-trpc-agent-go",
+		UpstreamCommit:          strings.Repeat("f", 40),
 		ObservationCodec:        "xml",
 		FrameworkModule:         "trpc.group/trpc-go/trpc-agent-go",
 		FrameworkVersion:        "v1.10.1-0.20260728070417-4237accb70cb",
@@ -223,6 +268,8 @@ func TestRunConfigSupportsFilteredNativeSelectionWithFullCasesManifest(t *testin
 	nativeManifest := runnerManifest{
 		RunID:                   "native-filtered",
 		RunnerType:              "trpc-agent-go-native",
+		AgentProtocol:           "mini-swe-agent-v2.1-on-trpc-agent-go",
+		UpstreamCommit:          strings.Repeat("f", 40),
 		ObservationCodec:        "xml",
 		FrameworkModule:         "trpc.group/trpc-go/trpc-agent-go",
 		FrameworkVersion:        "v1.10.1-0.20260728070417-4237accb70cb",
@@ -1396,6 +1443,74 @@ func TestValidateGenericRunnerModelName(t *testing.T) {
 	delete(manifest.ModelConfig, "MODEL_NAME")
 	if err := validateGenericRunnerModelName(manifest, "model-a"); err == nil || !strings.Contains(err.Error(), "no MODEL_NAME") {
 		t.Fatalf("missing error = %v", err)
+	}
+}
+
+func TestValidateShardedNativeRunnerModelName(t *testing.T) {
+	shards := shardsManifest{
+		RunnerIdentity: shardRunnerIdentity{
+			RunnerType: "trpc-agent-go-native",
+			ModelName:  "model-a",
+		},
+	}
+	if err := validateShardedNativeRunnerModelName(shards, true, "model-a"); err != nil {
+		t.Fatal(err)
+	}
+	if err := validateShardedNativeRunnerModelName(shards, true, "model-b"); err == nil ||
+		!strings.Contains(err.Error(), "does not match") {
+		t.Fatalf("model mismatch error = %v", err)
+	}
+	if err := validateShardedNativeRunnerModelName(shards, true, " model-a "); err == nil ||
+		!strings.Contains(err.Error(), "not canonical") {
+		t.Fatalf("CLI whitespace error = %v", err)
+	}
+	shards.RunnerIdentity.ModelName = ""
+	if err := validateShardedNativeRunnerModelName(shards, true, "model-a"); err == nil ||
+		!strings.Contains(err.Error(), "no MODEL_NAME") {
+		t.Fatalf("missing model error = %v", err)
+	}
+	shards.RunnerIdentity.RunnerType = "mini-swe-agent-go"
+	if err := validateShardedNativeRunnerModelName(shards, true, "model-a"); err != nil {
+		t.Fatalf("Mini-Go compatibility error = %v", err)
+	}
+}
+
+func TestRunnerManifestForNativeShardPreservesModelAndProtocolIdentity(t *testing.T) {
+	identity := shardRunnerIdentity{
+		RunnerType:     "trpc-agent-go-native",
+		AgentProtocol:  "mini-swe-agent-v2.1-on-trpc-agent-go",
+		UpstreamCommit: strings.Repeat("f", 40),
+		ModelName:      "model-a",
+	}
+	manifest := runnerManifestForNativeShard(shardSummary{
+		RunID:                   "shard-000",
+		RawDir:                  "/tmp/native-shard",
+		ExpectedCount:           1,
+		SelectedInstancesSHA256: strings.Repeat("a", 64),
+		Workers:                 4,
+		RunnerIdentity:          identity,
+	})
+	if manifest.ModelConfig["MODEL_NAME"] != identity.ModelName ||
+		manifest.AgentProtocol != identity.AgentProtocol ||
+		manifest.UpstreamCommit != identity.UpstreamCommit {
+		t.Fatalf("runner manifest = %+v, want model/protocol/upstream identity", manifest)
+	}
+	predictions := map[string]contract.Prediction{
+		"case-a": {
+			InstanceID:      "case-a",
+			ModelNameOrPath: "trpc-agent-go/model-a",
+		},
+	}
+	if err := validateNativePredictionModelNames(predictions, manifest); err != nil {
+		t.Fatal(err)
+	}
+	predictions["case-a"] = contract.Prediction{
+		InstanceID:      "case-a",
+		ModelNameOrPath: "trpc-agent-go/model-b",
+	}
+	if err := validateNativePredictionModelNames(predictions, manifest); err == nil ||
+		!strings.Contains(err.Error(), "does not match runner identity") {
+		t.Fatalf("prediction attribution error = %v", err)
 	}
 }
 

@@ -30,6 +30,9 @@ The committed core includes:
 - shared Docker-environment and XML-like/JSON/text observation codecs;
 - a golden-tested, source-aligned Mini-Go reference runner;
 - a framework-native tRPC-Agent-Go runner using only upstream public APIs;
+- an opt-in clean-room protocol with network-none generation, recursive Git
+  sanitation, closed-world offline assets, immutable local image identities,
+  and a model-free preflight;
 - the unmodified upstream local harness invocation;
 - batch planning, resumable shard inspection, and deterministic prediction
   merging.

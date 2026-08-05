@@ -27,7 +27,42 @@ type Environment interface {
 	Close(ctx context.Context) error
 }
 
+// CaseSpec is the minimum case identity required to enforce a clean-room
+// boundary before an agent sees a testbed.
+type CaseSpec struct {
+	InstanceID string
+	Repo       string
+	BaseCommit string
+}
+
+// ImageIdentity binds a Docker reference used by a testbed to the immutable
+// local image ID that was inspected before the container started.
+type ImageIdentity struct {
+	Reference string `json:"reference"`
+	ID        string `json:"id"`
+}
+
+// Provenance records container inputs that are relevant to clean-room runs.
+// AuxiliaryImages is keyed by the fixture role, for example "httpbin".
+type Provenance struct {
+	Testbed         ImageIdentity            `json:"testbed"`
+	AuxiliaryImages map[string]ImageIdentity `json:"auxiliary_images,omitempty"`
+}
+
+// ProvenanceProvider is implemented by environments that can attest the
+// immutable images used to construct a case testbed.
+type ProvenanceProvider interface {
+	Provenance() Provenance
+}
+
 // Factory starts one isolated environment per SWE-Bench instance.
 type Factory interface {
 	Start(ctx context.Context, instanceID string) (Environment, error)
+}
+
+// CaseFactory starts an environment using the complete immutable case
+// identity. Native runners use this interface so clean-room validation cannot
+// lose the expected base commit at the environment boundary.
+type CaseFactory interface {
+	StartCase(ctx context.Context, spec CaseSpec) (Environment, error)
 }

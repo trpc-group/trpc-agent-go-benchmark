@@ -35,3 +35,11 @@ owned by `openai-go`; they are not a byte-for-byte copy of LiteLLM's policy.
 
 The default configuration exposes no repository-search tool. A run therefore
 has only the `bash` tool available to the model.
+
+The optional clean-room mode is benchmark-local execution policy. Its
+network isolation, Git sanitation, offline fixtures and assets, image
+attestation, preflight, and provenance gates are not copied from
+mini-SWE-agent and are not tRPC-Agent-Go framework defaults. The default-off
+Native path keeps the source-aligned prompts and Docker behavior described
+above; enabling clean-room mode adds an accurate offline capability notice to
+the model-facing prompt and records the distinct protocol identity.

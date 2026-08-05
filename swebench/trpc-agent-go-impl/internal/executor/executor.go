@@ -14,6 +14,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"trpc.group/trpc-go/trpc-agent-go-benchmark/swebench/internal/contract"
@@ -28,24 +29,34 @@ import (
 	tagrunner "trpc.group/trpc-go/trpc-agent-go/runner"
 )
 
+const offlineHTTPBinImageReference = "docker.io/kennethreitz/httpbin:latest"
+
 // CaseInfo records the minimal status needed for resume and result analysis.
 type CaseInfo struct {
-	RunID                   string `json:"run_id,omitempty"`
-	ObservationCodec        string `json:"observation_codec,omitempty"`
-	SourceRevision          string `json:"source_revision,omitempty"`
-	SourceModified          bool   `json:"source_modified,omitempty"`
-	BinarySHA256            string `json:"binary_sha256,omitempty"`
-	ModelConfigSHA256       string `json:"model_config_sha256,omitempty"`
-	EnvironmentConfigSHA256 string `json:"environment_config_sha256,omitempty"`
-	CasesSHA256             string `json:"cases_sha256,omitempty"`
-	CommandTimeout          string `json:"command_timeout,omitempty"`
-	CaseTimeout             string `json:"case_timeout,omitempty"`
-	SelectedInstancesSHA256 string `json:"selected_instances_sha256,omitempty"`
-	Workers                 int    `json:"workers"`
-	ExitStatus              string `json:"exit_status"`
-	Error                   string `json:"error,omitempty"`
-	ErrorCategory           string `json:"error_category,omitempty"`
-	Retryable               bool   `json:"retryable,omitempty"`
+	RunID                   string             `json:"run_id,omitempty"`
+	ObservationCodec        string             `json:"observation_codec,omitempty"`
+	SourceRevision          string             `json:"source_revision,omitempty"`
+	SourceModified          bool               `json:"source_modified,omitempty"`
+	BinarySHA256            string             `json:"binary_sha256,omitempty"`
+	ModelConfigSHA256       string             `json:"model_config_sha256,omitempty"`
+	EnvironmentConfigSHA256 string             `json:"environment_config_sha256,omitempty"`
+	CasesSHA256             string             `json:"cases_sha256,omitempty"`
+	CommandTimeout          string             `json:"command_timeout,omitempty"`
+	CaseTimeout             string             `json:"case_timeout,omitempty"`
+	SelectedInstancesSHA256 string             `json:"selected_instances_sha256,omitempty"`
+	CleanRoom               bool               `json:"clean_room"`
+	CleanRoomPolicySHA256   string             `json:"clean_room_policy_sha256,omitempty"`
+	OfflineAssetsSHA256     string             `json:"offline_assets_sha256,omitempty"`
+	ImageSetSHA256          string             `json:"image_set_sha256,omitempty"`
+	Repo                    string             `json:"repo,omitempty"`
+	BaseCommit              string             `json:"base_commit,omitempty"`
+	VerifiedBaseCommit      string             `json:"verified_base_commit,omitempty"`
+	EnvironmentProvenance   *sweenv.Provenance `json:"environment_provenance,omitempty"`
+	Workers                 int                `json:"workers"`
+	ExitStatus              string             `json:"exit_status"`
+	Error                   string             `json:"error,omitempty"`
+	ErrorCategory           string             `json:"error_category,omitempty"`
+	Retryable               bool               `json:"retryable,omitempty"`
 }
 
 // CaseResult is the framework-native result artifact for one instance.
@@ -65,7 +76,7 @@ type CaseResult struct {
 
 // Executor owns the per-case model and environment lifecycle.
 type Executor struct {
-	Factory                 sweenv.Factory
+	Factory                 sweenv.CaseFactory
 	ModelConfig             modelconfig.EnvConfig
 	ObservationCodec        observation.ObservationCodec
 	RunID                   string
@@ -78,6 +89,11 @@ type Executor struct {
 	CommandTimeout          time.Duration
 	CaseTimeout             time.Duration
 	SelectedInstancesSHA256 string
+	CleanRoom               bool
+	CleanRoomPolicySHA256   string
+	OfflineAssetsSHA256     string
+	ImageSetSHA256          string
+	DockerImages            map[string]sweenv.ImageIdentity
 	Workers                 int
 	ModelFactory            func(modelconfig.EnvConfig) model.Model
 }
@@ -99,13 +115,44 @@ func (e Executor) Execute(ctx context.Context, c contract.Case) (result CaseResu
 		CommandTimeout:          e.CommandTimeout.String(),
 		CaseTimeout:             e.CaseTimeout.String(),
 		SelectedInstancesSHA256: e.SelectedInstancesSHA256,
+		CleanRoom:               e.CleanRoom,
+		CleanRoomPolicySHA256:   e.CleanRoomPolicySHA256,
+		OfflineAssetsSHA256:     e.OfflineAssetsSHA256,
+		ImageSetSHA256:          e.ImageSetSHA256,
+		Repo:                    c.Repo,
+		BaseCommit:              c.BaseCommit,
 		Workers:                 e.Workers,
 		ExitStatus:              "Error",
 	}
 	defer func() { result.DurationMS = time.Since(started).Milliseconds() }()
 
-	environment, err := e.Factory.Start(ctx, c.InstanceID)
+	caseTimeout := e.CaseTimeout
+	if caseTimeout <= 0 {
+		caseTimeout = 2 * time.Hour
+	}
+	startCtx := ctx
+	var caseCtx context.Context
+	var cancel context.CancelFunc
+	if e.CleanRoom {
+		// Clean-room setup is part of the bounded case because Git sanitation,
+		// asset installation, and local fixtures all run before the model.
+		caseCtx, cancel = context.WithTimeout(ctx, caseTimeout)
+		startCtx = caseCtx
+		defer cancel()
+	}
+
+	environment, err := e.Factory.StartCase(startCtx, sweenv.CaseSpec{
+		InstanceID: c.InstanceID,
+		Repo:       c.Repo,
+		BaseCommit: c.BaseCommit,
+	})
 	if err != nil {
+		if e.CleanRoom && errors.Is(caseCtx.Err(), context.DeadlineExceeded) {
+			result.Info.ExitStatus = "Timeout"
+			result.Info.Error = caseCtx.Err().Error()
+			result.Info.ErrorCategory = protocol.ErrorCategoryCaseTimeout
+			return result
+		}
 		result.Info.Error = err.Error()
 		result.Info.ErrorCategory = protocol.ErrorCategoryEnvironment
 		result.Info.Retryable = true
@@ -121,13 +168,32 @@ func (e Executor) Execute(ctx context.Context, c contract.Case) (result CaseResu
 			result.Info.Retryable = true
 		}
 	}()
-
-	caseTimeout := e.CaseTimeout
-	if caseTimeout <= 0 {
-		caseTimeout = 2 * time.Hour
+	if e.CleanRoom {
+		provider, ok := environment.(sweenv.ProvenanceProvider)
+		if !ok {
+			result.Info.Error = "clean-room environment did not attest image provenance"
+			result.Info.ErrorCategory = protocol.ErrorCategoryEnvironment
+			// A missing provenance provider is a deterministic contract failure,
+			// not a transient Docker startup failure.
+			result.Info.Retryable = false
+			return result
+		}
+		provenance := provider.Provenance()
+		result.Info.EnvironmentProvenance = &provenance
+		if err := validateCleanRoomProvenance(c.InstanceID, *result.Info.EnvironmentProvenance, e.DockerImages); err != nil {
+			result.Info.Error = err.Error()
+			result.Info.ErrorCategory = protocol.ErrorCategoryEnvironment
+			// Retrying the same frozen run cannot repair an attestation mismatch.
+			result.Info.Retryable = false
+			return result
+		}
+		result.Info.VerifiedBaseCommit = c.BaseCommit
+	} else {
+		// Preserve the default runner's historical timeout boundary: ordinary
+		// Docker startup is not charged to the model/tool case timeout.
+		caseCtx, cancel = context.WithTimeout(ctx, caseTimeout)
+		defer cancel()
 	}
-	caseCtx, cancel := context.WithTimeout(ctx, caseTimeout)
-	defer cancel()
 
 	modelImpl := newModel(e.ModelConfig)
 	if e.ModelFactory != nil {
@@ -135,7 +201,7 @@ func (e Executor) Execute(ctx context.Context, c contract.Case) (result CaseResu
 	}
 	modelImpl = validatedNonStreamingModel{Model: modelImpl}
 	state := &tagagent.State{}
-	agentImpl := tagagent.New(modelImpl, environment, e.ObservationCodec, generationConfig(e.ModelConfig), state)
+	agentImpl := tagagent.New(modelImpl, environment, e.ObservationCodec, generationConfig(e.ModelConfig), state, e.CleanRoom)
 	run := tagrunner.NewRunner("swebench", agentImpl)
 	defer run.Close()
 
@@ -143,7 +209,7 @@ func (e Executor) Execute(ctx context.Context, c contract.Case) (result CaseResu
 		caseCtx,
 		c.InstanceID,
 		c.InstanceID,
-		model.NewUserMessage(protocol.PromptForTask(c.ProblemStatement)),
+		model.NewUserMessage(protocol.PromptForTaskForMode(c.ProblemStatement, e.CleanRoom)),
 		agent.WithStream(false),
 		agent.WithModelRequestExtraFields(map[string]any{"parallel_tool_calls": true}),
 	)
@@ -195,6 +261,38 @@ func (e Executor) Execute(ctx context.Context, c contract.Case) (result CaseResu
 		result.Info.ErrorCategory = protocol.ErrorCategoryAgent
 	}
 	return result
+}
+
+func validateCleanRoomProvenance(
+	instanceID string,
+	provenance sweenv.Provenance,
+	images map[string]sweenv.ImageIdentity,
+) error {
+	testbed, ok := images[sweenv.ImageForInstance(instanceID)]
+	if !ok || provenance.Testbed != testbed {
+		return fmt.Errorf("clean-room environment did not attest the resolved testbed image")
+	}
+	expected := map[string]sweenv.ImageIdentity{}
+	if strings.HasPrefix(instanceID, "psf__requests-") {
+		httpbin, ok := images[offlineHTTPBinImageReference]
+		if !ok {
+			return fmt.Errorf("resolved Docker images do not contain the offline httpbin image")
+		}
+		expected["httpbin"] = httpbin
+	}
+	switch instanceID {
+	case "psf__requests-2317", "psf__requests-2931", "psf__requests-5414", "psf__requests-6028":
+		expected["network-helper"] = testbed
+	}
+	if len(provenance.AuxiliaryImages) != len(expected) {
+		return fmt.Errorf("clean-room environment attested unexpected auxiliary image roles")
+	}
+	for role, want := range expected {
+		if actual, ok := provenance.AuxiliaryImages[role]; !ok || actual != want {
+			return fmt.Errorf("clean-room environment attested unexpected %s image provenance", role)
+		}
+	}
+	return nil
 }
 
 func applySnapshot(result *CaseResult, snapshot tagagent.Snapshot) {

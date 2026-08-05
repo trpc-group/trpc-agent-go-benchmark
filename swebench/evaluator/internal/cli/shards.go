@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"trpc.group/trpc-go/trpc-agent-go-benchmark/swebench/internal/contract"
+	"trpc.group/trpc-go/trpc-agent-go-benchmark/swebench/internal/sweenv"
 )
 
 type shardsManifest struct {
@@ -47,19 +48,27 @@ type shardsManifest struct {
 }
 
 type shardRunnerIdentity struct {
-	ManifestKind            string `json:"manifest_kind"`
-	RunnerType              string `json:"runner_type"`
-	ObservationCodec        string `json:"observation_codec,omitempty"`
-	FrameworkModule         string `json:"framework_module,omitempty"`
-	FrameworkVersion        string `json:"framework_version,omitempty"`
-	SourceRevision          string `json:"source_revision,omitempty"`
-	SourceModified          bool   `json:"source_modified"`
-	BinarySHA256            string `json:"binary_sha256,omitempty"`
-	CasesSHA256             string `json:"cases_sha256,omitempty"`
-	ModelConfigSHA256       string `json:"model_config_sha256,omitempty"`
-	EnvironmentConfigSHA256 string `json:"environment_config_sha256,omitempty"`
-	CommandTimeout          string `json:"command_timeout,omitempty"`
-	CaseTimeout             string `json:"case_timeout,omitempty"`
+	ManifestKind            string                          `json:"manifest_kind"`
+	RunnerType              string                          `json:"runner_type"`
+	AgentProtocol           string                          `json:"agent_protocol,omitempty"`
+	UpstreamCommit          string                          `json:"upstream_commit,omitempty"`
+	ModelName               string                          `json:"model_name,omitempty"`
+	ObservationCodec        string                          `json:"observation_codec,omitempty"`
+	FrameworkModule         string                          `json:"framework_module,omitempty"`
+	FrameworkVersion        string                          `json:"framework_version,omitempty"`
+	SourceRevision          string                          `json:"source_revision,omitempty"`
+	SourceModified          bool                            `json:"source_modified"`
+	BinarySHA256            string                          `json:"binary_sha256,omitempty"`
+	CasesSHA256             string                          `json:"cases_sha256,omitempty"`
+	ModelConfigSHA256       string                          `json:"model_config_sha256,omitempty"`
+	EnvironmentConfigSHA256 string                          `json:"environment_config_sha256,omitempty"`
+	CommandTimeout          string                          `json:"command_timeout,omitempty"`
+	CaseTimeout             string                          `json:"case_timeout,omitempty"`
+	CleanRoom               bool                            `json:"clean_room"`
+	CleanRoomPolicySHA256   string                          `json:"clean_room_policy_sha256,omitempty"`
+	OfflineAssets           *sweenv.OfflineAssetIdentity    `json:"offline_assets,omitempty"`
+	ImageSetSHA256          string                          `json:"image_set_sha256,omitempty"`
+	DockerImages            map[string]sweenv.ImageIdentity `json:"docker_images,omitempty"`
 }
 
 type shardSummary struct {
@@ -153,15 +162,20 @@ func summarizeShardPlan(plan batchPlan, planPath, runsRoot, rawSubdir string) (s
 		shard := summarizeShard(batch, runsRoot, rawSubdir)
 		if shard.identityValidated {
 			if !canonicalIdentitySet {
-				canonicalIdentity = shard.RunnerIdentity
+				canonicalIdentity = cloneShardRunnerIdentity(shard.RunnerIdentity)
 				canonicalIdentitySet = true
-				manifest.RunnerIdentity = canonicalIdentity
 			} else if mismatch := shardRunnerIdentityMismatch(canonicalIdentity, shard.RunnerIdentity); mismatch != "" {
 				shard.Status = "failed"
 				if shard.FailureReason != "" {
 					shard.FailureReason += "; "
 				}
 				shard.FailureReason += "runner identity mismatch: " + mismatch
+			} else if err := mergeShardDockerImages(&canonicalIdentity, shard.RunnerIdentity); err != nil {
+				shard.Status = "failed"
+				if shard.FailureReason != "" {
+					shard.FailureReason += "; "
+				}
+				shard.FailureReason += "runner image provenance mismatch: " + err.Error()
 			}
 		}
 		manifest.Shards = append(manifest.Shards, shard)
@@ -196,6 +210,15 @@ func summarizeShardPlan(plan batchPlan, planPath, runsRoot, rawSubdir string) (s
 			}
 		}
 	}
+	if canonicalIdentitySet {
+		if canonicalIdentity.CleanRoom {
+			imageSetSHA256, err := sweenv.ImageSetSHA256(canonicalIdentity.DockerImages)
+			if err == nil {
+				canonicalIdentity.ImageSetSHA256 = imageSetSHA256
+			}
+		}
+		manifest.RunnerIdentity = canonicalIdentity
+	}
 	for id, count := range acceptedSeen {
 		if count > 1 {
 			manifest.DuplicateIDs = append(manifest.DuplicateIDs, id)
@@ -216,6 +239,28 @@ func summarizeShardPlan(plan batchPlan, planPath, runsRoot, rawSubdir string) (s
 		manifest.WallDurationMS = latest.Sub(earliest).Milliseconds()
 	}
 	return manifest, nil
+}
+
+func cloneShardRunnerIdentity(identity shardRunnerIdentity) shardRunnerIdentity {
+	identity.OfflineAssets = cloneOfflineAssetIdentity(identity.OfflineAssets)
+	identity.DockerImages = cloneDockerImages(identity.DockerImages)
+	return identity
+}
+
+func mergeShardDockerImages(canonical *shardRunnerIdentity, candidate shardRunnerIdentity) error {
+	if !canonical.CleanRoom {
+		return nil
+	}
+	if canonical.DockerImages == nil {
+		canonical.DockerImages = map[string]sweenv.ImageIdentity{}
+	}
+	for reference, identity := range candidate.DockerImages {
+		if existing, ok := canonical.DockerImages[reference]; ok && existing != identity {
+			return fmt.Errorf("Docker image %q resolves to both %q and %q", reference, existing.ID, identity.ID)
+		}
+		canonical.DockerImages[reference] = identity
+	}
+	return nil
 }
 
 func validateBatchPlan(plan batchPlan) error {
@@ -303,7 +348,7 @@ func summarizeShard(batch batchPlanItem, runsRoot, rawSubdir string) shardSummar
 		shard.InvalidCount++
 	}
 	for _, id := range batch.InstanceIDs {
-		caseSummary := summarizeShardCase(rawDir, id, preds)
+		caseSummary := summarizeShardCase(rawDir, id, preds, shard)
 		shard.Cases = append(shard.Cases, caseSummary)
 		switch caseSummary.Status {
 		case "accepted":
@@ -334,8 +379,10 @@ func summarizeShard(batch batchPlanItem, runsRoot, rawSubdir string) shardSummar
 func loadShardRunnerManifest(batch batchPlanItem, rawDir string, shard *shardSummary) {
 	legacyPath := filepath.Join(rawDir, "run-mini-manifest.json")
 	miniGoPath := filepath.Join(rawDir, "mini-go-runner-manifest.json")
+	nativePath := filepath.Join(rawDir, "native-runner-manifest.json")
 	legacyExists, legacyErr := artifactPathExists(legacyPath)
 	miniGoExists, miniGoErr := artifactPathExists(miniGoPath)
+	nativeExists, nativeErr := artifactPathExists(nativePath)
 	if legacyErr != nil {
 		shard.FailureReason = fmt.Sprintf("inspect run-mini-manifest.json: %v", legacyErr)
 		return
@@ -344,19 +391,33 @@ func loadShardRunnerManifest(batch batchPlanItem, rawDir string, shard *shardSum
 		shard.FailureReason = fmt.Sprintf("inspect mini-go-runner-manifest.json: %v", miniGoErr)
 		return
 	}
-	if legacyExists && miniGoExists {
-		shard.FailureReason = "ambiguous runner manifests: both run-mini-manifest.json and mini-go-runner-manifest.json exist"
+	if nativeErr != nil {
+		shard.FailureReason = fmt.Sprintf("inspect native-runner-manifest.json: %v", nativeErr)
 		return
 	}
-	if !legacyExists && !miniGoExists {
-		shard.FailureReason = "missing runner manifest: expected run-mini-manifest.json or mini-go-runner-manifest.json"
+	manifestCount := 0
+	for _, exists := range []bool{legacyExists, miniGoExists, nativeExists} {
+		if exists {
+			manifestCount++
+		}
+	}
+	if manifestCount > 1 {
+		shard.FailureReason = "ambiguous runner manifests: more than one supported runner manifest exists"
+		return
+	}
+	if manifestCount == 0 {
+		shard.FailureReason = "missing runner manifest: expected run-mini-manifest.json, mini-go-runner-manifest.json, or native-runner-manifest.json"
 		return
 	}
 	if legacyExists {
 		loadLegacyShardManifest(batch, rawDir, legacyPath, shard)
 		return
 	}
-	loadMiniGoShardManifest(batch, rawDir, miniGoPath, shard)
+	if miniGoExists {
+		loadMiniGoShardManifest(batch, rawDir, miniGoPath, shard)
+		return
+	}
+	loadNativeShardManifest(batch, rawDir, nativePath, shard)
 }
 
 func loadLegacyShardManifest(batch batchPlanItem, rawDir, manifestPath string, shard *shardSummary) {
@@ -402,6 +463,30 @@ func loadMiniGoShardManifest(batch batchPlanItem, rawDir, manifestPath string, s
 		return
 	}
 	if err := validateMiniGoShardManifest(batch, rawDir, manifest); err != nil {
+		shard.FailureReason = err.Error()
+	} else {
+		shard.identityValidated = true
+	}
+}
+
+func loadNativeShardManifest(batch batchPlanItem, rawDir, manifestPath string, shard *shardSummary) {
+	var manifest runnerManifest
+	if err := readJSONFile(manifestPath, &manifest); err != nil {
+		shard.FailureReason = fmt.Sprintf("invalid native-runner-manifest.json: %v", err)
+		return
+	}
+	shard.Workers = manifest.Workers
+	shard.StartedAt = formatTime(manifest.StartedAt)
+	shard.FinishedAt = formatTime(manifest.FinishedAt)
+	shard.DurationMS = manifest.DurationMS
+	shard.SelectedInstancesSHA256 = manifest.SelectedInstancesSHA256
+	identity, identityErr := normalizeShardRunnerIdentity(nativeRunnerIdentity(manifest))
+	shard.RunnerIdentity = identity
+	if identityErr != nil {
+		shard.FailureReason = fmt.Sprintf("native runner identity is invalid: %v", identityErr)
+		return
+	}
+	if err := validateNativeShardManifest(batch, rawDir, manifest); err != nil {
 		shard.FailureReason = err.Error()
 	} else {
 		shard.identityValidated = true
@@ -458,6 +543,56 @@ func validateMiniGoShardManifest(batch batchPlanItem, rawDir string, manifest ru
 	return nil
 }
 
+func validateNativeShardManifest(batch batchPlanItem, rawDir string, manifest runnerManifest) error {
+	if manifest.RunID != batch.RunID {
+		return fmt.Errorf("native run_id %q does not match %q", manifest.RunID, batch.RunID)
+	}
+	if manifest.RunnerType != "trpc-agent-go-native" {
+		return fmt.Errorf("native runner_type %q is not %q", manifest.RunnerType, "trpc-agent-go-native")
+	}
+	if _, err := normalizeShardRunnerIdentity(nativeRunnerIdentity(manifest)); err != nil {
+		return fmt.Errorf("native runner identity is invalid: %w", err)
+	}
+	if !sameArtifactPath(manifest.OutputDir, rawDir) {
+		return fmt.Errorf("native output_dir %q does not match %q", manifest.OutputDir, rawDir)
+	}
+	expectedPredictions := filepath.Join(rawDir, "preds.json")
+	if !sameArtifactPath(manifest.Predictions, expectedPredictions) {
+		return fmt.Errorf("native predictions %q do not match %q", manifest.Predictions, expectedPredictions)
+	}
+	if manifest.CaseCount != len(batch.InstanceIDs) {
+		return fmt.Errorf("native case_count %d does not match %d planned instances", manifest.CaseCount, len(batch.InstanceIDs))
+	}
+	expectedSelectedSHA256, err := selectedInstancesSHA256(batch.InstanceIDs)
+	if err != nil {
+		return fmt.Errorf("native selected instances are invalid: %w", err)
+	}
+	if manifest.SelectedInstancesSHA256 != expectedSelectedSHA256 {
+		return fmt.Errorf(
+			"native selected_instances_sha256 %q does not match planned instances %q",
+			manifest.SelectedInstancesSHA256,
+			expectedSelectedSHA256,
+		)
+	}
+	if manifest.Workers < 1 {
+		return fmt.Errorf("native workers %d is not positive", manifest.Workers)
+	}
+	if manifest.StartedAt.IsZero() || manifest.FinishedAt.IsZero() {
+		return fmt.Errorf("native start and finish times must be present")
+	}
+	if manifest.FinishedAt.Before(manifest.StartedAt) {
+		return fmt.Errorf("native finished_at precedes started_at")
+	}
+	expectedDuration := manifest.FinishedAt.Sub(manifest.StartedAt).Milliseconds()
+	if manifest.DurationMS != expectedDuration {
+		return fmt.Errorf("native duration_ms %d does not match elapsed time %d", manifest.DurationMS, expectedDuration)
+	}
+	if manifest.Status != "completed" && manifest.Status != "completed_with_errors" {
+		return fmt.Errorf("native status %q is not terminal", manifest.Status)
+	}
+	return nil
+}
+
 func miniGoShardRunnerIdentity(manifest runnerManifest) shardRunnerIdentity {
 	return shardRunnerIdentity{
 		ManifestKind:            "mini-go",
@@ -473,12 +608,20 @@ func miniGoShardRunnerIdentity(manifest runnerManifest) shardRunnerIdentity {
 		EnvironmentConfigSHA256: manifest.EnvironmentConfigSHA256,
 		CommandTimeout:          manifest.CommandTimeout,
 		CaseTimeout:             manifest.CaseTimeout,
+		CleanRoom:               manifest.CleanRoom,
+		CleanRoomPolicySHA256:   manifest.CleanRoomPolicySHA256,
+		OfflineAssets:           cloneOfflineAssetIdentity(manifest.OfflineAssets),
+		ImageSetSHA256:          manifest.ImageSetSHA256,
+		DockerImages:            cloneDockerImages(manifest.DockerImages),
 	}
 }
 
 func nativeRunnerIdentity(manifest runnerManifest) shardRunnerIdentity {
 	identity := miniGoShardRunnerIdentity(manifest)
 	identity.ManifestKind = "native"
+	identity.AgentProtocol = manifest.AgentProtocol
+	identity.UpstreamCommit = manifest.UpstreamCommit
+	identity.ModelName = manifest.ModelConfig["MODEL_NAME"]
 	return identity
 }
 
@@ -494,7 +637,17 @@ func normalizeShardRunnerIdentity(identity shardRunnerIdentity) (shardRunnerIden
 		if identity.RunnerType != "mini-swe-agent-python" {
 			return shardRunnerIdentity{}, fmt.Errorf("legacy runner_type %q is not %q", identity.RunnerType, "mini-swe-agent-python")
 		}
-		return identity, nil
+		if err := validateCleanRoomIdentity(
+			"legacy shard runner identity",
+			identity.CleanRoom,
+			identity.CleanRoomPolicySHA256,
+			identity.OfflineAssets,
+			identity.ImageSetSHA256,
+			identity.DockerImages,
+		); err != nil {
+			return shardRunnerIdentity{}, err
+		}
+		return cloneShardRunnerIdentity(identity), nil
 	case "mini-go":
 		expectedRunnerType = "mini-swe-agent-go"
 	case "native":
@@ -504,6 +657,48 @@ func normalizeShardRunnerIdentity(identity shardRunnerIdentity) (shardRunnerIden
 	}
 	if identity.RunnerType != expectedRunnerType {
 		return shardRunnerIdentity{}, fmt.Errorf("runner_type %q is not %q", identity.RunnerType, expectedRunnerType)
+	}
+	if identity.ManifestKind == "native" {
+		if identity.ModelName == "" {
+			return shardRunnerIdentity{}, fmt.Errorf("native model_name is empty")
+		}
+		if identity.ModelName != strings.TrimSpace(identity.ModelName) || strings.ContainsAny(identity.ModelName, "\r\n\t") {
+			return shardRunnerIdentity{}, fmt.Errorf("native model_name %q is not canonical", identity.ModelName)
+		}
+		if identity.AgentProtocol == "" || identity.AgentProtocol != strings.TrimSpace(identity.AgentProtocol) ||
+			strings.ContainsAny(identity.AgentProtocol, "\r\n\t") {
+			return shardRunnerIdentity{}, fmt.Errorf("agent_protocol %q is not canonical", identity.AgentProtocol)
+		}
+		if !isHexIdentifier(identity.UpstreamCommit, 40, 64) {
+			return shardRunnerIdentity{}, fmt.Errorf("upstream_commit %q is not a full Git revision", identity.UpstreamCommit)
+		}
+		if identity.CleanRoom {
+			if !strings.HasSuffix(identity.AgentProtocol, "+clean-room-v1") {
+				return shardRunnerIdentity{}, fmt.Errorf(
+					"clean-room native agent_protocol %q does not end with +clean-room-v1",
+					identity.AgentProtocol,
+				)
+			}
+			if !isHexIdentifier(identity.UpstreamCommit, 40, 64) {
+				return shardRunnerIdentity{}, fmt.Errorf(
+					"clean-room native upstream_commit %q is not a full Git revision",
+					identity.UpstreamCommit,
+				)
+			}
+		}
+	}
+	if identity.CleanRoom && identity.ManifestKind != "native" {
+		return shardRunnerIdentity{}, fmt.Errorf("manifest_kind %q does not support clean_room=true", identity.ManifestKind)
+	}
+	if err := validateCleanRoomIdentity(
+		"shard runner identity",
+		identity.CleanRoom,
+		identity.CleanRoomPolicySHA256,
+		identity.OfflineAssets,
+		identity.ImageSetSHA256,
+		identity.DockerImages,
+	); err != nil {
+		return shardRunnerIdentity{}, err
 	}
 	if identity.ObservationCodec != "xml" && identity.ObservationCodec != "json" && identity.ObservationCodec != "text" {
 		return shardRunnerIdentity{}, fmt.Errorf("observation_codec %q is not xml, json, or text", identity.ObservationCodec)
@@ -540,7 +735,7 @@ func normalizeShardRunnerIdentity(identity shardRunnerIdentity) (shardRunnerIden
 	}
 	identity.CommandTimeout = commandTimeout.String()
 	identity.CaseTimeout = caseTimeout.String()
-	return identity, nil
+	return cloneShardRunnerIdentity(identity), nil
 }
 
 func positiveDuration(name, value string) (time.Duration, error) {
@@ -607,6 +802,9 @@ func shardRunnerIdentityMismatch(canonical, candidate shardRunnerIdentity) strin
 	}{
 		{"manifest_kind", canonical.ManifestKind, candidate.ManifestKind},
 		{"runner_type", canonical.RunnerType, candidate.RunnerType},
+		{"agent_protocol", canonical.AgentProtocol, candidate.AgentProtocol},
+		{"upstream_commit", canonical.UpstreamCommit, candidate.UpstreamCommit},
+		{"model_name", canonical.ModelName, candidate.ModelName},
 		{"observation_codec", canonical.ObservationCodec, candidate.ObservationCodec},
 		{"framework_module", canonical.FrameworkModule, candidate.FrameworkModule},
 		{"framework_version", canonical.FrameworkVersion, candidate.FrameworkVersion},
@@ -617,6 +815,7 @@ func shardRunnerIdentityMismatch(canonical, candidate shardRunnerIdentity) strin
 		{"environment_config_sha256", canonical.EnvironmentConfigSHA256, candidate.EnvironmentConfigSHA256},
 		{"command_timeout", canonical.CommandTimeout, candidate.CommandTimeout},
 		{"case_timeout", canonical.CaseTimeout, candidate.CaseTimeout},
+		{"clean_room_policy_sha256", canonical.CleanRoomPolicySHA256, candidate.CleanRoomPolicySHA256},
 	}
 	for _, field := range fields {
 		if field.canonical != field.candidate {
@@ -626,7 +825,24 @@ func shardRunnerIdentityMismatch(canonical, candidate shardRunnerIdentity) strin
 	if canonical.SourceModified != candidate.SourceModified {
 		return fmt.Sprintf("source_modified %t does not match canonical %t", candidate.SourceModified, canonical.SourceModified)
 	}
+	if canonical.CleanRoom != candidate.CleanRoom {
+		return fmt.Sprintf("clean_room %t does not match canonical %t", candidate.CleanRoom, canonical.CleanRoom)
+	}
+	if !equalOfflineAssetIdentity(canonical.OfflineAssets, candidate.OfflineAssets) {
+		return fmt.Sprintf(
+			"offline_assets %+v do not match canonical %+v",
+			candidate.OfflineAssets,
+			canonical.OfflineAssets,
+		)
+	}
 	return ""
+}
+
+func equalOfflineAssetIdentity(a, b *sweenv.OfflineAssetIdentity) bool {
+	if a == nil || b == nil {
+		return a == nil && b == nil
+	}
+	return *a == *b
 }
 
 func artifactPathExists(path string) (bool, error) {
@@ -640,14 +856,67 @@ func artifactPathExists(path string) (bool, error) {
 	return false, err
 }
 
-func summarizeShardCase(rawDir, instanceID string, preds map[string]contract.Prediction) shardCaseSummary {
-	tracePath := filepath.Join(rawDir, instanceID, instanceID+".traj.json")
+func summarizeShardCase(
+	rawDir string,
+	instanceID string,
+	preds map[string]contract.Prediction,
+	shard shardSummary,
+) shardCaseSummary {
+	manifestKind := shard.RunnerIdentity.ManifestKind
+	traceSuffix := ".traj.json"
+	if manifestKind == "native" {
+		traceSuffix = ".native.json"
+	}
+	tracePath := filepath.Join(rawDir, instanceID, instanceID+traceSuffix)
 	relTrace := relPath(rawDir, tracePath)
 	data, err := os.ReadFile(tracePath)
 	if err != nil {
 		return shardCaseSummary{InstanceID: instanceID, Status: "missing", Reason: "missing trajectory", TracePath: relTrace}
 	}
-	exitStatus := extractExitStatus(data)
+	exitStatus := ""
+	var nativeTrace nativeTraceEnvelope
+	if manifestKind == "native" {
+		nativeTrace, err = parseNativeTraceEnvelope(data, instanceID)
+		if err != nil {
+			return shardCaseSummary{
+				InstanceID: instanceID,
+				Status:     "invalid",
+				Reason:     "invalid native trace: " + err.Error(),
+				TracePath:  relTrace,
+			}
+		}
+		row := importedCase{
+			InstanceID:            instanceID,
+			Repo:                  nativeTrace.Info.Repo,
+			BaseCommit:            nativeTrace.Info.BaseCommit,
+			VerifiedBaseCommit:    nativeTrace.Info.VerifiedBaseCommit,
+			CleanRoom:             nativeTrace.Info.CleanRoom,
+			CleanRoomPolicySHA256: nativeTrace.Info.CleanRoomPolicySHA256,
+			OfflineAssetsSHA256:   nativeTrace.Info.OfflineAssetsSHA256,
+			ImageSetSHA256:        nativeTrace.Info.ImageSetSHA256,
+			EnvironmentProvenance: cloneEnvironmentProvenance(nativeTrace.Info.EnvironmentProvenance),
+		}
+		selection := runConfigSelection{
+			CaseCount:    shard.ExpectedCount,
+			CaseListHash: shard.SelectedInstancesSHA256,
+		}
+		if err := validateNativeTraceIdentity(
+			row,
+			nativeTrace,
+			runnerManifestForNativeShard(shard),
+			selection,
+		); err != nil {
+			return shardCaseSummary{
+				InstanceID: instanceID,
+				Status:     "invalid",
+				Reason:     "native trace identity mismatch: " + err.Error(),
+				TracePath:  relTrace,
+			}
+		}
+		exitStatus = nativeTrace.Info.ExitStatus
+	} else {
+		exitStatus = extractExitStatus(data)
+	}
 	if strings.TrimSpace(exitStatus) == "" {
 		return shardCaseSummary{InstanceID: instanceID, Status: "invalid", Reason: "missing exit status", TracePath: relTrace}
 	}
@@ -659,6 +928,16 @@ func summarizeShardCase(rawDir, instanceID string, preds map[string]contract.Pre
 			ExitStatus: exitStatus,
 			Reason:     "missing prediction",
 			TracePath:  relTrace,
+		}
+	}
+	if manifestKind == "native" && nativeTrace.ModelPatch != pred.ModelPatch {
+		return shardCaseSummary{
+			InstanceID:    instanceID,
+			Status:        "invalid",
+			ExitStatus:    exitStatus,
+			Reason:        "native trace model_patch does not match prediction",
+			HasPrediction: true,
+			TracePath:     relTrace,
 		}
 	}
 	patch := pred.ModelPatch

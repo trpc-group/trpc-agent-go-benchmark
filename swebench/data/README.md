@@ -13,6 +13,10 @@ Committed fixed inputs:
 - `case-lists/verified-test-500.case_ids.txt`: canonical 500-case instance id list.
 - `case-lists/verified-test-500.case_ids.sha256`: SHA256 of the sorted instance id
   list, using the same hash rule as `prepare-data`.
+- `case-lists/offline-smoke.case_ids.txt`: small model-free clean-room preflight
+  panel covering ordinary testbeds and both offline requests fixture/dependency
+  profiles. It is an operational isolation gate, not an evaluation result set
+  or a replacement denominator for the canonical 500-case panel.
 
 Generated files from `evaluator prepare-data`:
 

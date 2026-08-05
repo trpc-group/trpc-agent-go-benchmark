@@ -57,9 +57,13 @@ func (m *scriptedModel) GenerateContent(_ context.Context, request *model.Reques
 type fakeFactory struct {
 	environment sweenv.Environment
 	err         error
+	start       func(context.Context, sweenv.CaseSpec) (sweenv.Environment, error)
 }
 
-func (f fakeFactory) Start(context.Context, string) (sweenv.Environment, error) {
+func (f fakeFactory) StartCase(ctx context.Context, spec sweenv.CaseSpec) (sweenv.Environment, error) {
+	if f.start != nil {
+		return f.start(ctx, spec)
+	}
 	return f.environment, f.err
 }
 
@@ -70,6 +74,13 @@ type fakeEnvironment struct {
 	closed   bool
 	closeErr error
 }
+
+type provenanceEnvironment struct {
+	*fakeEnvironment
+	provenance sweenv.Provenance
+}
+
+func (e provenanceEnvironment) Provenance() sweenv.Provenance { return e.provenance }
 
 func (e *fakeEnvironment) Execute(_ context.Context, command string) sweenv.CommandResult {
 	e.mu.Lock()
@@ -372,6 +383,257 @@ func TestEnvironmentAndEndpointFailuresAreClassified(t *testing.T) {
 			t.Fatalf("result = %+v", result)
 		}
 	})
+}
+
+func TestCaseIdentityAndCleanRoomProvenanceReachCaseArtifact(t *testing.T) {
+	selectedCase := contract.Case{
+		InstanceID:       "org__repo-123",
+		Repo:             "org/repo",
+		BaseCommit:       strings.Repeat("1", 40),
+		ProblemStatement: "fix it",
+	}
+	wantSpec := sweenv.CaseSpec{
+		InstanceID: selectedCase.InstanceID,
+		Repo:       selectedCase.Repo,
+		BaseCommit: selectedCase.BaseCommit,
+	}
+	wantProvenance := sweenv.Provenance{Testbed: sweenv.ImageIdentity{
+		Reference: sweenv.ImageForInstance(selectedCase.InstanceID),
+		ID:        "sha256:" + strings.Repeat("2", 64),
+	}}
+	dockerImages := map[string]sweenv.ImageIdentity{
+		wantProvenance.Testbed.Reference: wantProvenance.Testbed,
+	}
+	environment := provenanceEnvironment{
+		fakeEnvironment: &fakeEnvironment{results: []sweenv.CommandResult{{
+			Output: protocol.SubmissionMarker + "\npatch\n",
+		}}},
+		provenance: wantProvenance,
+	}
+	var gotSpec sweenv.CaseSpec
+	modelImpl := &scriptedModel{responses: []*model.Response{
+		assistantResponse("done", bashCall("submit", "submit")),
+	}}
+	exec := Executor{
+		Factory: fakeFactory{start: func(_ context.Context, spec sweenv.CaseSpec) (sweenv.Environment, error) {
+			gotSpec = spec
+			return environment, nil
+		}},
+		ObservationCodec:      observation.ObservationCodecXML,
+		ModelFactory:          func(modelconfig.EnvConfig) model.Model { return modelImpl },
+		CleanRoom:             true,
+		CleanRoomPolicySHA256: strings.Repeat("3", 64),
+		OfflineAssetsSHA256:   strings.Repeat("4", 64),
+		ImageSetSHA256:        strings.Repeat("5", 64),
+		DockerImages:          dockerImages,
+		Workers:               1,
+	}
+	result := exec.Execute(context.Background(), selectedCase)
+
+	if !reflect.DeepEqual(gotSpec, wantSpec) {
+		t.Fatalf("case spec = %#v, want %#v", gotSpec, wantSpec)
+	}
+	if result.Info.ExitStatus != "Submitted" || result.ModelPatch != "patch\n" {
+		t.Fatalf("result = %+v", result)
+	}
+	if !result.Info.CleanRoom || result.Info.CleanRoomPolicySHA256 != strings.Repeat("3", 64) ||
+		result.Info.OfflineAssetsSHA256 != strings.Repeat("4", 64) ||
+		result.Info.ImageSetSHA256 != strings.Repeat("5", 64) {
+		t.Fatalf("clean-room identity = %+v", result.Info)
+	}
+	if result.Info.Repo != selectedCase.Repo || result.Info.BaseCommit != selectedCase.BaseCommit ||
+		result.Info.VerifiedBaseCommit != selectedCase.BaseCommit {
+		t.Fatalf("case identity = %+v", result.Info)
+	}
+	if result.Info.EnvironmentProvenance == nil ||
+		!reflect.DeepEqual(*result.Info.EnvironmentProvenance, wantProvenance) {
+		t.Fatalf("provenance = %#v, want %#v", result.Info.EnvironmentProvenance, wantProvenance)
+	}
+}
+
+func TestEnvironmentFailureDoesNotConstructModel(t *testing.T) {
+	modelFactoryCalls := 0
+	result := Executor{
+		Factory: fakeFactory{start: func(_ context.Context, spec sweenv.CaseSpec) (sweenv.Environment, error) {
+			if spec.InstanceID != "case-a" {
+				t.Fatalf("case spec = %#v", spec)
+			}
+			return nil, errors.New("clean-room setup failed")
+		}},
+		ModelFactory: func(modelconfig.EnvConfig) model.Model {
+			modelFactoryCalls++
+			return &scriptedModel{}
+		},
+	}.Execute(context.Background(), contract.Case{InstanceID: "case-a"})
+
+	if modelFactoryCalls != 0 {
+		t.Fatalf("model factory calls = %d, want 0", modelFactoryCalls)
+	}
+	if result.Info.ExitStatus != "Error" || result.Info.ErrorCategory != protocol.ErrorCategoryEnvironment ||
+		!result.Info.Retryable {
+		t.Fatalf("result = %+v", result)
+	}
+}
+
+func TestDefaultModePreservesStartupBoundaryAndOmitsCleanRoomProvenance(t *testing.T) {
+	modelImpl := &scriptedModel{responses: []*model.Response{
+		assistantResponse("done", bashCall("submit", "submit")),
+	}}
+	environment := provenanceEnvironment{
+		fakeEnvironment: &fakeEnvironment{results: []sweenv.CommandResult{{
+			Output: protocol.SubmissionMarker + "\npatch\n",
+		}}},
+		provenance: sweenv.Provenance{Testbed: sweenv.ImageIdentity{
+			Reference: "must-not-be-recorded",
+			ID:        "sha256:" + strings.Repeat("1", 64),
+		}},
+	}
+	result := Executor{
+		Factory: fakeFactory{start: func(ctx context.Context, _ sweenv.CaseSpec) (sweenv.Environment, error) {
+			if _, ok := ctx.Deadline(); ok {
+				t.Fatal("default-mode environment startup unexpectedly consumed the case timeout")
+			}
+			return environment, nil
+		}},
+		ObservationCodec: observation.ObservationCodecXML,
+		ModelFactory:     func(modelconfig.EnvConfig) model.Model { return modelImpl },
+		Workers:          1,
+		CaseTimeout:      time.Second,
+	}.Execute(context.Background(), contract.Case{InstanceID: "case-a", ProblemStatement: "fix it"})
+
+	if result.Info.ExitStatus != "Submitted" {
+		t.Fatalf("result = %+v", result)
+	}
+	if result.Info.EnvironmentProvenance != nil || result.Info.VerifiedBaseCommit != "" {
+		t.Fatalf("default-mode clean-room provenance = %+v", result.Info)
+	}
+}
+
+func TestCleanRoomRequiresImageProvenanceBeforeConstructingModel(t *testing.T) {
+	tests := []struct {
+		name        string
+		environment sweenv.Environment
+	}{
+		{name: "missing provider", environment: &fakeEnvironment{}},
+		{name: "empty identity", environment: provenanceEnvironment{fakeEnvironment: &fakeEnvironment{}}},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			modelFactoryCalls := 0
+			result := Executor{
+				Factory:   fakeFactory{environment: tc.environment},
+				CleanRoom: true,
+				ModelFactory: func(modelconfig.EnvConfig) model.Model {
+					modelFactoryCalls++
+					return &scriptedModel{}
+				},
+			}.Execute(context.Background(), contract.Case{
+				InstanceID: "case-a",
+				Repo:       "org/repo",
+				BaseCommit: strings.Repeat("1", 40),
+			})
+
+			if modelFactoryCalls != 0 {
+				t.Fatalf("model factory calls = %d, want 0", modelFactoryCalls)
+			}
+			if result.Info.ExitStatus != "Error" || result.Info.ErrorCategory != protocol.ErrorCategoryEnvironment ||
+				result.Info.Retryable || !strings.Contains(result.Info.Error, "attest") {
+				t.Fatalf("result = %+v", result)
+			}
+			switch environment := tc.environment.(type) {
+			case *fakeEnvironment:
+				if !environment.closed {
+					t.Fatal("environment was not closed")
+				}
+			case provenanceEnvironment:
+				if !environment.closed {
+					t.Fatal("environment was not closed")
+				}
+			}
+		})
+	}
+}
+
+func TestCleanRoomRequiresExactAuxiliaryImagesBeforeConstructingModel(t *testing.T) {
+	instanceID := "psf__requests-2317"
+	testbed := sweenv.ImageIdentity{
+		Reference: sweenv.ImageForInstance(instanceID),
+		ID:        "sha256:" + strings.Repeat("1", 64),
+	}
+	httpbin := sweenv.ImageIdentity{
+		Reference: offlineHTTPBinImageReference,
+		ID:        "sha256:" + strings.Repeat("2", 64),
+	}
+	images := map[string]sweenv.ImageIdentity{
+		testbed.Reference: testbed,
+		httpbin.Reference: httpbin,
+	}
+	tests := []struct {
+		name      string
+		auxiliary map[string]sweenv.ImageIdentity
+		wantError string
+	}{
+		{
+			name: "missing httpbin",
+			auxiliary: map[string]sweenv.ImageIdentity{
+				"network-helper": testbed,
+			},
+			wantError: "auxiliary image roles",
+		},
+		{
+			name: "wrong network helper",
+			auxiliary: map[string]sweenv.ImageIdentity{
+				"httpbin":        httpbin,
+				"network-helper": httpbin,
+			},
+			wantError: "network-helper image provenance",
+		},
+		{
+			name: "extra role",
+			auxiliary: map[string]sweenv.ImageIdentity{
+				"httpbin":        httpbin,
+				"network-helper": testbed,
+				"unexpected":     testbed,
+			},
+			wantError: "auxiliary image roles",
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			environment := provenanceEnvironment{
+				fakeEnvironment: &fakeEnvironment{},
+				provenance: sweenv.Provenance{
+					Testbed:         testbed,
+					AuxiliaryImages: tc.auxiliary,
+				},
+			}
+			modelFactoryCalls := 0
+			result := Executor{
+				Factory:      fakeFactory{environment: environment},
+				CleanRoom:    true,
+				DockerImages: images,
+				ModelFactory: func(modelconfig.EnvConfig) model.Model {
+					modelFactoryCalls++
+					return &scriptedModel{}
+				},
+			}.Execute(context.Background(), contract.Case{
+				InstanceID: instanceID,
+				Repo:       "psf/requests",
+				BaseCommit: strings.Repeat("3", 40),
+			})
+
+			if modelFactoryCalls != 0 {
+				t.Fatalf("model factory calls = %d, want 0", modelFactoryCalls)
+			}
+			if result.Info.ErrorCategory != protocol.ErrorCategoryEnvironment || result.Info.Retryable ||
+				!strings.Contains(result.Info.Error, tc.wantError) {
+				t.Fatalf("result = %+v", result)
+			}
+			if !environment.closed {
+				t.Fatal("environment was not closed")
+			}
+		})
+	}
 }
 
 func TestCaseTimeout(t *testing.T) {

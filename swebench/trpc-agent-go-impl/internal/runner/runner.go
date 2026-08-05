@@ -36,46 +36,53 @@ import (
 
 var artifactNamePattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]*$`)
 
+const offlineHTTPBinImageReference = "docker.io/kennethreitz/httpbin:latest"
+
 type manifest struct {
-	RunID                   string            `json:"run_id"`
-	RunnerType              string            `json:"runner_type"`
-	FrameworkModule         string            `json:"framework_module"`
-	FrameworkVersion        string            `json:"framework_version"`
-	AgentProtocol           string            `json:"agent_protocol"`
-	UpstreamCommit          string            `json:"upstream_commit"`
-	ObservationCodec        string            `json:"observation_codec"`
-	SourceRevision          string            `json:"source_revision,omitempty"`
-	SourceModified          bool              `json:"source_modified"`
-	BinarySHA256            string            `json:"binary_sha256,omitempty"`
-	CasesSHA256             string            `json:"cases_sha256"`
-	ModelConfigSHA256       string            `json:"model_config_sha256"`
-	EnvironmentConfigSHA256 string            `json:"environment_config_sha256"`
-	SelectedInstancesSHA256 string            `json:"selected_instances_sha256"`
-	StartedAt               time.Time         `json:"started_at"`
-	FinishedAt              time.Time         `json:"finished_at"`
-	DurationMS              int64             `json:"duration_ms"`
-	Cases                   string            `json:"cases"`
-	OutputDir               string            `json:"output_dir"`
-	Filter                  string            `json:"filter,omitempty"`
-	CaseCount               int               `json:"case_count"`
-	AttemptedCount          int               `json:"attempted_count"`
-	SkippedExisting         int               `json:"skipped_existing"`
-	CompletedCount          int               `json:"completed_count"`
-	PredictionCount         int               `json:"prediction_count"`
-	Workers                 int               `json:"workers"`
-	RedoExisting            bool              `json:"redo_existing"`
-	Predictions             string            `json:"predictions"`
-	Progress                string            `json:"progress"`
-	ModelConfig             map[string]string `json:"model_config,omitempty"`
-	Environment             string            `json:"environment_config"`
-	CommandTimeout          string            `json:"command_timeout"`
-	CaseTimeout             string            `json:"case_timeout"`
-	ExitStatusCounts        map[string]int    `json:"exit_status_counts"`
-	LLMCalls                int               `json:"llm_calls"`
-	ToolCalls               int               `json:"tool_calls"`
-	Usage                   usageSummary      `json:"usage"`
-	Status                  string            `json:"status"`
-	Notes                   []string          `json:"notes,omitempty"`
+	RunID                   string                          `json:"run_id"`
+	RunnerType              string                          `json:"runner_type"`
+	FrameworkModule         string                          `json:"framework_module"`
+	FrameworkVersion        string                          `json:"framework_version"`
+	AgentProtocol           string                          `json:"agent_protocol"`
+	UpstreamCommit          string                          `json:"upstream_commit"`
+	ObservationCodec        string                          `json:"observation_codec"`
+	SourceRevision          string                          `json:"source_revision,omitempty"`
+	SourceModified          bool                            `json:"source_modified"`
+	BinarySHA256            string                          `json:"binary_sha256,omitempty"`
+	CasesSHA256             string                          `json:"cases_sha256"`
+	ModelConfigSHA256       string                          `json:"model_config_sha256"`
+	EnvironmentConfigSHA256 string                          `json:"environment_config_sha256"`
+	SelectedInstancesSHA256 string                          `json:"selected_instances_sha256"`
+	CleanRoom               bool                            `json:"clean_room"`
+	CleanRoomPolicySHA256   string                          `json:"clean_room_policy_sha256,omitempty"`
+	OfflineAssets           *sweenv.OfflineAssetIdentity    `json:"offline_assets,omitempty"`
+	ImageSetSHA256          string                          `json:"image_set_sha256,omitempty"`
+	DockerImages            map[string]sweenv.ImageIdentity `json:"docker_images,omitempty"`
+	StartedAt               time.Time                       `json:"started_at"`
+	FinishedAt              time.Time                       `json:"finished_at"`
+	DurationMS              int64                           `json:"duration_ms"`
+	Cases                   string                          `json:"cases"`
+	OutputDir               string                          `json:"output_dir"`
+	Filter                  string                          `json:"filter,omitempty"`
+	CaseCount               int                             `json:"case_count"`
+	AttemptedCount          int                             `json:"attempted_count"`
+	SkippedExisting         int                             `json:"skipped_existing"`
+	CompletedCount          int                             `json:"completed_count"`
+	PredictionCount         int                             `json:"prediction_count"`
+	Workers                 int                             `json:"workers"`
+	RedoExisting            bool                            `json:"redo_existing"`
+	Predictions             string                          `json:"predictions"`
+	Progress                string                          `json:"progress"`
+	ModelConfig             map[string]string               `json:"model_config,omitempty"`
+	Environment             string                          `json:"environment_config"`
+	CommandTimeout          string                          `json:"command_timeout"`
+	CaseTimeout             string                          `json:"case_timeout"`
+	ExitStatusCounts        map[string]int                  `json:"exit_status_counts"`
+	LLMCalls                int                             `json:"llm_calls"`
+	ToolCalls               int                             `json:"tool_calls"`
+	Usage                   usageSummary                    `json:"usage"`
+	Status                  string                          `json:"status"`
+	Notes                   []string                        `json:"notes,omitempty"`
 }
 
 type usageSummary struct {
@@ -114,6 +121,12 @@ func Run(args []string) error {
 	commandTimeout := fs.Duration("command-timeout", time.Minute, "timeout for each bash tool call")
 	caseTimeout := fs.Duration("case-timeout", 2*time.Hour, "timeout for each case")
 	dockerHost := fs.String("docker-host", "", "optional Docker daemon endpoint")
+	cleanRoom := fs.Bool("clean-room", false, "enable network-none generation and recursive Git sanitation")
+	offlineAssetsDir := fs.String(
+		"offline-assets-dir",
+		"",
+		"portable host asset bundle prepared by scripts/prepare-offline-assets.sh",
+	)
 	redoExisting := fs.Bool("redo-existing", false, "rerun selected cases already present in preds.json")
 	codecValue := fs.String("observation-codec", string(observation.ObservationCodecXML), "observation codec: xml, json, or text")
 	if err := fs.Parse(args[1:]); err != nil {
@@ -130,6 +143,9 @@ func Run(args []string) error {
 	}
 	if *commandTimeout <= 0 || *caseTimeout <= 0 {
 		return fmt.Errorf("command and case timeouts must be positive")
+	}
+	if !*cleanRoom && strings.TrimSpace(*offlineAssetsDir) != "" {
+		return fmt.Errorf("-offline-assets-dir requires -clean-room=true")
 	}
 	codec, err := observation.ParseObservationCodec(*codecValue)
 	if err != nil {
@@ -173,8 +189,14 @@ func Run(args []string) error {
 		}
 	}
 	selectedIDs := make([]string, 0, len(selected))
+	selectedSpecs := make([]sweenv.CaseSpec, 0, len(selected))
 	for _, c := range selected {
 		selectedIDs = append(selectedIDs, c.InstanceID)
+		selectedSpecs = append(selectedSpecs, sweenv.CaseSpec{
+			InstanceID: c.InstanceID,
+			Repo:       c.Repo,
+			BaseCommit: c.BaseCommit,
+		})
 	}
 	selectedHash, err := selectedInstancesSHA256(selectedIDs)
 	if err != nil {
@@ -191,11 +213,34 @@ func Run(args []string) error {
 	if err != nil {
 		return err
 	}
+	var offlineAssetsIdentity sweenv.OfflineAssetIdentity
+	var cleanRoomPolicySHA256 string
+	if *cleanRoom {
+		offlineAssetsIdentity, err = sweenv.InspectOfflineAssets(*offlineAssetsDir, selectedIDs)
+		if err != nil {
+			return err
+		}
+		cleanRoomPolicySHA256, err = sweenv.CleanRoomPolicySHA256(nil)
+		if err != nil {
+			return err
+		}
+	}
 	factory := sweenv.DockerFactory{
 		Config: envCfg, DockerHost: *dockerHost, CommandTimeout: *commandTimeout,
 		CaseTimeout: *caseTimeout, ContainerNamePrefix: "trpc-agent-go-swebench-",
-		Labels: map[string]string{"swebench.run_id": *runID, "swebench.runner": "trpc-agent-go"},
+		Labels:    map[string]string{"swebench.run_id": *runID, "swebench.runner": "trpc-agent-go"},
+		CleanRoom: *cleanRoom, EnableOfflineServices: *cleanRoom,
+		OfflineAssetsDir: *offlineAssetsDir, OfflineAssets: offlineAssetsIdentity,
 	}
+	resolvedImages, err := factory.ResolveImages(context.Background(), selectedSpecs)
+	if err != nil {
+		return err
+	}
+	imageSetSHA256, err := sweenv.ImageSetSHA256(resolvedImages)
+	if err != nil {
+		return err
+	}
+	factory.ResolvedImages = resolvedImages
 	exec := executor.Executor{
 		Factory: factory, ModelConfig: modelCfg, ObservationCodec: codec,
 		RunID: *runID, SourceRevision: build.SourceRevision, SourceModified: build.SourceModified,
@@ -203,7 +248,10 @@ func Run(args []string) error {
 		EnvironmentConfigSHA256: environmentHash, CasesSHA256: casesHash,
 		CommandTimeout: *commandTimeout, CaseTimeout: *caseTimeout,
 		SelectedInstancesSHA256: selectedHash,
-		Workers:                 *workers,
+		CleanRoom:               *cleanRoom, CleanRoomPolicySHA256: cleanRoomPolicySHA256,
+		OfflineAssetsSHA256: offlineAssetsIdentity.SHA256, ImageSetSHA256: imageSetSHA256,
+		DockerImages: resolvedImages,
+		Workers:      *workers,
 	}
 	if err := exec.Validate(); err != nil {
 		return err
@@ -216,7 +264,10 @@ func Run(args []string) error {
 		ModelConfigSHA256: modelHash, EnvironmentConfigSHA256: environmentHash,
 		CasesSHA256: casesHash, CommandTimeout: commandTimeout.String(),
 		CaseTimeout: caseTimeout.String(), SelectedInstancesSHA256: selectedHash,
-		Workers: *workers,
+		CleanRoom: *cleanRoom, CleanRoomPolicySHA256: cleanRoomPolicySHA256,
+		OfflineAssetsSHA256: offlineAssetsIdentity.SHA256, ImageSetSHA256: imageSetSHA256,
+		DockerImages: resolvedImages,
+		Workers:      *workers,
 	}
 	preds, pending, skipped, err := prepareResume(*output, predictionsPath, selected, *redoExisting, identity)
 	if err != nil {
@@ -333,11 +384,13 @@ func Run(args []string) error {
 	doc := manifest{
 		RunID: *runID, RunnerType: "trpc-agent-go-native", FrameworkModule: build.FrameworkModule,
 		FrameworkVersion: build.FrameworkVersion,
-		AgentProtocol:    agentProtocol(codec), UpstreamCommit: protocol.UpstreamCommit,
+		AgentProtocol:    agentProtocol(codec, *cleanRoom), UpstreamCommit: protocol.UpstreamCommit,
 		ObservationCodec: string(codec), SourceRevision: build.SourceRevision,
 		SourceModified: build.SourceModified, BinarySHA256: build.BinarySHA256,
 		CasesSHA256: casesHash, ModelConfigSHA256: modelHash,
 		EnvironmentConfigSHA256: environmentHash, SelectedInstancesSHA256: selectedHash,
+		CleanRoom: *cleanRoom, CleanRoomPolicySHA256: cleanRoomPolicySHA256,
+		ImageSetSHA256: imageSetSHA256, DockerImages: resolvedImages,
 		StartedAt:  started.UTC(),
 		FinishedAt: finished.UTC(), DurationMS: finished.Sub(started).Milliseconds(),
 		Cases: artifact.AbsPath(*casesPath), OutputDir: artifact.AbsPath(*output), Filter: *filter,
@@ -354,6 +407,14 @@ func Run(args []string) error {
 			"OpenAI SDK retry is configured with nine retries after the initial request; preds.json is the resume boundary.",
 		},
 	}
+	if offlineAssetsIdentity.SHA256 != "" {
+		doc.OfflineAssets = &offlineAssetsIdentity
+	}
+	if *cleanRoom {
+		doc.Notes = append(doc.Notes,
+			"Clean-room cases use local immutable image IDs, Docker network=none, recursive Git sanitation, and exact base-commit verification before the first model call.",
+		)
+	}
 	manifestPath := filepath.Join(*output, "native-runner-manifest.json")
 	if err := artifact.WriteJSON(manifestPath, doc); err != nil {
 		return err
@@ -366,12 +427,15 @@ func Run(args []string) error {
 	return nil
 }
 
-func agentProtocol(codec observation.ObservationCodec) string {
+func agentProtocol(codec observation.ObservationCodec, cleanRoom bool) string {
 	base := "mini-swe-agent-v2.1-on-trpc-agent-go"
-	if codec == observation.ObservationCodecXML {
-		return base
+	if codec != observation.ObservationCodecXML {
+		base += "+codec-" + string(codec)
 	}
-	return base + "+codec-" + string(codec)
+	if cleanRoom {
+		base += "+clean-room-v1"
+	}
+	return base
 }
 
 func modelManifestConfig(cfg modelconfig.EnvConfig) map[string]string {
@@ -437,7 +501,7 @@ func prepareResume(
 			if err != nil {
 				return nil, nil, nil, fmt.Errorf("cannot validate provenance for existing prediction %s: %w", c.InstanceID, err)
 			}
-			if err := validateResumeResult(c.InstanceID, result, identity); err != nil {
+			if err := validateResumeResult(c, result, identity); err != nil {
 				return nil, nil, nil, err
 			}
 			if !redo {
@@ -488,6 +552,32 @@ func validateRunIdentity(identity runIdentity) error {
 	if identity.Workers <= 0 {
 		return fmt.Errorf("run identity has non-positive workers %d", identity.Workers)
 	}
+	if identity.CleanRoom {
+		for _, hash := range []struct {
+			name  string
+			value string
+		}{
+			{"clean-room policy hash", identity.CleanRoomPolicySHA256},
+			{"image-set hash", identity.ImageSetSHA256},
+		} {
+			if !isHexIdentifier(hash.value, 64) {
+				return fmt.Errorf("run identity %s %q is not a SHA-256 digest", hash.name, hash.value)
+			}
+		}
+		if identity.OfflineAssetsSHA256 != "" && !isHexIdentifier(identity.OfflineAssetsSHA256, 64) {
+			return fmt.Errorf("run identity offline assets hash %q is not a SHA-256 digest", identity.OfflineAssetsSHA256)
+		}
+		resolvedHash, err := sweenv.ImageSetSHA256(identity.DockerImages)
+		if err != nil {
+			return err
+		}
+		if resolvedHash != identity.ImageSetSHA256 {
+			return fmt.Errorf("run identity Docker images hash %q, want %q", resolvedHash, identity.ImageSetSHA256)
+		}
+	} else if identity.CleanRoomPolicySHA256 != "" || identity.OfflineAssetsSHA256 != "" ||
+		identity.ImageSetSHA256 != "" || len(identity.DockerImages) != 0 {
+		return fmt.Errorf("non-clean-room run identity contains clean-room provenance")
+	}
 	return nil
 }
 
@@ -512,11 +602,15 @@ func isHexIdentifier(value string, lengths ...int) bool {
 	return true
 }
 
-func validateResumeResult(instanceID string, result executor.CaseResult, expected runIdentity) error {
+func validateResumeResult(c contract.Case, result executor.CaseResult, expected runIdentity) error {
+	instanceID := c.InstanceID
 	if result.InstanceID != instanceID {
 		return fmt.Errorf("existing prediction %s has result instance_id %q", instanceID, result.InstanceID)
 	}
 	info := result.Info
+	if info.CleanRoom != expected.CleanRoom {
+		return fmt.Errorf("existing prediction %s has clean_room=%t, want %t", instanceID, info.CleanRoom, expected.CleanRoom)
+	}
 	checks := []struct {
 		name     string
 		actual   string
@@ -538,6 +632,19 @@ func validateResumeResult(instanceID string, result executor.CaseResult, expecte
 			return fmt.Errorf("existing prediction %s has %s %q, want %q", instanceID, check.name, check.actual, check.expected)
 		}
 	}
+	for _, check := range []struct {
+		name     string
+		actual   string
+		expected string
+	}{
+		{"clean-room policy hash", info.CleanRoomPolicySHA256, expected.CleanRoomPolicySHA256},
+		{"offline assets hash", info.OfflineAssetsSHA256, expected.OfflineAssetsSHA256},
+		{"image-set hash", info.ImageSetSHA256, expected.ImageSetSHA256},
+	} {
+		if check.actual != check.expected {
+			return fmt.Errorf("existing prediction %s has %s %q, want %q", instanceID, check.name, check.actual, check.expected)
+		}
+	}
 	if info.SourceModified != expected.SourceModified {
 		return fmt.Errorf(
 			"existing prediction %s has source_modified=%t, want %t",
@@ -546,10 +653,66 @@ func validateResumeResult(instanceID string, result executor.CaseResult, expecte
 			expected.SourceModified,
 		)
 	}
+	if expected.CleanRoom {
+		for _, check := range []struct {
+			name     string
+			actual   string
+			expected string
+		}{
+			{"repo", info.Repo, c.Repo},
+			{"base commit", info.BaseCommit, c.BaseCommit},
+			{"verified base commit", info.VerifiedBaseCommit, c.BaseCommit},
+		} {
+			if check.actual != check.expected {
+				return fmt.Errorf("existing prediction %s has %s %q, want %q", instanceID, check.name, check.actual, check.expected)
+			}
+		}
+		if info.EnvironmentProvenance == nil {
+			return fmt.Errorf("existing prediction %s has no environment provenance", instanceID)
+		}
+		wantImage, ok := expected.DockerImages[sweenv.ImageForInstance(instanceID)]
+		if !ok || info.EnvironmentProvenance.Testbed != wantImage {
+			return fmt.Errorf("existing prediction %s has unexpected testbed image provenance", instanceID)
+		}
+		wantAuxiliary, err := expectedAuxiliaryImages(instanceID, expected.DockerImages, wantImage)
+		if err != nil {
+			return fmt.Errorf("existing prediction %s: %w", instanceID, err)
+		}
+		if len(info.EnvironmentProvenance.AuxiliaryImages) != len(wantAuxiliary) {
+			return fmt.Errorf("existing prediction %s has unexpected auxiliary image roles", instanceID)
+		}
+		for role, want := range wantAuxiliary {
+			if actual, ok := info.EnvironmentProvenance.AuxiliaryImages[role]; !ok || actual != want {
+				return fmt.Errorf("existing prediction %s has unexpected %s image provenance", instanceID, role)
+			}
+		}
+	} else if info.VerifiedBaseCommit != "" || info.EnvironmentProvenance != nil {
+		return fmt.Errorf("existing prediction %s carries clean-room case provenance with clean_room=false", instanceID)
+	}
 	if info.Workers != expected.Workers {
 		return fmt.Errorf("existing prediction %s has workers %d, want %d", instanceID, info.Workers, expected.Workers)
 	}
 	return nil
+}
+
+func expectedAuxiliaryImages(
+	instanceID string,
+	images map[string]sweenv.ImageIdentity,
+	testbed sweenv.ImageIdentity,
+) (map[string]sweenv.ImageIdentity, error) {
+	expected := map[string]sweenv.ImageIdentity{}
+	if strings.HasPrefix(instanceID, "psf__requests-") {
+		httpbin, ok := images[offlineHTTPBinImageReference]
+		if !ok {
+			return nil, fmt.Errorf("resolved Docker images do not contain the offline httpbin image")
+		}
+		expected["httpbin"] = httpbin
+	}
+	switch instanceID {
+	case "psf__requests-2317", "psf__requests-2931", "psf__requests-5414", "psf__requests-6028":
+		expected["network-helper"] = testbed
+	}
+	return expected, nil
 }
 
 func persistPredictions(path string, predictions map[string]contract.Prediction) error {
