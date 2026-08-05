@@ -76,13 +76,28 @@ repository_root=$2
 shift 2
 cd "$repository_root"
 
-actual_base=$(git rev-parse --verify HEAD)
-if [[ "$actual_base" != "$expected_base" ]]; then
-  echo "testbed HEAD $actual_base does not match expected base $expected_base" >&2
-  exit 1
-fi
+actual_head=$(git rev-parse --verify HEAD)
 if ! git diff --quiet || ! git diff --cached --quiet; then
   echo "official testbed has tracked changes before clean-room sanitation" >&2
+  exit 1
+fi
+if [[ "$actual_head" != "$expected_base" ]]; then
+  revision_line=$(git rev-list --parents -n 1 "$actual_head")
+  read -r -a revision_parts <<<"$revision_line"
+  subject=$(git show -s --format=%s "$actual_head")
+  if [[ "${#revision_parts[@]}" -ne 2 || "${revision_parts[1]}" != "$expected_base" \
+    || "$subject" != "SWE-bench" ]]; then
+    echo "testbed HEAD $actual_head is not expected base $expected_base or its official setup commit" >&2
+    exit 1
+  fi
+  # Official images wrap the task base in a synthetic setup commit. Never
+  # expose that commit's tree to the model: reset to the dataset base before
+  # recursively rebuilding the reachable Git history.
+  git reset -q --hard "$expected_base"
+fi
+actual_base=$(git rev-parse --verify HEAD)
+if [[ "$actual_base" != "$expected_base" ]]; then
+  echo "testbed did not reset to expected base $expected_base" >&2
   exit 1
 fi
 

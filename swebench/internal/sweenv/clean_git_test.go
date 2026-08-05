@@ -169,10 +169,45 @@ func TestCleanGitRepositoryScriptRejectsDirtyOrWrongGitlink(t *testing.T) {
 	t.Run("base mismatch", func(t *testing.T) {
 		fixture := newNestedGitFixture(t)
 		output, err := executeCleanGitScript(fixture.root, strings.Repeat("0", 40))
-		if err == nil || !strings.Contains(output, "does not match expected base") {
+		if err == nil || !strings.Contains(output, "is not expected base") {
 			t.Fatalf("error = %v, output = %q", err, output)
 		}
 	})
+}
+
+func TestCleanGitRepositoryScriptResetsOfficialSetupCommitToBase(t *testing.T) {
+	fixture := newNestedGitFixture(t)
+	writeFile(t, filepath.Join(fixture.root, "root.txt"), "synthetic setup\n")
+	runGit(t, fixture.root, "add", "root.txt")
+	runGit(t, fixture.root, "commit", "-qm", "SWE-bench")
+	setupCommit := strings.TrimSpace(runGit(t, fixture.root, "rev-parse", "HEAD"))
+	if setupCommit == fixture.base {
+		t.Fatal("official setup commit unexpectedly equals case base")
+	}
+
+	runCleanGitScript(t, fixture.root, fixture.base)
+
+	if got := strings.TrimSpace(runGit(t, fixture.root, "rev-parse", "HEAD")); got != fixture.base {
+		t.Fatalf("root HEAD = %s, want %s", got, fixture.base)
+	}
+	if got := readFile(t, filepath.Join(fixture.root, "root.txt")); got != "root\n" {
+		t.Fatalf("root.txt = %q, want case-base contents", got)
+	}
+	assertSanitizedGitRepository(t, fixture.root)
+	runVerifyGitScript(t, fixture.root, fixture.base)
+}
+
+func TestCleanGitRepositoryScriptRejectsNonOfficialCommitAfterBase(t *testing.T) {
+	fixture := newNestedGitFixture(t)
+	runGit(t, fixture.root, "commit", "--allow-empty", "-qm", "unexpected wrapper")
+
+	output, err := executeCleanGitScript(fixture.root, fixture.base)
+	if err == nil || !strings.Contains(output, "is not expected base") {
+		t.Fatalf("error = %v, output = %q", err, output)
+	}
+	if got := strings.TrimSpace(runGit(t, fixture.root, "rev-parse", "HEAD")); got == fixture.base {
+		t.Fatal("rejected wrapper was unexpectedly reset")
+	}
 }
 
 func TestCleanGitRepositoryScriptRejectsIgnoredSymlink(t *testing.T) {
