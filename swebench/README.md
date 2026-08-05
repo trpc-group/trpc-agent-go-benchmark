@@ -14,6 +14,11 @@ It reuses tRPC-Agent-Go's public model and tool types, but intentionally keeps
 mini-SWE-agent's explicit control loop. It is therefore a reference lane, not
 the native `llmagent` runner.
 
+The native TAG lane applies the same pinned model-facing protocol through the
+public tRPC-Agent-Go lifecycle (`llmagent.New`, `runner.NewRunner`, and
+`runner.Run`). Its default tool set contains only `bash`; repository retrieval
+and loop-warning instrumentation are deliberately outside this layer.
+
 ## Scope
 
 The committed core includes:
@@ -24,6 +29,7 @@ The committed core includes:
 - an adapter for the external mini-SWE-agent reference implementation;
 - shared Docker-environment and XML-like/JSON/text observation codecs;
 - a golden-tested, source-aligned Mini-Go reference runner;
+- a framework-native tRPC-Agent-Go runner using only upstream public APIs;
 - the unmodified upstream local harness invocation;
 - batch planning, resumable shard inspection, and deterministic prediction
   merging.
@@ -41,6 +47,7 @@ swebench/
   internal/               # Artifact, contract, environment, and codec packages.
   mini-swe-agent-impl/    # External reference-runner instructions.
   mini-swe-agent-go-impl/ # Source-aligned Mini-Go reference runner.
+  trpc-agent-go-impl/     # Framework-native TAG runner.
   results/                # Ignored runtime outputs and future summaries.
 ```
 
@@ -112,12 +119,17 @@ go run ./evaluator prepare-data --python python
 For the canonical dataset and split, preparation fails closed unless the
 generated instance IDs match the committed list and checksum.
 
+Run `prepare-data` again for manifests created before the cases-content
+checksum was added. `run-config` intentionally rejects those older manifests
+instead of accepting unverifiable case contents.
+
 ### 5. Produce and verify predictions
 
 Choose either the
 [`external mini-SWE-agent runner`](mini-swe-agent-impl/README.md), the
-[`source-aligned Mini-Go runner`](mini-swe-agent-go-impl/README.md), or any
-other prediction producer that follows the shared contract.
+[`source-aligned Mini-Go runner`](mini-swe-agent-go-impl/README.md), the
+[`native tRPC-Agent-Go runner`](trpc-agent-go-impl/README.md), or any other
+prediction producer that follows the shared contract.
 
 ```bash
 go run ./evaluator verify \
@@ -130,8 +142,14 @@ go run ./evaluator verify \
 ```
 
 By default the harness is restricted to instance IDs present in the prediction
-file. The verifier manifest records the installed SWE-Bench version, discoverable
-Git revision, package path, exact command, and runtime configuration.
+file. The verifier manifest records the installed SWE-Bench version,
+discoverable Git revision, package path, exact command, runtime configuration,
+and the official report's harness run ID, absolute path, and SHA-256. For
+file-backed predictions, `verify` atomically snapshots the exact input used by
+the harness and records its SHA-256; Native finalization requires the runner
+predictions, snapshot, digest, and harness `-p` argument to agree. A
+successful harness command is not accepted as a successful `verify` step when
+that report cannot be identified unambiguously.
 
 `<target-label>` is an agent-neutral lowercase slug such as `baseline`,
 `mini-go`, or `tag`. Prediction readers accept SWE-Bench map JSON, array JSON,
@@ -145,14 +163,15 @@ go run ./evaluator import \
   --target <target-label> \
   --cases data/generated/cases.jsonl \
   --predictions <path-to-preds.json> \
-  --harness-report <path-to-harness-report.json> \
+  --harness-report <verifier_manifest.report.path> \
   --output results/runs/<run-id>/imported
 ```
 
 Use `run-config` after generation, verification, and import have produced their
 manifests. See [`evaluator/README.md`](evaluator/README.md) for the complete CLI.
 
-The importer writes a target-neutral versioned row for every canonical case:
+The importer writes a target-neutral versioned row for every input case (the
+canonical panel when `--cases` is supplied, otherwise the prediction set):
 
 ```json
 {
@@ -167,8 +186,14 @@ The importer writes a target-neutral versioned row for every canonical case:
 }
 ```
 
-`run-config` accepts exactly one runner provenance source and rejects mismatched
-run IDs, targets, datasets, case counts, summary counts, or prediction paths.
+For filtered or sliced runs, omit `--cases` during import so predictions define
+the normalized rows. `run-config` still receives the full
+`cases.manifest.json`: its `dataset` field preserves the complete panel identity
+while `selection` records the cases actually run. The command accepts exactly
+one runner provenance source and rejects mismatched run IDs, targets, datasets,
+selection identities, summary counts, prediction paths, or harness reports.
+Pass the same report recorded by `verify` to both `import` and `run-config`;
+Native finalization requires that verify-time path and SHA-256 attestation.
 
 ## Validation
 

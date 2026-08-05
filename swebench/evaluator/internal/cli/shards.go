@@ -476,12 +476,19 @@ func miniGoShardRunnerIdentity(manifest runnerManifest) shardRunnerIdentity {
 	}
 }
 
+func nativeRunnerIdentity(manifest runnerManifest) shardRunnerIdentity {
+	identity := miniGoShardRunnerIdentity(manifest)
+	identity.ManifestKind = "native"
+	return identity
+}
+
 func validateShardRunnerIdentity(identity shardRunnerIdentity) error {
 	_, err := normalizeShardRunnerIdentity(identity)
 	return err
 }
 
 func normalizeShardRunnerIdentity(identity shardRunnerIdentity) (shardRunnerIdentity, error) {
+	expectedRunnerType := ""
 	switch identity.ManifestKind {
 	case "legacy-run-mini":
 		if identity.RunnerType != "mini-swe-agent-python" {
@@ -489,11 +496,14 @@ func normalizeShardRunnerIdentity(identity shardRunnerIdentity) (shardRunnerIden
 		}
 		return identity, nil
 	case "mini-go":
+		expectedRunnerType = "mini-swe-agent-go"
+	case "native":
+		expectedRunnerType = "trpc-agent-go-native"
 	default:
 		return shardRunnerIdentity{}, fmt.Errorf("unsupported manifest_kind %q", identity.ManifestKind)
 	}
-	if identity.RunnerType != "mini-swe-agent-go" {
-		return shardRunnerIdentity{}, fmt.Errorf("runner_type %q is not %q", identity.RunnerType, "mini-swe-agent-go")
+	if identity.RunnerType != expectedRunnerType {
+		return shardRunnerIdentity{}, fmt.Errorf("runner_type %q is not %q", identity.RunnerType, expectedRunnerType)
 	}
 	if identity.ObservationCodec != "xml" && identity.ObservationCodec != "json" && identity.ObservationCodec != "text" {
 		return shardRunnerIdentity{}, fmt.Errorf("observation_codec %q is not xml, json, or text", identity.ObservationCodec)

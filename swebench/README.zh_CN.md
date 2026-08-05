@@ -11,6 +11,10 @@ Core 层不绑定具体 Agent：它生成安全的 case manifest，接收外部 
 tRPC-Agent-Go 的公开 model 与 tool 类型，但刻意保留 mini-SWE-agent 的显式控制循环。因此
 它是参考实现路径，而不是原生 `llmagent` runner。
 
+Native TAG 路径通过 tRPC-Agent-Go 的公开生命周期（`llmagent.New`、
+`runner.NewRunner` 和 `runner.Run`）执行同一组固定的模型侧协议。默认只向模型提供 `bash`
+工具；仓库检索与 loop-warning instrumentation 不属于这一层。
+
 ## 范围
 
 当前 Core 包含：
@@ -21,6 +25,7 @@ tRPC-Agent-Go 的公开 model 与 tool 类型，但刻意保留 mini-SWE-agent �
 - 外部 mini-SWE-agent 参考实现的适配入口；
 - 共享 Docker environment 与 XML-like/JSON/text observation codec；
 - 经过 golden 测试的 source-aligned Mini-Go 参考 runner；
+- 只使用 upstream 公开 API 的 tRPC-Agent-Go 原生 runner；
 - 对未经修改的 upstream official local harness 的调用；
 - batch 规划、可恢复 shard 检查和确定性 predictions 合并。
 
@@ -37,6 +42,7 @@ swebench/
   internal/               # artifact、contract、environment 与 codec 包。
   mini-swe-agent-impl/    # 外部参考 runner 说明。
   mini-swe-agent-go-impl/ # source-aligned Mini-Go 参考 runner。
+  trpc-agent-go-impl/     # tRPC-Agent-Go 原生 runner。
   results/                # 被忽略的运行产物与后续结果摘要。
 ```
 
@@ -107,12 +113,16 @@ go run ./evaluator prepare-data --python python
 当使用固定 dataset 与 split 时，生成结果必须与提交的 case list 和 checksum 完全匹配，否则
 命令失败。
 
+如果 case manifest 生成于 cases 内容 checksum 引入之前，请重新执行 `prepare-data`。
+`run-config` 会拒绝这类旧 manifest，避免接受无法验证的 case 内容。
+
 ### 5. 生成并验证 predictions
 
 可以选择
 [`外部 mini-SWE-agent runner`](mini-swe-agent-impl/README.md)、
-[`source-aligned Mini-Go runner`](mini-swe-agent-go-impl/README.md)，或提供任何符合共享契约的
-其他 predictions 文件。
+[`source-aligned Mini-Go runner`](mini-swe-agent-go-impl/README.md)、
+[`tRPC-Agent-Go 原生 runner`](trpc-agent-go-impl/README.md)，或提供任何符合共享契约的其他
+predictions 文件。
 
 ```bash
 go run ./evaluator verify \
@@ -125,7 +135,11 @@ go run ./evaluator verify \
 ```
 
 默认只验证 predictions 中出现的 instance。verifier manifest 会记录实际 SWE-Bench
-version、可发现的 Git revision、package path、完整命令和运行配置。
+version、可发现的 Git revision、package path、完整命令、运行配置，以及官方 report 的
+harness run ID、绝对路径和 SHA-256。对于文件形式的 predictions，`verify` 会原子快照
+harness 实际使用的输入并记录其 SHA-256；Native finalization 强制核对 runner predictions、
+快照、digest 与 harness `-p` 参数。即使 harness 命令成功，只要无法唯一定位该 report，
+`verify` 仍会失败。
 
 `<target-label>` 是与 Agent 实现解耦的小写 slug，例如 `baseline`、`mini-go` 或
 `tag`。prediction reader 支持 SWE-Bench map JSON、array JSON 与 JSONL；空输入、重复 ID、
@@ -138,14 +152,15 @@ go run ./evaluator import \
   --target <target-label> \
   --cases data/generated/cases.jsonl \
   --predictions <path-to-preds.json> \
-  --harness-report <path-to-harness-report.json> \
+  --harness-report <verifier_manifest.report.path> \
   --output results/runs/<run-id>/imported
 ```
 
 generation、verification 和 import 都生成 manifest 后，再使用 `run-config` 汇总。完整 CLI
 见 [`evaluator/README.md`](evaluator/README.md)。
 
-import 会为每个固定 case 写入与 target 无关、带版本号的结构：
+import 会为每个输入 case 写入与 target 无关、带版本号的结构；提供 `--cases` 时输入是完整固定
+面板，否则输入是 predictions 中的实际选择集：
 
 ```json
 {
@@ -160,8 +175,12 @@ import 会为每个固定 case 写入与 target 无关、带版本号的结构�
 }
 ```
 
-`run-config` 只接受一个 runner provenance 来源，并强制核对 run ID、target、dataset、case
-数量、summary counts 与 predictions 路径；任一项不一致都会失败。
+对于经过 filter 或 slice 的运行，import 时省略 `--cases`，由 predictions 定义本次需要
+归一化的 case。`run-config` 仍接收完整的 `cases.manifest.json`：`dataset` 保留完整面板身份，
+`selection` 单独记录实际运行的 case。它只接受一个 runner provenance 来源，并强制核对 run
+ID、target、dataset、selection、summary counts、predictions 路径与 harness report；任一项
+不一致都会失败。`import` 与 `run-config` 必须使用 `verify` 记录的同一份 report；Native
+finalization 强制要求 verify 时记录的 path 与 SHA-256 见证。
 
 ## 验证
 

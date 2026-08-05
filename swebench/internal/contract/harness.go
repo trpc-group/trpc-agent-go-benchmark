@@ -14,6 +14,8 @@ type HarnessIndex struct {
 	Resolved   map[string]bool
 	Unresolved map[string]bool
 	Errors     map[string]bool
+	EmptyPatch map[string]bool
+	Incomplete map[string]bool
 	Completed  map[string]bool
 }
 
@@ -23,6 +25,8 @@ func NewHarnessIndex() HarnessIndex {
 		Resolved:   map[string]bool{},
 		Unresolved: map[string]bool{},
 		Errors:     map[string]bool{},
+		EmptyPatch: map[string]bool{},
+		Incomplete: map[string]bool{},
 		Completed:  map[string]bool{},
 	}
 }
