@@ -14,12 +14,224 @@ import (
 	"encoding/hex"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
 
 	"trpc.group/trpc-go/trpc-agent-go-benchmark/swebench/internal/contract"
+	"trpc.group/trpc-go/trpc-agent-go-benchmark/swebench/internal/sweenv"
 )
+
+func TestSummarizeShardPlanBindsNativeCleanRoomProvenance(t *testing.T) {
+	dir := t.TempDir()
+	instanceID := "psf__requests-2317"
+	batch := batchPlanItem{
+		Index: 0, Name: "batch-000", RunID: "native-000", Size: 1,
+		InstanceIDs: []string{instanceID},
+	}
+	plan := testBatchPlan([]batchPlanItem{batch})
+	rawDir := filepath.Join(dir, batch.RunID, "raw", "native")
+	selectedSHA256, err := selectedInstancesSHA256(batch.InstanceIDs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	artifact, images, offlineAssets := cleanRoomNativeArtifact(
+		t,
+		instanceID,
+		"psf/requests",
+		strings.Repeat("c", 40),
+	)
+	imageSetSHA256, err := sweenv.ImageSetSHA256(images)
+	if err != nil {
+		t.Fatal(err)
+	}
+	start := time.Date(2026, 8, 1, 1, 0, 0, 0, time.UTC)
+	manifest := runnerManifest{
+		RunID: batch.RunID, RunnerType: "trpc-agent-go-native", ObservationCodec: "xml",
+		AgentProtocol:   "mini-swe-agent-v2.1-on-trpc-agent-go+clean-room-v1",
+		UpstreamCommit:  strings.Repeat("f", 40),
+		FrameworkModule: "trpc.group/trpc-go/trpc-agent-go", FrameworkVersion: "v1.2.3",
+		SourceRevision: strings.Repeat("a", 40), BinarySHA256: strings.Repeat("b", 64),
+		CasesSHA256: strings.Repeat("c", 64), ModelConfigSHA256: strings.Repeat("d", 64),
+		EnvironmentConfigSHA256: strings.Repeat("e", 64), SelectedInstancesSHA256: selectedSHA256,
+		CommandTimeout: "1m0s", CaseTimeout: "4h0m0s", CleanRoom: true,
+		CleanRoomPolicySHA256: strings.Repeat("3", 64), OfflineAssets: offlineAssets,
+		ImageSetSHA256: imageSetSHA256, DockerImages: images,
+		StartedAt: start, FinishedAt: start.Add(time.Minute), DurationMS: int64(time.Minute / time.Millisecond),
+		OutputDir: rawDir, CaseCount: 1, Workers: 1,
+		Predictions: filepath.Join(rawDir, "preds.json"), Status: "completed",
+		ModelConfig: map[string]string{"MODEL_NAME": "test-model"},
+	}
+	if err := writeJSON(filepath.Join(rawDir, "native-runner-manifest.json"), manifest); err != nil {
+		t.Fatal(err)
+	}
+	info := artifact["info"].(map[string]any)
+	info["run_id"] = manifest.RunID
+	info["observation_codec"] = manifest.ObservationCodec
+	info["source_revision"] = manifest.SourceRevision
+	info["binary_sha256"] = manifest.BinarySHA256
+	info["model_config_sha256"] = manifest.ModelConfigSHA256
+	info["environment_config_sha256"] = manifest.EnvironmentConfigSHA256
+	info["cases_sha256"] = manifest.CasesSHA256
+	info["command_timeout"] = manifest.CommandTimeout
+	info["case_timeout"] = manifest.CaseTimeout
+	info["selected_instances_sha256"] = manifest.SelectedInstancesSHA256
+	artifact["model_patch"] = "patch"
+	if err := writeJSON(filepath.Join(rawDir, instanceID, instanceID+".native.json"), artifact); err != nil {
+		t.Fatal(err)
+	}
+	writeTestPreds(t, rawDir, map[string]contract.Prediction{
+		instanceID: {InstanceID: instanceID, ModelPatch: "patch"},
+	})
+
+	summary, err := summarizeShardPlan(plan, filepath.Join(dir, "plan.json"), dir, filepath.Join("raw", "native"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if summary.AcceptedCases != 1 || summary.Shards[0].Status != "accepted" ||
+		summary.RunnerIdentity.ManifestKind != "native" || !summary.RunnerIdentity.CleanRoom ||
+		summary.RunnerIdentity.ImageSetSHA256 != imageSetSHA256 ||
+		summary.RunnerIdentity.ModelName != "test-model" ||
+		summary.RunnerIdentity.AgentProtocol != manifest.AgentProtocol ||
+		summary.RunnerIdentity.UpstreamCommit != manifest.UpstreamCommit {
+		t.Fatalf("native clean-room shard summary = %+v", summary)
+	}
+}
+
+func TestNativeShardRunnerIdentityBindsModelAndProtocol(t *testing.T) {
+	manifest := runnerManifest{
+		RunnerType:              "trpc-agent-go-native",
+		AgentProtocol:           "mini-swe-agent-v2.1-on-trpc-agent-go",
+		UpstreamCommit:          strings.Repeat("f", 40),
+		ObservationCodec:        "xml",
+		FrameworkModule:         "trpc.group/trpc-go/trpc-agent-go",
+		FrameworkVersion:        "v1.2.3",
+		SourceRevision:          strings.Repeat("a", 40),
+		BinarySHA256:            strings.Repeat("b", 64),
+		CasesSHA256:             strings.Repeat("c", 64),
+		ModelConfigSHA256:       strings.Repeat("d", 64),
+		EnvironmentConfigSHA256: strings.Repeat("e", 64),
+		CommandTimeout:          "1m",
+		CaseTimeout:             "4h",
+		ModelConfig:             map[string]string{"MODEL_NAME": "model-a"},
+	}
+	identity, err := normalizeShardRunnerIdentity(nativeRunnerIdentity(manifest))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if identity.ModelName != "model-a" || identity.AgentProtocol != manifest.AgentProtocol ||
+		identity.UpstreamCommit != manifest.UpstreamCommit {
+		t.Fatalf("native identity = %+v", identity)
+	}
+
+	changed := cloneShardRunnerIdentity(identity)
+	changed.ModelName = "model-b"
+	if mismatch := shardRunnerIdentityMismatch(identity, changed); !strings.Contains(mismatch, "model_name") {
+		t.Fatalf("model mismatch = %q, want model_name", mismatch)
+	}
+	changed = cloneShardRunnerIdentity(identity)
+	changed.AgentProtocol += "+changed"
+	if mismatch := shardRunnerIdentityMismatch(identity, changed); !strings.Contains(mismatch, "agent_protocol") {
+		t.Fatalf("protocol mismatch = %q, want agent_protocol", mismatch)
+	}
+	changed = cloneShardRunnerIdentity(identity)
+	changed.UpstreamCommit = strings.Repeat("1", 40)
+	if mismatch := shardRunnerIdentityMismatch(identity, changed); !strings.Contains(mismatch, "upstream_commit") {
+		t.Fatalf("upstream mismatch = %q, want upstream_commit", mismatch)
+	}
+}
+
+func TestNativeShardRunnerIdentityRejectsMissingOrNonCanonicalModel(t *testing.T) {
+	base := shardRunnerIdentity{
+		ManifestKind:            "native",
+		RunnerType:              "trpc-agent-go-native",
+		ObservationCodec:        "xml",
+		FrameworkModule:         "trpc.group/trpc-go/trpc-agent-go",
+		FrameworkVersion:        "v1.2.3",
+		SourceRevision:          strings.Repeat("a", 40),
+		BinarySHA256:            strings.Repeat("b", 64),
+		CasesSHA256:             strings.Repeat("c", 64),
+		ModelConfigSHA256:       strings.Repeat("d", 64),
+		EnvironmentConfigSHA256: strings.Repeat("e", 64),
+		CommandTimeout:          "1m",
+		CaseTimeout:             "4h",
+	}
+	for _, modelName := range []string{"", " model-a", "model-a\nmodel-b"} {
+		identity := cloneShardRunnerIdentity(base)
+		identity.ModelName = modelName
+		if _, err := normalizeShardRunnerIdentity(identity); err == nil || !strings.Contains(err.Error(), "model_name") {
+			t.Fatalf("model_name %q error = %v, want model_name rejection", modelName, err)
+		}
+	}
+}
+
+func TestNativeShardRunnerIdentityRequiresProtocolAndUpstreamCommit(t *testing.T) {
+	identity := defaultMiniGoIdentity()
+	identity.ManifestKind = "native"
+	identity.RunnerType = "trpc-agent-go-native"
+	identity.ModelName = "model-a"
+	identity.AgentProtocol = "mini-swe-agent-v2.1-on-trpc-agent-go"
+	identity.UpstreamCommit = strings.Repeat("f", 40)
+	if _, err := normalizeShardRunnerIdentity(identity); err != nil {
+		t.Fatal(err)
+	}
+
+	missingProtocol := cloneShardRunnerIdentity(identity)
+	missingProtocol.AgentProtocol = ""
+	if _, err := normalizeShardRunnerIdentity(missingProtocol); err == nil ||
+		!strings.Contains(err.Error(), "agent_protocol") {
+		t.Fatalf("missing protocol error = %v", err)
+	}
+	missingUpstream := cloneShardRunnerIdentity(identity)
+	missingUpstream.UpstreamCommit = ""
+	if _, err := normalizeShardRunnerIdentity(missingUpstream); err == nil ||
+		!strings.Contains(err.Error(), "upstream_commit") {
+		t.Fatalf("missing upstream error = %v", err)
+	}
+}
+
+func TestNativeCleanRoomIdentityRequiresProtocolAndUpstreamCommit(t *testing.T) {
+	identity := defaultMiniGoIdentity()
+	identity.ManifestKind = "native"
+	identity.RunnerType = "trpc-agent-go-native"
+	identity.ModelName = "model-a"
+	identity.AgentProtocol = "mini-swe-agent-v2.1-on-trpc-agent-go+clean-room-v1"
+	identity.UpstreamCommit = strings.Repeat("f", 40)
+	identity.CleanRoom = true
+	identity.CleanRoomPolicySHA256 = strings.Repeat("1", 64)
+	identity.OfflineAssets = &sweenv.OfflineAssetIdentity{
+		Schema: "swebench-offline-assets-v1", SHA256: strings.Repeat("2", 64),
+		ManifestSHA256: strings.Repeat("3", 64), FileCount: 1,
+	}
+	identity.DockerImages = map[string]sweenv.ImageIdentity{
+		"example/image:latest": {
+			Reference: "example/image:latest",
+			ID:        "sha256:" + strings.Repeat("4", 64),
+		},
+	}
+	imageSetSHA256, err := sweenv.ImageSetSHA256(identity.DockerImages)
+	if err != nil {
+		t.Fatal(err)
+	}
+	identity.ImageSetSHA256 = imageSetSHA256
+	if _, err := normalizeShardRunnerIdentity(identity); err != nil {
+		t.Fatal(err)
+	}
+
+	missingProtocol := cloneShardRunnerIdentity(identity)
+	missingProtocol.AgentProtocol = ""
+	if _, err := normalizeShardRunnerIdentity(missingProtocol); err == nil ||
+		!strings.Contains(err.Error(), "agent_protocol") {
+		t.Fatalf("missing protocol error = %v", err)
+	}
+	missingUpstream := cloneShardRunnerIdentity(identity)
+	missingUpstream.UpstreamCommit = ""
+	if _, err := normalizeShardRunnerIdentity(missingUpstream); err == nil ||
+		!strings.Contains(err.Error(), "upstream_commit") {
+		t.Fatalf("missing upstream error = %v", err)
+	}
+}
 
 func TestSummarizeShardPlanAcceptsCaseLevelResults(t *testing.T) {
 	dir := t.TempDir()
@@ -312,7 +524,7 @@ func TestSummarizeShardPlanRejectsMiniGoIdentityMismatch(t *testing.T) {
 			if err != nil {
 				t.Fatalf("summarizeShardPlan() error = %v", err)
 			}
-			if got := manifest.RunnerIdentity; got != defaultMiniGoIdentity() {
+			if got := manifest.RunnerIdentity; !reflect.DeepEqual(got, defaultMiniGoIdentity()) {
 				t.Fatalf("RunnerIdentity = %+v, want canonical %+v", got, defaultMiniGoIdentity())
 			}
 			shard := manifest.Shards[1]

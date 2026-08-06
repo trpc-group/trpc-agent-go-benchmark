@@ -19,7 +19,50 @@ import (
 
 	"trpc.group/trpc-go/trpc-agent-go-benchmark/swebench/internal/artifact"
 	"trpc.group/trpc-go/trpc-agent-go-benchmark/swebench/internal/contract"
+	"trpc.group/trpc-go/trpc-agent-go-benchmark/swebench/internal/sweenv"
 )
+
+func TestValidateCleanRoomIdentityBindsImageAndAssetDigests(t *testing.T) {
+	images := map[string]sweenv.ImageIdentity{
+		"example.test/image:tag": {
+			Reference: "example.test/image:tag",
+			ID:        "sha256:" + strings.Repeat("a", 64),
+		},
+	}
+	imageSetSHA256, err := sweenv.ImageSetSHA256(images)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assets := &sweenv.OfflineAssetIdentity{
+		Schema:         "swebench-offline-assets-v1",
+		SHA256:         strings.Repeat("1", 64),
+		ManifestSHA256: strings.Repeat("2", 64),
+		FileCount:      1,
+	}
+	if err := validateCleanRoomIdentity(
+		"test",
+		true,
+		strings.Repeat("3", 64),
+		assets,
+		imageSetSHA256,
+		images,
+	); err != nil {
+		t.Fatalf("validateCleanRoomIdentity() error = %v", err)
+	}
+	if err := validateCleanRoomIdentity("test", false, strings.Repeat("3", 64), nil, "", nil); err == nil {
+		t.Fatal("validateCleanRoomIdentity() accepted provenance with clean_room=false")
+	}
+	mutated := cloneDockerImages(images)
+	mutated["example.test/image:tag"] = sweenv.ImageIdentity{
+		Reference: "example.test/image:tag",
+		ID:        "sha256:" + strings.Repeat("b", 64),
+	}
+	if err := validateCleanRoomIdentity(
+		"test", true, strings.Repeat("3", 64), assets, imageSetSHA256, mutated,
+	); err == nil || !strings.Contains(err.Error(), "does not match") {
+		t.Fatalf("validateCleanRoomIdentity() error = %v, want image-set mismatch", err)
+	}
+}
 
 func TestRunConfigSupportsGenericNativeRunnerManifest(t *testing.T) {
 	dir := t.TempDir()
@@ -57,6 +100,8 @@ func TestRunConfigSupportsGenericNativeRunnerManifest(t *testing.T) {
 	nativeManifest := runnerManifest{
 		RunID:                   "native-run",
 		RunnerType:              "trpc-agent-go-native",
+		AgentProtocol:           "mini-swe-agent-v2.1-on-trpc-agent-go",
+		UpstreamCommit:          strings.Repeat("f", 40),
 		ObservationCodec:        "xml",
 		FrameworkModule:         "trpc.group/trpc-go/trpc-agent-go",
 		FrameworkVersion:        "v1.10.1-0.20260728070417-4237accb70cb",
@@ -209,12 +254,58 @@ func TestRunConfigSupportsGenericNativeRunnerManifest(t *testing.T) {
 	}
 }
 
-func TestRunConfigSupportsFilteredNativeSelectionWithFullCasesManifest(t *testing.T) {
+func TestRunConfigSupportsFilteredNativeImportWithFullCasesManifest(t *testing.T) {
+	for _, tt := range []struct {
+		name      string
+		cleanRoom bool
+	}{
+		{name: "default-off"},
+		{name: "clean-room", cleanRoom: true},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			testRunConfigSupportsFilteredNativeImportWithFullCasesManifest(t, tt.cleanRoom)
+		})
+	}
+}
+
+func testRunConfigSupportsFilteredNativeImportWithFullCasesManifest(t *testing.T, cleanRoom bool) {
+	t.Helper()
 	dir := t.TempDir()
-	fixture := writeRunConfigSelectionFixture(t, dir, []string{"case-a", "case-b"}, []string{"case-a"}, "native")
-	selectedHash, err := selectedInstancesSHA256([]string{"case-a"})
+	instanceID := "psf__requests-2317"
+	repo := "psf/requests"
+	baseCommit := strings.Repeat("c", 40)
+	fullIDs := []string{instanceID, "sympy__sympy-20590"}
+	fixture := writeRunConfigSelectionFixture(t, dir, fullIDs, []string{instanceID}, "native")
+	casesJSONLPath := filepath.Join(fixture.cases.OutputDir, "cases.jsonl")
+	writeCasesJSONL(t, casesJSONLPath, []contract.Case{
+		{InstanceID: instanceID, Repo: repo, BaseCommit: baseCommit},
+		{InstanceID: fullIDs[1], Repo: "sympy/sympy", BaseCommit: strings.Repeat("d", 40)},
+	})
+	fixture.cases.CasesJSONLSHA256 = testFileSHA256(t, casesJSONLPath)
+	if err := writeJSON(fixture.casesManifestPath, fixture.cases); err != nil {
+		t.Fatal(err)
+	}
+	selectedHash, err := selectedInstancesSHA256([]string{instanceID})
 	if err != nil {
 		t.Fatal(err)
+	}
+	nativeArtifact := validNativeArtifact()
+	nativeArtifact["instance_id"] = instanceID
+	nativeInfo := nativeArtifact["info"].(map[string]any)
+	agentProtocol := "mini-swe-agent-v2.1-on-trpc-agent-go"
+	var dockerImages map[string]sweenv.ImageIdentity
+	var offlineAssets *sweenv.OfflineAssetIdentity
+	imageSetSHA256 := ""
+	cleanRoomPolicySHA256 := ""
+	if cleanRoom {
+		nativeArtifact, dockerImages, offlineAssets = cleanRoomNativeArtifact(t, instanceID, repo, baseCommit)
+		nativeInfo = nativeArtifact["info"].(map[string]any)
+		agentProtocol += "+clean-room-v1"
+		cleanRoomPolicySHA256 = strings.Repeat("3", 64)
+		imageSetSHA256, err = sweenv.ImageSetSHA256(dockerImages)
+		if err != nil {
+			t.Fatal(err)
+		}
 	}
 
 	runnerDir := filepath.Join(dir, "native")
@@ -223,6 +314,8 @@ func TestRunConfigSupportsFilteredNativeSelectionWithFullCasesManifest(t *testin
 	nativeManifest := runnerManifest{
 		RunID:                   "native-filtered",
 		RunnerType:              "trpc-agent-go-native",
+		AgentProtocol:           agentProtocol,
+		UpstreamCommit:          strings.Repeat("f", 40),
 		ObservationCodec:        "xml",
 		FrameworkModule:         "trpc.group/trpc-go/trpc-agent-go",
 		FrameworkVersion:        "v1.10.1-0.20260728070417-4237accb70cb",
@@ -234,6 +327,11 @@ func TestRunConfigSupportsFilteredNativeSelectionWithFullCasesManifest(t *testin
 		SelectedInstancesSHA256: selectedHash,
 		CommandTimeout:          "1m",
 		CaseTimeout:             "2h",
+		CleanRoom:               cleanRoom,
+		CleanRoomPolicySHA256:   cleanRoomPolicySHA256,
+		OfflineAssets:           offlineAssets,
+		ImageSetSHA256:          imageSetSHA256,
+		DockerImages:            dockerImages,
 		OutputDir:               runnerDir,
 		CaseCount:               1,
 		Workers:                 1,
@@ -245,40 +343,79 @@ func TestRunConfigSupportsFilteredNativeSelectionWithFullCasesManifest(t *testin
 		t.Fatal(err)
 	}
 	prediction := contract.Prediction{
-		InstanceID:      "case-a",
+		InstanceID:      instanceID,
 		ModelNameOrPath: "trpc-agent-go/test-model",
 		ModelPatch:      "diff --git a/a b/a\n--- a/a\n+++ b/a\n@@ -1 +1 @@\n-old\n+filtered\n",
 	}
-	if err := writeJSON(predictionsPath, map[string]contract.Prediction{"case-a": prediction}); err != nil {
+	if err := writeJSON(predictionsPath, map[string]contract.Prediction{instanceID: prediction}); err != nil {
 		t.Fatal(err)
 	}
-	nativeResult := writeNativeBindingArtifacts(
-		t,
-		nativeManifest,
-		filepath.Join(dir, "imported"),
-		"native",
-		prediction,
-	)
+	caseDir := filepath.Join(runnerDir, instanceID)
+	if err := os.MkdirAll(caseDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := writeJSON(filepath.Join(caseDir, instanceID+".responses.json"), []any{}); err != nil {
+		t.Fatal(err)
+	}
+	nativeArtifact["model_patch"] = prediction.ModelPatch
+	for key, value := range map[string]any{
+		"run_id":                    nativeManifest.RunID,
+		"observation_codec":         nativeManifest.ObservationCodec,
+		"source_revision":           nativeManifest.SourceRevision,
+		"source_modified":           nativeManifest.SourceModified,
+		"binary_sha256":             nativeManifest.BinarySHA256,
+		"model_config_sha256":       nativeManifest.ModelConfigSHA256,
+		"environment_config_sha256": nativeManifest.EnvironmentConfigSHA256,
+		"cases_sha256":              nativeManifest.CasesSHA256,
+		"command_timeout":           nativeManifest.CommandTimeout,
+		"case_timeout":              nativeManifest.CaseTimeout,
+		"selected_instances_sha256": nativeManifest.SelectedInstancesSHA256,
+		"workers":                   nativeManifest.Workers,
+	} {
+		nativeInfo[key] = value
+	}
+	if err := writeJSON(filepath.Join(caseDir, instanceID+".native.json"), nativeArtifact); err != nil {
+		t.Fatal(err)
+	}
 	verifyDir := filepath.Join(dir, "verify")
 	harnessReportPath := filepath.Join(verifyDir, "test-model.native-filtered-native.json")
 	if err := os.MkdirAll(verifyDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := writeJSON(harnessReportPath, map[string]any{"unresolved_ids": []string{"case-a"}}); err != nil {
+	if err := writeJSON(harnessReportPath, map[string]any{"unresolved_ids": []string{instanceID}}); err != nil {
 		t.Fatal(err)
 	}
-	nativeResult.MainStatus = "unresolved"
-	nativeResult.FailureReason = "failed official harness"
-	nativeResult.VerifierResultRef = absPath(harnessReportPath)
-	writeImportedCasesJSONL(t, filepath.Join(dir, "imported", "cases.jsonl"), []importedCase{{
-		SchemaVersion: importSchemaVersion,
-		InstanceID:    "case-a",
-		Target:        "native",
-		Result:        nativeResult,
-	}})
-	fixture.importSummary.Counts = map[string]int{"unresolved": 1}
-	if err := writeJSON(fixture.importSummaryPath, fixture.importSummary); err != nil {
+	importedDir := filepath.Join(dir, "imported")
+	if err := runImport([]string{
+		"--target", "native",
+		"--predictions", predictionsPath,
+		"--raw-dir", runnerDir,
+		"--harness-report", harnessReportPath,
+		"--output", importedDir,
+	}); err != nil {
+		t.Fatalf("runImport() error = %v", err)
+	}
+	importedRows, err := readAndValidateImportedCases(
+		filepath.Join(importedDir, "cases.jsonl"),
+		importSummary{
+			SchemaVersion: importSchemaVersion,
+			Target:        "native",
+			Total:         1,
+			Counts:        map[string]int{"unresolved": 1},
+		},
+		"native",
+	)
+	if err != nil {
 		t.Fatal(err)
+	}
+	if len(importedRows) != 1 {
+		t.Fatalf("filtered Native import rows = %+v, want one row", importedRows)
+	}
+	if cleanRoom && (importedRows[0].Repo != repo || importedRows[0].BaseCommit != baseCommit) {
+		t.Fatalf("filtered clean-room import row = %+v, want trace-bound canonical metadata", importedRows[0])
+	}
+	if !cleanRoom && (importedRows[0].Repo != "" || importedRows[0].BaseCommit != "") {
+		t.Fatalf("filtered default-off import row = %+v, want legacy empty metadata", importedRows[0])
 	}
 
 	verifierManifestPath := filepath.Join(dir, "verify", "verifier_manifest.json")
@@ -289,7 +426,7 @@ func TestRunConfigSupportsFilteredNativeSelectionWithFullCasesManifest(t *testin
 	verifier.Config = verifyConfig{
 		Dataset:     defaultDatasetName,
 		Split:       defaultSplit,
-		InstanceIDs: []string{"case-a"},
+		InstanceIDs: []string{instanceID},
 		Predictions: predictionsPath,
 		OutputDir:   verifyDir,
 		Workers:     1,
@@ -327,6 +464,9 @@ func TestRunConfigSupportsFilteredNativeSelectionWithFullCasesManifest(t *testin
 	}
 	if doc.Selection.CaseCount != 1 || doc.Selection.CaseListHash != selectedHash {
 		t.Fatalf("Selection = %+v, want filtered case identity %q", doc.Selection, selectedHash)
+	}
+	if doc.Runner.CleanRoom != cleanRoom || doc.Runner.CleanRoomPolicySHA256 != nativeManifest.CleanRoomPolicySHA256 {
+		t.Fatalf("Runner = %+v, want clean_room=%t with matching provenance", doc.Runner, cleanRoom)
 	}
 }
 
@@ -1399,6 +1539,74 @@ func TestValidateGenericRunnerModelName(t *testing.T) {
 	}
 }
 
+func TestValidateShardedNativeRunnerModelName(t *testing.T) {
+	shards := shardsManifest{
+		RunnerIdentity: shardRunnerIdentity{
+			RunnerType: "trpc-agent-go-native",
+			ModelName:  "model-a",
+		},
+	}
+	if err := validateShardedNativeRunnerModelName(shards, true, "model-a"); err != nil {
+		t.Fatal(err)
+	}
+	if err := validateShardedNativeRunnerModelName(shards, true, "model-b"); err == nil ||
+		!strings.Contains(err.Error(), "does not match") {
+		t.Fatalf("model mismatch error = %v", err)
+	}
+	if err := validateShardedNativeRunnerModelName(shards, true, " model-a "); err == nil ||
+		!strings.Contains(err.Error(), "not canonical") {
+		t.Fatalf("CLI whitespace error = %v", err)
+	}
+	shards.RunnerIdentity.ModelName = ""
+	if err := validateShardedNativeRunnerModelName(shards, true, "model-a"); err == nil ||
+		!strings.Contains(err.Error(), "no MODEL_NAME") {
+		t.Fatalf("missing model error = %v", err)
+	}
+	shards.RunnerIdentity.RunnerType = "mini-swe-agent-go"
+	if err := validateShardedNativeRunnerModelName(shards, true, "model-a"); err != nil {
+		t.Fatalf("Mini-Go compatibility error = %v", err)
+	}
+}
+
+func TestRunnerManifestForNativeShardPreservesModelAndProtocolIdentity(t *testing.T) {
+	identity := shardRunnerIdentity{
+		RunnerType:     "trpc-agent-go-native",
+		AgentProtocol:  "mini-swe-agent-v2.1-on-trpc-agent-go",
+		UpstreamCommit: strings.Repeat("f", 40),
+		ModelName:      "model-a",
+	}
+	manifest := runnerManifestForNativeShard(shardSummary{
+		RunID:                   "shard-000",
+		RawDir:                  "/tmp/native-shard",
+		ExpectedCount:           1,
+		SelectedInstancesSHA256: strings.Repeat("a", 64),
+		Workers:                 4,
+		RunnerIdentity:          identity,
+	})
+	if manifest.ModelConfig["MODEL_NAME"] != identity.ModelName ||
+		manifest.AgentProtocol != identity.AgentProtocol ||
+		manifest.UpstreamCommit != identity.UpstreamCommit {
+		t.Fatalf("runner manifest = %+v, want model/protocol/upstream identity", manifest)
+	}
+	predictions := map[string]contract.Prediction{
+		"case-a": {
+			InstanceID:      "case-a",
+			ModelNameOrPath: "trpc-agent-go/model-a",
+		},
+	}
+	if err := validateNativePredictionModelNames(predictions, manifest); err != nil {
+		t.Fatal(err)
+	}
+	predictions["case-a"] = contract.Prediction{
+		InstanceID:      "case-a",
+		ModelNameOrPath: "trpc-agent-go/model-b",
+	}
+	if err := validateNativePredictionModelNames(predictions, manifest); err == nil ||
+		!strings.Contains(err.Error(), "does not match runner identity") {
+		t.Fatalf("prediction attribution error = %v", err)
+	}
+}
+
 func TestValidateNativePredictionModelNames(t *testing.T) {
 	manifest := runnerManifest{
 		RunnerType:  "trpc-agent-go-native",
@@ -1536,6 +1744,22 @@ func writeCaseIDsJSONL(t *testing.T, path string, ids []string) {
 		data.WriteString("{\"instance_id\":\"")
 		data.WriteString(id)
 		data.WriteString("\"}\n")
+	}
+	if err := os.WriteFile(path, []byte(data.String()), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func writeCasesJSONL(t *testing.T, path string, cases []contract.Case) {
+	t.Helper()
+	var data strings.Builder
+	for _, c := range cases {
+		encoded, err := json.Marshal(c)
+		if err != nil {
+			t.Fatal(err)
+		}
+		data.Write(encoded)
+		data.WriteByte('\n')
 	}
 	if err := os.WriteFile(path, []byte(data.String()), 0o644); err != nil {
 		t.Fatal(err)

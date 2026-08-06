@@ -22,17 +22,24 @@ import (
 
 	"trpc.group/trpc-go/trpc-agent-go-benchmark/swebench/internal/artifact"
 	"trpc.group/trpc-go/trpc-agent-go-benchmark/swebench/internal/contract"
+	"trpc.group/trpc-go/trpc-agent-go-benchmark/swebench/internal/sweenv"
 )
 
 const importSchemaVersion = 1
 
 type importedCase struct {
-	SchemaVersion int          `json:"schema_version"`
-	InstanceID    string       `json:"instance_id"`
-	Repo          string       `json:"repo,omitempty"`
-	BaseCommit    string       `json:"base_commit,omitempty"`
-	Target        string       `json:"target"`
-	Result        targetResult `json:"result"`
+	SchemaVersion         int                `json:"schema_version"`
+	InstanceID            string             `json:"instance_id"`
+	Repo                  string             `json:"repo,omitempty"`
+	BaseCommit            string             `json:"base_commit,omitempty"`
+	VerifiedBaseCommit    string             `json:"verified_base_commit,omitempty"`
+	CleanRoom             bool               `json:"clean_room,omitempty"`
+	CleanRoomPolicySHA256 string             `json:"clean_room_policy_sha256,omitempty"`
+	OfflineAssetsSHA256   string             `json:"offline_assets_sha256,omitempty"`
+	ImageSetSHA256        string             `json:"image_set_sha256,omitempty"`
+	EnvironmentProvenance *sweenv.Provenance `json:"environment_provenance,omitempty"`
+	Target                string             `json:"target"`
+	Result                targetResult       `json:"result"`
 }
 
 type targetResult struct {
@@ -93,6 +100,7 @@ func runImport(args []string) error {
 	if err != nil {
 		return err
 	}
+	selectionFromPredictions := strings.TrimSpace(*casesPath) == ""
 	cases, err := readCases(*casesPath, preds)
 	if err != nil {
 		return err
@@ -142,6 +150,7 @@ func runImport(args []string) error {
 		}
 		pred, hasPred := preds[c.InstanceID]
 		result := targetResult{PatchStats: artifact.PatchStats{ChangedFiles: []string{}}}
+		var nativeInfo *nativeInfoEnvelope
 		if hasPred {
 			result.ModelNameOrPath = pred.ModelNameOrPath
 			if strings.TrimSpace(pred.ModelPatch) != "" {
@@ -163,6 +172,10 @@ func runImport(args []string) error {
 				}
 				result.TracePath = relPath(*output, tracePath)
 				result.Usage = usage
+				nativeInfo, err = importedNativeInfo(caseRawDir, c, selectionFromPredictions)
+				if err != nil {
+					return fmt.Errorf("import native provenance for %s: %w", c.InstanceID, err)
+				}
 			}
 		}
 		status, reason := classify(c.InstanceID, hasPred, pred.ModelPatch, harness)
@@ -180,6 +193,20 @@ func runImport(args []string) error {
 			BaseCommit:    c.BaseCommit,
 			Target:        *target,
 			Result:        result,
+		}
+		if nativeInfo != nil {
+			if selectionFromPredictions {
+				row.Repo = nativeInfo.Repo
+				row.BaseCommit = nativeInfo.BaseCommit
+			}
+			if nativeInfo.CleanRoom {
+				row.VerifiedBaseCommit = nativeInfo.VerifiedBaseCommit
+				row.CleanRoom = true
+				row.CleanRoomPolicySHA256 = nativeInfo.CleanRoomPolicySHA256
+				row.OfflineAssetsSHA256 = nativeInfo.OfflineAssetsSHA256
+				row.ImageSetSHA256 = nativeInfo.ImageSetSHA256
+				row.EnvironmentProvenance = cloneEnvironmentProvenance(nativeInfo.EnvironmentProvenance)
+			}
 		}
 		data, err := json.Marshal(row)
 		if err != nil {
@@ -475,6 +502,15 @@ type nativeInfoEnvelope struct {
 	CommandTimeout          string
 	CaseTimeout             string
 	SelectedInstancesSHA256 string
+	CleanRoom               bool
+	CleanRoomDeclared       bool
+	CleanRoomPolicySHA256   string
+	OfflineAssetsSHA256     string
+	ImageSetSHA256          string
+	Repo                    string
+	BaseCommit              string
+	VerifiedBaseCommit      string
+	EnvironmentProvenance   *sweenv.Provenance
 	Workers                 int
 	ExitStatus              string
 	Error                   string
@@ -519,22 +555,30 @@ type nativeTraceJSON struct {
 }
 
 type nativeInfoJSON struct {
-	RunID                   string  `json:"run_id,omitempty"`
-	ObservationCodec        string  `json:"observation_codec,omitempty"`
-	SourceRevision          string  `json:"source_revision,omitempty"`
-	SourceModified          bool    `json:"source_modified,omitempty"`
-	BinarySHA256            string  `json:"binary_sha256,omitempty"`
-	ModelConfigSHA256       string  `json:"model_config_sha256,omitempty"`
-	EnvironmentConfigSHA256 string  `json:"environment_config_sha256,omitempty"`
-	CasesSHA256             string  `json:"cases_sha256,omitempty"`
-	CommandTimeout          string  `json:"command_timeout,omitempty"`
-	CaseTimeout             string  `json:"case_timeout,omitempty"`
-	SelectedInstancesSHA256 string  `json:"selected_instances_sha256,omitempty"`
-	Workers                 *int    `json:"workers"`
-	ExitStatus              *string `json:"exit_status"`
-	Error                   string  `json:"error,omitempty"`
-	ErrorCategory           string  `json:"error_category,omitempty"`
-	Retryable               bool    `json:"retryable,omitempty"`
+	RunID                   string             `json:"run_id,omitempty"`
+	ObservationCodec        string             `json:"observation_codec,omitempty"`
+	SourceRevision          string             `json:"source_revision,omitempty"`
+	SourceModified          bool               `json:"source_modified,omitempty"`
+	BinarySHA256            string             `json:"binary_sha256,omitempty"`
+	ModelConfigSHA256       string             `json:"model_config_sha256,omitempty"`
+	EnvironmentConfigSHA256 string             `json:"environment_config_sha256,omitempty"`
+	CasesSHA256             string             `json:"cases_sha256,omitempty"`
+	CommandTimeout          string             `json:"command_timeout,omitempty"`
+	CaseTimeout             string             `json:"case_timeout,omitempty"`
+	SelectedInstancesSHA256 string             `json:"selected_instances_sha256,omitempty"`
+	CleanRoom               *bool              `json:"clean_room,omitempty"`
+	CleanRoomPolicySHA256   string             `json:"clean_room_policy_sha256,omitempty"`
+	OfflineAssetsSHA256     string             `json:"offline_assets_sha256,omitempty"`
+	ImageSetSHA256          string             `json:"image_set_sha256,omitempty"`
+	Repo                    string             `json:"repo,omitempty"`
+	BaseCommit              string             `json:"base_commit,omitempty"`
+	VerifiedBaseCommit      string             `json:"verified_base_commit,omitempty"`
+	EnvironmentProvenance   *sweenv.Provenance `json:"environment_provenance,omitempty"`
+	Workers                 *int               `json:"workers"`
+	ExitStatus              *string            `json:"exit_status"`
+	Error                   string             `json:"error,omitempty"`
+	ErrorCategory           string             `json:"error_category,omitempty"`
+	Retryable               bool               `json:"retryable,omitempty"`
 }
 
 type nativeUsageJSON struct {
@@ -688,6 +732,10 @@ func parseNativeInfo(data json.RawMessage, instanceID string) (nativeInfoEnvelop
 			instanceID,
 		)
 	}
+	if err := validateNativeCleanRoomInfo(raw, instanceID); err != nil {
+		return nativeInfoEnvelope{}, err
+	}
+	cleanRoom := raw.CleanRoom != nil && *raw.CleanRoom
 	return nativeInfoEnvelope{
 		RunID:                   raw.RunID,
 		ObservationCodec:        raw.ObservationCodec,
@@ -700,12 +748,265 @@ func parseNativeInfo(data json.RawMessage, instanceID string) (nativeInfoEnvelop
 		CommandTimeout:          raw.CommandTimeout,
 		CaseTimeout:             raw.CaseTimeout,
 		SelectedInstancesSHA256: raw.SelectedInstancesSHA256,
+		CleanRoom:               cleanRoom,
+		CleanRoomDeclared:       raw.CleanRoom != nil,
+		CleanRoomPolicySHA256:   raw.CleanRoomPolicySHA256,
+		OfflineAssetsSHA256:     raw.OfflineAssetsSHA256,
+		ImageSetSHA256:          raw.ImageSetSHA256,
+		Repo:                    raw.Repo,
+		BaseCommit:              raw.BaseCommit,
+		VerifiedBaseCommit:      raw.VerifiedBaseCommit,
+		EnvironmentProvenance:   cloneEnvironmentProvenance(raw.EnvironmentProvenance),
 		Workers:                 *raw.Workers,
 		ExitStatus:              *raw.ExitStatus,
 		Error:                   raw.Error,
 		ErrorCategory:           raw.ErrorCategory,
 		Retryable:               raw.Retryable,
 	}, nil
+}
+
+func validateNativeCleanRoomInfo(raw nativeInfoJSON, instanceID string) error {
+	cleanRoom := raw.CleanRoom != nil && *raw.CleanRoom
+	if !cleanRoom {
+		for _, field := range []struct {
+			name  string
+			value string
+		}{
+			{"info.clean_room_policy_sha256", raw.CleanRoomPolicySHA256},
+			{"info.offline_assets_sha256", raw.OfflineAssetsSHA256},
+			{"info.image_set_sha256", raw.ImageSetSHA256},
+			{"info.verified_base_commit", raw.VerifiedBaseCommit},
+		} {
+			if field.value != "" {
+				return fmt.Errorf("native trace for %s has %s without clean_room=true", instanceID, field.name)
+			}
+		}
+		if raw.EnvironmentProvenance != nil {
+			return fmt.Errorf("native trace for %s has info.environment_provenance without clean_room=true", instanceID)
+		}
+		return nil
+	}
+	for _, field := range []struct {
+		name  string
+		value string
+	}{
+		{"info.clean_room_policy_sha256", raw.CleanRoomPolicySHA256},
+		{"info.image_set_sha256", raw.ImageSetSHA256},
+	} {
+		if !isSHA256Hex(field.value) {
+			return fmt.Errorf("native trace for %s has invalid %s %q", instanceID, field.name, field.value)
+		}
+	}
+	if raw.OfflineAssetsSHA256 != "" && !isSHA256Hex(raw.OfflineAssetsSHA256) {
+		return fmt.Errorf(
+			"native trace for %s has invalid info.offline_assets_sha256 %q",
+			instanceID,
+			raw.OfflineAssetsSHA256,
+		)
+	}
+	if strings.TrimSpace(raw.Repo) == "" {
+		return missingNativeFieldError(instanceID, "info.repo")
+	}
+	for _, field := range []struct {
+		name  string
+		value string
+	}{
+		{"info.base_commit", raw.BaseCommit},
+		{"info.verified_base_commit", raw.VerifiedBaseCommit},
+	} {
+		if !isHexIdentifier(field.value, 40) {
+			return fmt.Errorf("native trace for %s has invalid %s %q", instanceID, field.name, field.value)
+		}
+	}
+	if raw.BaseCommit != raw.VerifiedBaseCommit {
+		return fmt.Errorf(
+			"native trace for %s verified base commit %q does not match declared base commit %q",
+			instanceID,
+			raw.VerifiedBaseCommit,
+			raw.BaseCommit,
+		)
+	}
+	if raw.EnvironmentProvenance == nil {
+		return missingNativeFieldError(instanceID, "info.environment_provenance")
+	}
+	return validateCaseEnvironmentProvenance(instanceID, *raw.EnvironmentProvenance, nil)
+}
+
+func cloneEnvironmentProvenance(provenance *sweenv.Provenance) *sweenv.Provenance {
+	if provenance == nil {
+		return nil
+	}
+	cloned := *provenance
+	if provenance.AuxiliaryImages != nil {
+		cloned.AuxiliaryImages = make(map[string]sweenv.ImageIdentity, len(provenance.AuxiliaryImages))
+		for role, identity := range provenance.AuxiliaryImages {
+			cloned.AuxiliaryImages[role] = identity
+		}
+	}
+	return &cloned
+}
+
+func importedNativeInfo(
+	rawDir string,
+	c contract.Case,
+	allowTraceCaseMetadata bool,
+) (*nativeInfoEnvelope, error) {
+	source, err := traceSourcePath(rawDir, c.InstanceID)
+	if err != nil {
+		return nil, err
+	}
+	if !strings.HasSuffix(source, ".native.json") {
+		return nil, nil
+	}
+	data, err := os.ReadFile(source)
+	if err != nil {
+		return nil, err
+	}
+	trace, err := parseNativeTraceEnvelope(data, c.InstanceID)
+	if err != nil {
+		return nil, err
+	}
+	if allowTraceCaseMetadata {
+		repoProvided := trace.Info.Repo != ""
+		baseCommitProvided := trace.Info.BaseCommit != ""
+		if !trace.Info.CleanRoom && !repoProvided && !baseCommitProvided {
+			return &trace.Info, nil
+		}
+		if repoProvided != baseCommitProvided {
+			return nil, fmt.Errorf(
+				"prediction-defined native import must provide trace info.repo and info.base_commit together",
+			)
+		}
+		if strings.TrimSpace(trace.Info.Repo) == "" {
+			return nil, fmt.Errorf("prediction-defined native import requires non-empty trace info.repo")
+		}
+		if !isHexIdentifier(trace.Info.BaseCommit, 40) {
+			return nil, fmt.Errorf(
+				"prediction-defined native import requires 40-hex trace info.base_commit, got %q",
+				trace.Info.BaseCommit,
+			)
+		}
+		return &trace.Info, nil
+	}
+	if !trace.Info.CleanRoom {
+		return &trace.Info, nil
+	}
+	if strings.TrimSpace(c.Repo) == "" || !isHexIdentifier(c.BaseCommit, 40) {
+		return nil, fmt.Errorf("clean-room native import requires canonical repo/base_commit case metadata")
+	}
+	if trace.Info.Repo != c.Repo || trace.Info.BaseCommit != c.BaseCommit || trace.Info.VerifiedBaseCommit != c.BaseCommit {
+		return nil, fmt.Errorf(
+			"trace repo/base/verified %q/%q/%q do not match case metadata %q/%q",
+			trace.Info.Repo,
+			trace.Info.BaseCommit,
+			trace.Info.VerifiedBaseCommit,
+			c.Repo,
+			c.BaseCommit,
+		)
+	}
+	return &trace.Info, nil
+}
+
+func validateCaseEnvironmentProvenance(
+	instanceID string,
+	provenance sweenv.Provenance,
+	images map[string]sweenv.ImageIdentity,
+) error {
+	expectedReference := sweenv.ImageForInstance(instanceID)
+	if provenance.Testbed.Reference != expectedReference {
+		return fmt.Errorf(
+			"native trace for %s testbed image reference %q does not match %q",
+			instanceID,
+			provenance.Testbed.Reference,
+			expectedReference,
+		)
+	}
+	if _, err := sweenv.ImageSetSHA256(map[string]sweenv.ImageIdentity{
+		expectedReference: provenance.Testbed,
+	}); err != nil {
+		return fmt.Errorf("native trace for %s has invalid testbed image provenance: %w", instanceID, err)
+	}
+	if images != nil {
+		expected, ok := images[expectedReference]
+		if !ok || expected != provenance.Testbed {
+			return fmt.Errorf(
+				"native trace for %s testbed image %+v does not match runner image set %+v",
+				instanceID,
+				provenance.Testbed,
+				expected,
+			)
+		}
+	}
+
+	expectedRoles := expectedAuxiliaryImageRoles(instanceID)
+	if len(provenance.AuxiliaryImages) != len(expectedRoles) {
+		return fmt.Errorf(
+			"native trace for %s has %d auxiliary image roles, want %d",
+			instanceID,
+			len(provenance.AuxiliaryImages),
+			len(expectedRoles),
+		)
+	}
+	for role := range expectedRoles {
+		identity, ok := provenance.AuxiliaryImages[role]
+		if !ok {
+			return fmt.Errorf("native trace for %s is missing auxiliary image role %q", instanceID, role)
+		}
+		if _, err := sweenv.ImageSetSHA256(map[string]sweenv.ImageIdentity{
+			identity.Reference: identity,
+		}); err != nil {
+			return fmt.Errorf(
+				"native trace for %s has invalid auxiliary image role %q: %w",
+				instanceID,
+				role,
+				err,
+			)
+		}
+		switch role {
+		case "httpbin":
+			if identity.Reference != "docker.io/kennethreitz/httpbin:latest" {
+				return fmt.Errorf(
+					"native trace for %s httpbin image reference %q does not match the offline fixture",
+					instanceID,
+					identity.Reference,
+				)
+			}
+		case "network-helper":
+			if identity != provenance.Testbed {
+				return fmt.Errorf(
+					"native trace for %s network-helper image %+v does not match the testbed image %+v",
+					instanceID,
+					identity,
+					provenance.Testbed,
+				)
+			}
+		}
+		if images != nil {
+			expected, ok := images[identity.Reference]
+			if !ok || expected != identity {
+				return fmt.Errorf(
+					"native trace for %s auxiliary image %q %+v does not match runner image set %+v",
+					instanceID,
+					role,
+					identity,
+					expected,
+				)
+			}
+		}
+	}
+	return nil
+}
+
+func expectedAuxiliaryImageRoles(instanceID string) map[string]struct{} {
+	roles := map[string]struct{}{}
+	if strings.HasPrefix(instanceID, "psf__requests-") {
+		roles["httpbin"] = struct{}{}
+	}
+	switch instanceID {
+	case "psf__requests-2317", "psf__requests-2931", "psf__requests-5414", "psf__requests-6028":
+		roles["network-helper"] = struct{}{}
+	}
+	return roles
 }
 
 func parseNativeUsage(data json.RawMessage, instanceID string) (nativeUsageEnvelope, error) {

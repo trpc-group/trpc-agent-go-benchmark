@@ -26,6 +26,8 @@ Native TAG 路径通过 tRPC-Agent-Go 的公开生命周期（`llmagent.New`、
 - 共享 Docker environment 与 XML-like/JSON/text observation codec；
 - 经过 golden 测试的 source-aligned Mini-Go 参考 runner；
 - 只使用 upstream 公开 API 的 tRPC-Agent-Go 原生 runner；
+- 显式启用的 clean-room 协议：generation 断网、递归 Git 净化、closed-world 离线资产、
+  不可变本地镜像身份与 model-free preflight；
 - 对未经修改的 upstream official local harness 的调用；
 - batch 规划、可恢复 shard 检查和确定性 predictions 合并。
 

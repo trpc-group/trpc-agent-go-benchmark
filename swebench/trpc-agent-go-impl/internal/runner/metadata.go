@@ -17,6 +17,8 @@ import (
 	"os"
 	"runtime/debug"
 	"sort"
+
+	"trpc.group/trpc-go/trpc-agent-go-benchmark/swebench/internal/sweenv"
 )
 
 const frameworkModulePath = "trpc.group/trpc-go/trpc-agent-go"
@@ -41,6 +43,11 @@ type runIdentity struct {
 	CommandTimeout          string
 	CaseTimeout             string
 	SelectedInstancesSHA256 string
+	CleanRoom               bool
+	CleanRoomPolicySHA256   string
+	OfflineAssetsSHA256     string
+	ImageSetSHA256          string
+	DockerImages            map[string]sweenv.ImageIdentity
 	Workers                 int
 }
 

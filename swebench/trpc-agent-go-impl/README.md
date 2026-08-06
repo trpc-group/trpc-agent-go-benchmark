@@ -39,9 +39,14 @@ go run ./trpc-agent-go-impl \
 skipping instance IDs already present in `preds.json` only after the complete
 per-case bundle matches the run ID, source/binary, model/environment/cases,
 codec, timeout, worker-count, and selected-case fingerprints. Pass
-`--redo-existing` to rerun a matching bundle. Model configuration supports arbitrary
-OpenAI-compatible HTTP headers through the shared `modelconfig.HTTPHeaders`
-normalization.
+`--redo-existing` to rerun a matching bundle. In clean-room mode, that flag may
+also rerun a complete retryable environment failure produced before a successful
+`StartCase`, when the success-only verified-base and image-provenance
+attestations cannot yet exist. The immutable run identity and all available
+bundle fingerprints must still match; without the flag, or for any other
+missing or mismatched attestation, resume remains fail-closed. Model
+configuration supports arbitrary OpenAI-compatible HTTP headers through the
+shared `modelconfig.HTTPHeaders` normalization.
 
 Case bundles created before the worker-count and response-artifact fingerprints
 were added are rejected during resume. Keep them as historical evidence and use
@@ -60,6 +65,68 @@ native-runner-progress.json
 
 The manifest reads the linked tRPC-Agent-Go module version from Go build
 information. It does not hardcode a development revision.
+
+## Optional clean-room generation
+
+Clean-room mode is a benchmark protocol option, not a tRPC-Agent-Go framework
+default. It is disabled unless `--clean-room=true` is supplied. When enabled,
+the runner:
+
+- resolves all selected testbed and fixture images before resume, starts them
+  by immutable local image ID, and uses `--pull=never`;
+- starts each model-facing testbed with `--network=none`;
+- recursively removes Git remotes, tags, extra refs, reflogs, alternates,
+  unreachable objects, untracked files, and non-allowlisted ignored files;
+- verifies the repository `HEAD` is exactly the case `base_commit`, then
+  recursively re-attests the complete Git state after all environment setup
+  and before the model is constructed;
+- provides isolated loopback HTTP/HTTPS fixtures for requests cases without
+  publishing host ports; and
+- installs the few required request-test dependencies only from a validated
+  closed-world asset bundle.
+
+Prepare the portable asset bundle in a separate, intentionally network-enabled
+preparation phase. Before running the script, both requests testbed images
+referenced by the script must already exist locally because image startup uses
+`--pull=never`. The preparation host also needs the Go toolchain, GNU
+`sha256sum`, and a `sort` implementation with `-z` support, while the compiler
+testbed image must provide `gcc` with static-linking support. Runtime containers
+never download these dependencies:
+
+```bash
+./scripts/prepare-offline-assets.sh results/offline-assets
+```
+
+Before model-backed generation, run the model-free smoke panel through the
+same environment setup and cleanup path. This standalone preflight is an
+operator gate: it exits nonzero on any failed case, and model-backed generation
+must not start unless the complete panel passes.
+
+```bash
+go run ./trpc-agent-go-impl/cmd/offline-preflight \
+  --cases data/generated/cases.jsonl \
+  --case-list data/case-lists/offline-smoke.case_ids.txt \
+  --environment-config config/environments/swebench-testbed.yaml \
+  --offline-assets-dir results/offline-assets \
+  --output results/runs/offline-preflight/manifest.json \
+  --workers 1
+```
+
+Then add the two explicit flags to a Native run:
+
+```text
+--clean-room=true
+--offline-assets-dir results/offline-assets
+```
+
+The runner manifest records the portable asset-tree identity, clean-room
+policy hash, resolved image map, and image-set hash. Per-case artifacts record
+the exact base commit and actual environment image provenance. These values are
+validated again by resume, import, and `run-config`; host asset paths are not
+part of the portable identity. Independently of the standalone operator gate,
+the Native runner fails closed before model construction when it encounters a
+missing local image, malformed or changed asset bundle, Git mismatch, or
+isolation setup failure.
 
 ## Complete a filtered smoke run
 

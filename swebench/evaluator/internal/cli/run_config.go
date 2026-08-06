@@ -24,6 +24,7 @@ import (
 
 	"trpc.group/trpc-go/trpc-agent-go-benchmark/swebench/internal/artifact"
 	"trpc.group/trpc-go/trpc-agent-go-benchmark/swebench/internal/contract"
+	"trpc.group/trpc-go/trpc-agent-go-benchmark/swebench/internal/sweenv"
 )
 
 type runConfigDocument struct {
@@ -73,14 +74,21 @@ type runConfigModel struct {
 }
 
 type runConfigRunner struct {
-	Type                string `json:"type"`
-	MiniSWEAgentVersion string `json:"mini_swe_agent_version,omitempty"`
-	MiniExtra           string `json:"mini_extra,omitempty"`
-	BaseConfig          string `json:"base_config,omitempty"`
-	PrivateConfig       string `json:"private_config,omitempty"`
-	StartedAt           string `json:"started_at,omitempty"`
-	FinishedAt          string `json:"finished_at,omitempty"`
-	DurationMS          int64  `json:"duration_ms,omitempty"`
+	Type                  string                          `json:"type"`
+	AgentProtocol         string                          `json:"agent_protocol,omitempty"`
+	UpstreamCommit        string                          `json:"upstream_commit,omitempty"`
+	MiniSWEAgentVersion   string                          `json:"mini_swe_agent_version,omitempty"`
+	MiniExtra             string                          `json:"mini_extra,omitempty"`
+	BaseConfig            string                          `json:"base_config,omitempty"`
+	PrivateConfig         string                          `json:"private_config,omitempty"`
+	StartedAt             string                          `json:"started_at,omitempty"`
+	FinishedAt            string                          `json:"finished_at,omitempty"`
+	DurationMS            int64                           `json:"duration_ms,omitempty"`
+	CleanRoom             bool                            `json:"clean_room"`
+	CleanRoomPolicySHA256 string                          `json:"clean_room_policy_sha256,omitempty"`
+	OfflineAssets         *sweenv.OfflineAssetIdentity    `json:"offline_assets,omitempty"`
+	ImageSetSHA256        string                          `json:"image_set_sha256,omitempty"`
+	DockerImages          map[string]sweenv.ImageIdentity `json:"docker_images,omitempty"`
 }
 
 type runConfigConcurrency struct {
@@ -138,29 +146,113 @@ type runConfigSourceFiles struct {
 }
 
 type runnerManifest struct {
-	RunID                   string            `json:"run_id"`
-	RunnerType              string            `json:"runner_type"`
-	ObservationCodec        string            `json:"observation_codec,omitempty"`
-	FrameworkModule         string            `json:"framework_module,omitempty"`
-	FrameworkVersion        string            `json:"framework_version,omitempty"`
-	SourceRevision          string            `json:"source_revision,omitempty"`
-	SourceModified          bool              `json:"source_modified"`
-	BinarySHA256            string            `json:"binary_sha256,omitempty"`
-	CasesSHA256             string            `json:"cases_sha256,omitempty"`
-	ModelConfigSHA256       string            `json:"model_config_sha256,omitempty"`
-	EnvironmentConfigSHA256 string            `json:"environment_config_sha256,omitempty"`
-	SelectedInstancesSHA256 string            `json:"selected_instances_sha256,omitempty"`
-	CommandTimeout          string            `json:"command_timeout,omitempty"`
-	CaseTimeout             string            `json:"case_timeout,omitempty"`
-	StartedAt               time.Time         `json:"started_at"`
-	FinishedAt              time.Time         `json:"finished_at"`
-	DurationMS              int64             `json:"duration_ms"`
-	OutputDir               string            `json:"output_dir"`
-	CaseCount               int               `json:"case_count"`
-	Workers                 int               `json:"workers,omitempty"`
-	Predictions             string            `json:"predictions"`
-	ModelConfig             map[string]string `json:"model_config,omitempty"`
-	Status                  string            `json:"status,omitempty"`
+	RunID                   string                          `json:"run_id"`
+	RunnerType              string                          `json:"runner_type"`
+	AgentProtocol           string                          `json:"agent_protocol,omitempty"`
+	UpstreamCommit          string                          `json:"upstream_commit,omitempty"`
+	ObservationCodec        string                          `json:"observation_codec,omitempty"`
+	FrameworkModule         string                          `json:"framework_module,omitempty"`
+	FrameworkVersion        string                          `json:"framework_version,omitempty"`
+	SourceRevision          string                          `json:"source_revision,omitempty"`
+	SourceModified          bool                            `json:"source_modified"`
+	BinarySHA256            string                          `json:"binary_sha256,omitempty"`
+	CasesSHA256             string                          `json:"cases_sha256,omitempty"`
+	ModelConfigSHA256       string                          `json:"model_config_sha256,omitempty"`
+	EnvironmentConfigSHA256 string                          `json:"environment_config_sha256,omitempty"`
+	SelectedInstancesSHA256 string                          `json:"selected_instances_sha256,omitempty"`
+	CommandTimeout          string                          `json:"command_timeout,omitempty"`
+	CaseTimeout             string                          `json:"case_timeout,omitempty"`
+	CleanRoom               bool                            `json:"clean_room"`
+	CleanRoomPolicySHA256   string                          `json:"clean_room_policy_sha256,omitempty"`
+	OfflineAssets           *sweenv.OfflineAssetIdentity    `json:"offline_assets,omitempty"`
+	ImageSetSHA256          string                          `json:"image_set_sha256,omitempty"`
+	DockerImages            map[string]sweenv.ImageIdentity `json:"docker_images,omitempty"`
+	StartedAt               time.Time                       `json:"started_at"`
+	FinishedAt              time.Time                       `json:"finished_at"`
+	DurationMS              int64                           `json:"duration_ms"`
+	OutputDir               string                          `json:"output_dir"`
+	CaseCount               int                             `json:"case_count"`
+	Workers                 int                             `json:"workers,omitempty"`
+	Predictions             string                          `json:"predictions"`
+	ModelConfig             map[string]string               `json:"model_config,omitempty"`
+	Status                  string                          `json:"status,omitempty"`
+}
+
+func cloneOfflineAssetIdentity(identity *sweenv.OfflineAssetIdentity) *sweenv.OfflineAssetIdentity {
+	if identity == nil {
+		return nil
+	}
+	cloned := *identity
+	return &cloned
+}
+
+func cloneDockerImages(images map[string]sweenv.ImageIdentity) map[string]sweenv.ImageIdentity {
+	if images == nil {
+		return nil
+	}
+	cloned := make(map[string]sweenv.ImageIdentity, len(images))
+	for reference, identity := range images {
+		cloned[reference] = identity
+	}
+	return cloned
+}
+
+func equalDockerImages(a, b map[string]sweenv.ImageIdentity) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for reference, identity := range a {
+		if b[reference] != identity {
+			return false
+		}
+	}
+	return true
+}
+
+func validateCleanRoomIdentity(
+	label string,
+	cleanRoom bool,
+	policySHA256 string,
+	offlineAssets *sweenv.OfflineAssetIdentity,
+	imageSetSHA256 string,
+	dockerImages map[string]sweenv.ImageIdentity,
+) error {
+	if !cleanRoom {
+		if policySHA256 != "" || offlineAssets != nil || imageSetSHA256 != "" || len(dockerImages) != 0 {
+			return fmt.Errorf("%s carries clean-room provenance with clean_room=false", label)
+		}
+		return nil
+	}
+	if !isSHA256Hex(policySHA256) {
+		return fmt.Errorf("%s clean_room_policy_sha256 %q is not a SHA-256 digest", label, policySHA256)
+	}
+	if offlineAssets != nil {
+		if offlineAssets.Schema != "swebench-offline-assets-v1" {
+			return fmt.Errorf("%s offline assets schema %q is unsupported", label, offlineAssets.Schema)
+		}
+		if !isSHA256Hex(offlineAssets.SHA256) || !isSHA256Hex(offlineAssets.ManifestSHA256) {
+			return fmt.Errorf("%s offline assets hashes are invalid", label)
+		}
+		if offlineAssets.FileCount < 1 {
+			return fmt.Errorf("%s offline assets file_count %d is not positive", label, offlineAssets.FileCount)
+		}
+	}
+	if !isSHA256Hex(imageSetSHA256) {
+		return fmt.Errorf("%s image_set_sha256 %q is not a SHA-256 digest", label, imageSetSHA256)
+	}
+	actualImageSetSHA256, err := sweenv.ImageSetSHA256(dockerImages)
+	if err != nil {
+		return fmt.Errorf("%s Docker image set is invalid: %w", label, err)
+	}
+	if actualImageSetSHA256 != imageSetSHA256 {
+		return fmt.Errorf(
+			"%s Docker image set SHA-256 %q does not match %q",
+			label,
+			actualImageSetSHA256,
+			imageSetSHA256,
+		)
+	}
+	return nil
 }
 
 func runRunConfig(args []string) error {
@@ -280,18 +372,12 @@ func runRunConfig(args []string) error {
 	if err != nil {
 		return err
 	}
-	predictionsSHA256, err := validatePredictionsBinding(
-		verifierManifest,
-		genericManifest.RunnerType == "trpc-agent-go-native",
-	)
+	nativeRun := isNativeRun(genericManifest, shardManifest, hasShardsManifest)
+	predictionsSHA256, err := validatePredictionsBinding(verifierManifest, nativeRun)
 	if err != nil {
 		return err
 	}
-	harnessReportSHA256, err := validateHarnessReportBinding(
-		verifierManifest,
-		*harnessReportPath,
-		genericManifest.RunnerType == "trpc-agent-go-native",
-	)
+	harnessReportSHA256, err := validateHarnessReportBinding(verifierManifest, *harnessReportPath, nativeRun)
 	if err != nil {
 		return err
 	}
@@ -300,6 +386,9 @@ func runRunConfig(args []string) error {
 		harnessRunID = verifierManifest.RunID + "-" + verifierManifest.Target
 	}
 	if err := validateGenericRunnerModelName(genericManifest, *modelName); err != nil {
+		return err
+	}
+	if err := validateShardedNativeRunnerModelName(shardManifest, hasShardsManifest, *modelName); err != nil {
 		return err
 	}
 
@@ -341,6 +430,13 @@ func runRunConfig(args []string) error {
 	serviceFindings := scanServiceFindings(runnerLog)
 	miniRawDir := outputDir
 	miniLog := runnerLog
+	runnerCleanRoom := false
+	runnerAgentProtocol := ""
+	runnerUpstreamCommit := ""
+	runnerCleanRoomPolicySHA256 := ""
+	var runnerOfflineAssets *sweenv.OfflineAssetIdentity
+	runnerImageSetSHA256 := ""
+	var runnerDockerImages map[string]sweenv.ImageIdentity
 	if !hasMiniManifest {
 		runnerType = defaultIfEmpty(genericManifest.RunnerType, "unknown")
 		runnerStartedAt = formatTime(genericManifest.StartedAt)
@@ -352,9 +448,19 @@ func runRunConfig(args []string) error {
 		serviceFindings = runConfigServiceFindings{}
 		miniRawDir = ""
 		miniLog = ""
+		runnerCleanRoom = genericManifest.CleanRoom
+		runnerAgentProtocol = genericManifest.AgentProtocol
+		runnerUpstreamCommit = genericManifest.UpstreamCommit
+		runnerCleanRoomPolicySHA256 = genericManifest.CleanRoomPolicySHA256
+		runnerOfflineAssets = cloneOfflineAssetIdentity(genericManifest.OfflineAssets)
+		runnerImageSetSHA256 = genericManifest.ImageSetSHA256
+		runnerDockerImages = cloneDockerImages(genericManifest.DockerImages)
 	}
 	if hasShardsManifest {
 		runnerType = "mini-swe-agent-sharded"
+		if shardManifest.RunnerIdentity.RunnerType == "trpc-agent-go-native" {
+			runnerType = "trpc-agent-go-native-sharded"
+		}
 		runnerStartedAt = shardManifest.StartedAt
 		runnerFinishedAt = shardManifest.FinishedAt
 		runnerDurationMS = shardManifest.WallDurationMS
@@ -369,6 +475,13 @@ func runRunConfig(args []string) error {
 		serviceFindings = runConfigServiceFindings{}
 		miniRawDir = ""
 		miniLog = ""
+		runnerCleanRoom = shardManifest.RunnerIdentity.CleanRoom
+		runnerAgentProtocol = shardManifest.RunnerIdentity.AgentProtocol
+		runnerUpstreamCommit = shardManifest.RunnerIdentity.UpstreamCommit
+		runnerCleanRoomPolicySHA256 = shardManifest.RunnerIdentity.CleanRoomPolicySHA256
+		runnerOfflineAssets = cloneOfflineAssetIdentity(shardManifest.RunnerIdentity.OfflineAssets)
+		runnerImageSetSHA256 = shardManifest.RunnerIdentity.ImageSetSHA256
+		runnerDockerImages = cloneDockerImages(shardManifest.RunnerIdentity.DockerImages)
 	}
 
 	doc := runConfigDocument{
@@ -396,14 +509,21 @@ func runRunConfig(args []string) error {
 			ConfigReference: configReference,
 		},
 		Runner: runConfigRunner{
-			Type:                runnerType,
-			MiniSWEAgentVersion: miniSWEAgentVersion(doctor),
-			MiniExtra:           miniExtra,
-			BaseConfig:          baseConfig,
-			PrivateConfig:       privateConfig,
-			StartedAt:           runnerStartedAt,
-			FinishedAt:          runnerFinishedAt,
-			DurationMS:          runnerDurationMS,
+			Type:                  runnerType,
+			AgentProtocol:         runnerAgentProtocol,
+			UpstreamCommit:        runnerUpstreamCommit,
+			MiniSWEAgentVersion:   miniSWEAgentVersion(doctor),
+			MiniExtra:             miniExtra,
+			BaseConfig:            baseConfig,
+			PrivateConfig:         privateConfig,
+			StartedAt:             runnerStartedAt,
+			FinishedAt:            runnerFinishedAt,
+			DurationMS:            runnerDurationMS,
+			CleanRoom:             runnerCleanRoom,
+			CleanRoomPolicySHA256: runnerCleanRoomPolicySHA256,
+			OfflineAssets:         runnerOfflineAssets,
+			ImageSetSHA256:        runnerImageSetSHA256,
+			DockerImages:          runnerDockerImages,
 		},
 		Concurrency: runConfigConcurrency{
 			AgentGenerationWorkers: agentWorkers,
@@ -573,6 +693,9 @@ func validateRunConfigInputs(
 				shards.DuplicateCases,
 			)
 		}
+		aggregatedIdentity := cloneShardRunnerIdentity(canonicalIdentity)
+		aggregatedIdentity.DockerImages = nil
+		aggregatedIdentity.ImageSetSHA256 = ""
 		for _, shard := range shards.Shards {
 			if shard.Status != "accepted" || shard.FailureReason != "" {
 				return fmt.Errorf("shard %q is not accepted: status=%q reason=%q", shard.RunID, shard.Status, shard.FailureReason)
@@ -583,6 +706,9 @@ func validateRunConfigInputs(
 			}
 			if mismatch := shardRunnerIdentityMismatch(canonicalIdentity, shardIdentity); mismatch != "" {
 				return fmt.Errorf("shard %q runner identity mismatch: %s", shard.RunID, mismatch)
+			}
+			if err := mergeShardDockerImages(&aggregatedIdentity, shardIdentity); err != nil {
+				return fmt.Errorf("shard %q runner image provenance mismatch: %w", shard.RunID, err)
 			}
 			selectedSHA256, err := selectedInstancesSHA256(shard.ExpectedIDs)
 			if err != nil {
@@ -595,6 +721,16 @@ func validateRunConfigInputs(
 					shard.SelectedInstancesSHA256,
 					selectedSHA256,
 				)
+			}
+		}
+		if canonicalIdentity.CleanRoom {
+			aggregatedImageSetSHA256, err := sweenv.ImageSetSHA256(aggregatedIdentity.DockerImages)
+			if err != nil {
+				return fmt.Errorf("aggregate shard Docker images: %w", err)
+			}
+			if aggregatedImageSetSHA256 != canonicalIdentity.ImageSetSHA256 ||
+				!equalDockerImages(aggregatedIdentity.DockerImages, canonicalIdentity.DockerImages) {
+				return fmt.Errorf("shards aggregate Docker image provenance does not match canonical runner identity")
 			}
 		}
 		runnerPredictions = verifier.Config.Predictions
@@ -611,6 +747,19 @@ func validateRunConfigInputs(
 		}
 		if generic.Status != "" && generic.Status != "completed" && generic.Status != "completed_with_errors" {
 			return fmt.Errorf("runner status %q is not a supported terminal status", generic.Status)
+		}
+		if generic.CleanRoom && generic.RunnerType != "trpc-agent-go-native" {
+			return fmt.Errorf("runner type %q does not support clean_room=true", generic.RunnerType)
+		}
+		if err := validateCleanRoomIdentity(
+			"runner manifest",
+			generic.CleanRoom,
+			generic.CleanRoomPolicySHA256,
+			generic.OfflineAssets,
+			generic.ImageSetSHA256,
+			generic.DockerImages,
+		); err != nil {
+			return err
 		}
 		if generic.RunnerType == "mini-swe-agent-go" || generic.RunnerType == "trpc-agent-go-native" {
 			if generic.Workers < 1 {
@@ -671,16 +820,17 @@ func validateRunConfigSelection(
 	hasMini bool,
 	hasShards bool,
 ) (runConfigSelection, error) {
+	nativeRun := isNativeRun(generic, shards, hasShards)
 	if _, err := validatePredictionsBinding(
 		verifier,
-		generic.RunnerType == "trpc-agent-go-native",
+		nativeRun,
 	); err != nil {
 		return runConfigSelection{}, err
 	}
 	if _, err := validateHarnessReportBinding(
 		verifier,
 		harnessReportPath,
-		generic.RunnerType == "trpc-agent-go-native",
+		nativeRun,
 	); err != nil {
 		return runConfigSelection{}, err
 	}
@@ -806,6 +956,22 @@ func validateRunConfigSelection(
 		); err != nil {
 			return runConfigSelection{}, err
 		}
+	} else if hasShards && shards.RunnerIdentity.RunnerType == "trpc-agent-go-native" {
+		if err := validateNativePredictionModelNames(
+			predictions,
+			runnerManifestForNativeShardIdentity(shards.RunnerIdentity),
+		); err != nil {
+			return runConfigSelection{}, err
+		}
+		if err := validateShardedNativeImportedBundles(
+			importedCases,
+			predictions,
+			importedRoot,
+			target,
+			shards,
+		); err != nil {
+			return runConfigSelection{}, err
+		}
 	}
 
 	verifierIDs := verifier.Config.InstanceIDs
@@ -819,6 +985,13 @@ func validateRunConfigSelection(
 		return runConfigSelection{}, err
 	}
 	return selection, nil
+}
+
+func isNativeRun(generic runnerManifest, shards shardsManifest, hasShards bool) bool {
+	if hasShards {
+		return shards.RunnerIdentity.RunnerType == "trpc-agent-go-native"
+	}
+	return generic.RunnerType == "trpc-agent-go-native"
 }
 
 func validatePredictionsBinding(verifier verifyManifest, requireAttested bool) (string, error) {
@@ -1175,7 +1348,7 @@ func validateNativeImportedBundles(
 		if err != nil {
 			return fmt.Errorf("validate native result bundle for %s: %w", row.InstanceID, err)
 		}
-		if err := validateNativeTraceIdentity(row.InstanceID, trace, manifest, selection); err != nil {
+		if err := validateNativeTraceIdentity(row, trace, manifest, selection); err != nil {
 			return err
 		}
 		if trace.ModelPatch != prediction.ModelPatch {
@@ -1241,12 +1414,98 @@ func validateNativeImportedBundles(
 	return nil
 }
 
+func validateShardedNativeImportedBundles(
+	rows []importedCase,
+	predictions map[string]contract.Prediction,
+	importedRoot string,
+	target string,
+	shards shardsManifest,
+) error {
+	byInstance := make(map[string]shardSummary, len(rows))
+	for _, shard := range shards.Shards {
+		for _, instanceID := range shard.ExpectedIDs {
+			if existing, ok := byInstance[instanceID]; ok {
+				return fmt.Errorf(
+					"native shard case %s is declared by both %s and %s",
+					instanceID,
+					existing.RunID,
+					shard.RunID,
+				)
+			}
+			byInstance[instanceID] = shard
+		}
+	}
+	for _, row := range rows {
+		shard, ok := byInstance[row.InstanceID]
+		if !ok {
+			return fmt.Errorf("imported native case %s is not declared by any shard", row.InstanceID)
+		}
+		manifest := runnerManifestForNativeShard(shard)
+		selection := runConfigSelection{
+			CaseCount:    shard.ExpectedCount,
+			CaseListHash: shard.SelectedInstancesSHA256,
+		}
+		if err := validateNativeImportedBundles(
+			[]importedCase{row},
+			predictions,
+			importedRoot,
+			target,
+			manifest,
+			selection,
+		); err != nil {
+			return fmt.Errorf("validate native shard %s: %w", shard.RunID, err)
+		}
+	}
+	return nil
+}
+
+func runnerManifestForNativeShard(shard shardSummary) runnerManifest {
+	identity := shard.RunnerIdentity
+	manifest := runnerManifestForNativeShardIdentity(identity)
+	manifest.RunID = shard.RunID
+	manifest.SelectedInstancesSHA256 = shard.SelectedInstancesSHA256
+	manifest.OutputDir = shard.RawDir
+	manifest.CaseCount = shard.ExpectedCount
+	manifest.Workers = shard.Workers
+	return manifest
+}
+
+func runnerManifestForNativeShardIdentity(identity shardRunnerIdentity) runnerManifest {
+	return runnerManifest{
+		RunnerType:              identity.RunnerType,
+		AgentProtocol:           identity.AgentProtocol,
+		UpstreamCommit:          identity.UpstreamCommit,
+		ObservationCodec:        identity.ObservationCodec,
+		FrameworkModule:         identity.FrameworkModule,
+		FrameworkVersion:        identity.FrameworkVersion,
+		SourceRevision:          identity.SourceRevision,
+		SourceModified:          identity.SourceModified,
+		BinarySHA256:            identity.BinarySHA256,
+		CasesSHA256:             identity.CasesSHA256,
+		ModelConfigSHA256:       identity.ModelConfigSHA256,
+		EnvironmentConfigSHA256: identity.EnvironmentConfigSHA256,
+		CommandTimeout:          identity.CommandTimeout,
+		CaseTimeout:             identity.CaseTimeout,
+		CleanRoom:               identity.CleanRoom,
+		CleanRoomPolicySHA256:   identity.CleanRoomPolicySHA256,
+		OfflineAssets:           cloneOfflineAssetIdentity(identity.OfflineAssets),
+		ImageSetSHA256:          identity.ImageSetSHA256,
+		DockerImages:            cloneDockerImages(identity.DockerImages),
+		ModelConfig:             map[string]string{"MODEL_NAME": identity.ModelName},
+	}
+}
+
 func validateNativeTraceIdentity(
-	instanceID string,
+	row importedCase,
 	trace nativeTraceEnvelope,
 	manifest runnerManifest,
 	selection runConfigSelection,
 ) error {
+	instanceID := row.InstanceID
+	offlineAssetsSHA256 := ""
+	if manifest.OfflineAssets != nil {
+		offlineAssetsSHA256 = manifest.OfflineAssets.SHA256
+	}
 	checks := []struct {
 		name string
 		got  string
@@ -1262,6 +1521,9 @@ func validateNativeTraceIdentity(
 		{"info.command_timeout", trace.Info.CommandTimeout, manifest.CommandTimeout},
 		{"info.case_timeout", trace.Info.CaseTimeout, manifest.CaseTimeout},
 		{"info.selected_instances_sha256", trace.Info.SelectedInstancesSHA256, selection.CaseListHash},
+		{"info.clean_room_policy_sha256", trace.Info.CleanRoomPolicySHA256, manifest.CleanRoomPolicySHA256},
+		{"info.offline_assets_sha256", trace.Info.OfflineAssetsSHA256, offlineAssetsSHA256},
+		{"info.image_set_sha256", trace.Info.ImageSetSHA256, manifest.ImageSetSHA256},
 	}
 	for _, check := range checks {
 		if check.got != check.want {
@@ -1282,6 +1544,14 @@ func validateNativeTraceIdentity(
 			manifest.SourceModified,
 		)
 	}
+	if trace.Info.CleanRoom != manifest.CleanRoom {
+		return fmt.Errorf(
+			"native result bundle for %s info.clean_room=%t does not match runner manifest %t",
+			instanceID,
+			trace.Info.CleanRoom,
+			manifest.CleanRoom,
+		)
+	}
 	if trace.Info.Workers != manifest.Workers {
 		return fmt.Errorf(
 			"native result bundle for %s info.workers=%d does not match runner manifest %d",
@@ -1290,7 +1560,75 @@ func validateNativeTraceIdentity(
 			manifest.Workers,
 		)
 	}
+	if !trace.Info.CleanRoom {
+		if row.CleanRoom || row.CleanRoomPolicySHA256 != "" || row.OfflineAssetsSHA256 != "" ||
+			row.ImageSetSHA256 != "" || row.VerifiedBaseCommit != "" || row.EnvironmentProvenance != nil {
+			return fmt.Errorf("imported native case %s carries clean-room provenance for a default-off trace", instanceID)
+		}
+		if trace.Info.Repo != "" && trace.Info.Repo != row.Repo {
+			return fmt.Errorf("native result bundle for %s info.repo %q does not match imported case %q", instanceID, trace.Info.Repo, row.Repo)
+		}
+		if trace.Info.BaseCommit != "" && trace.Info.BaseCommit != row.BaseCommit {
+			return fmt.Errorf(
+				"native result bundle for %s info.base_commit %q does not match imported case %q",
+				instanceID,
+				trace.Info.BaseCommit,
+				row.BaseCommit,
+			)
+		}
+		return nil
+	}
+	caseChecks := []struct {
+		name string
+		got  string
+		want string
+	}{
+		{"info.repo", trace.Info.Repo, row.Repo},
+		{"info.base_commit", trace.Info.BaseCommit, row.BaseCommit},
+		{"info.verified_base_commit", trace.Info.VerifiedBaseCommit, row.VerifiedBaseCommit},
+		{"import.clean_room_policy_sha256", row.CleanRoomPolicySHA256, trace.Info.CleanRoomPolicySHA256},
+		{"import.offline_assets_sha256", row.OfflineAssetsSHA256, trace.Info.OfflineAssetsSHA256},
+		{"import.image_set_sha256", row.ImageSetSHA256, trace.Info.ImageSetSHA256},
+	}
+	for _, check := range caseChecks {
+		if check.got != check.want {
+			return fmt.Errorf(
+				"native result bundle for %s %s %q does not match %q",
+				instanceID,
+				check.name,
+				check.got,
+				check.want,
+			)
+		}
+	}
+	if !row.CleanRoom {
+		return fmt.Errorf("imported native case %s lost clean_room=true", instanceID)
+	}
+	if !equalEnvironmentProvenance(row.EnvironmentProvenance, trace.Info.EnvironmentProvenance) {
+		return fmt.Errorf("imported native case %s environment provenance does not match raw trace", instanceID)
+	}
+	if trace.Info.EnvironmentProvenance == nil {
+		return fmt.Errorf("native result bundle for %s has no environment provenance", instanceID)
+	}
+	if err := validateCaseEnvironmentProvenance(instanceID, *trace.Info.EnvironmentProvenance, manifest.DockerImages); err != nil {
+		return err
+	}
 	return nil
+}
+
+func equalEnvironmentProvenance(a, b *sweenv.Provenance) bool {
+	if a == nil || b == nil {
+		return a == nil && b == nil
+	}
+	if a.Testbed != b.Testbed || len(a.AuxiliaryImages) != len(b.AuxiliaryImages) {
+		return false
+	}
+	for role, identity := range a.AuxiliaryImages {
+		if b.AuxiliaryImages[role] != identity {
+			return false
+		}
+	}
+	return true
 }
 
 func readRegularArtifact(path string) ([]byte, error) {
@@ -1472,19 +1810,32 @@ func validateGenericRunnerModelName(manifest runnerManifest, modelName string) e
 	if manifest.RunnerType != "trpc-agent-go-native" {
 		return nil
 	}
-	actual := manifest.ModelConfig["MODEL_NAME"]
-	expected := modelName
+	return validateNativeRunnerModelName("native runner", manifest.ModelConfig["MODEL_NAME"], modelName)
+}
+
+func validateShardedNativeRunnerModelName(
+	shards shardsManifest,
+	hasShards bool,
+	modelName string,
+) error {
+	if !hasShards || shards.RunnerIdentity.RunnerType != "trpc-agent-go-native" {
+		return nil
+	}
+	return validateNativeRunnerModelName("native shard runner", shards.RunnerIdentity.ModelName, modelName)
+}
+
+func validateNativeRunnerModelName(source, actual, expected string) error {
 	if actual != strings.TrimSpace(actual) {
-		return fmt.Errorf("native runner MODEL_NAME %q is not canonical", actual)
+		return fmt.Errorf("%s MODEL_NAME %q is not canonical", source, actual)
 	}
 	if expected != strings.TrimSpace(expected) {
 		return fmt.Errorf("native -model-name %q is not canonical", expected)
 	}
 	if actual == "" {
-		return fmt.Errorf("native runner manifest has no MODEL_NAME")
+		return fmt.Errorf("%s manifest has no MODEL_NAME", source)
 	}
 	if actual != expected {
-		return fmt.Errorf("native runner MODEL_NAME %q does not match -model-name %q", actual, expected)
+		return fmt.Errorf("%s MODEL_NAME %q does not match -model-name %q", source, actual, expected)
 	}
 	return nil
 }

@@ -1,0 +1,3 @@
+# Prepared offline bundles contain wheels, helper binaries, and fixture TLS
+# material. They are local inputs, never benchmark source artifacts.
+offline-assets/

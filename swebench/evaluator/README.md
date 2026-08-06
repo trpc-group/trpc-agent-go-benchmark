@@ -38,6 +38,11 @@ source code.
   the source path, snapshot path, exact-byte SHA-256, and harness `-p` argument.
 - `import` writes schema version 1 with one explicit target and result per row;
   filtered or sliced runs can omit `--cases` so prediction IDs define the rows.
+  Clean-room Native traces must supply the selected case repository and base
+  commit; newer default-off traces may supply the same pair, while legacy
+  default-off traces may omit both. `run-config` binds any supplied values, or
+  the legacy row's selection identity, to the full prepared cases manifest, so
+  no synthetic subset case file is needed.
 - `run-config` accepts exactly one of `--run-mini-manifest`,
   `--runner-manifest`, or `--shards-manifest`, preserves the full prepared panel
   under `dataset`, records the actual prediction-backed run under `selection`,
@@ -48,8 +53,12 @@ source code.
   Native finalization additionally requires the current runner predictions to
   match the verify-time snapshot digest. Legacy Mini manifests may omit this
   newer attestation.
-- `summarize-shards` accepts both the external mini-SWE-agent manifest and the
-  Mini-Go runner manifest, while applying the same fixed-plan coverage checks.
+- `summarize-shards` accepts external mini-SWE-agent, Mini-Go, and Native runner
+  manifests while applying the same fixed-plan coverage checks. For clean-room
+  Native shards, it also requires one consistent policy and offline asset-tree
+  identity, safely merges resolved image provenance, recomputes the image-set
+  hash, and validates every accepted case artifact's base-commit and
+  environment-image provenance.
 
 Target labels must be lowercase slugs. Run IDs and instance IDs are restricted
 to path-safe artifact names because they are used below ignored runtime roots.
