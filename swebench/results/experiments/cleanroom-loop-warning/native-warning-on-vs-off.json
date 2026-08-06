@@ -1,0 +1,298 @@
+{
+  "schema_version": 1,
+  "result_id": "cleanroom-native-loop-warning-on-vs-off-three-runs",
+  "status": "completed",
+  "evidence_status": "complete_with_one_reproducible_warning_off_harness_error",
+  "source_repository": "https://github.com/hr-chang/trpc-agent-go-benchmark",
+  "question": "Across three fresh clean-room full-500 Native runs per setting, how do exact repeated-tool warnings enabled and disabled compare on official-harness quality, model-side usage, long tails, repeatability, and observed repeat-loop trajectories?",
+  "source_artifacts": [
+    {
+      "role": "warning_on_result",
+      "frozen_branch_head": "7264ec6d3946ec79b0c09ecfe4b5d8018c323d02",
+      "source_commit": "d6719df7b52897d3566ca85ac3e066f720f4670b",
+      "path": "swebench/results/experiments/workspace-rag/v11-cleanroom-loopwarn-timeout4h-r3-result.json",
+      "sha256": "b2b9a8e1c70398838ca30d40cd47740904a9ec720ddbc937ef51715dcd6e9b52"
+    },
+    {
+      "role": "warning_off_result",
+      "frozen_branch_head": "7264ec6d3946ec79b0c09ecfe4b5d8018c323d02",
+      "path": "swebench/results/experiments/workspace-rag/v12-cleanroom-native-noloopwarn-timeout4h-r3-result.json",
+      "sha256": "f38251261447e9c03e65ae8ed627d9d23905da48ad968c348d4b2e154bed6e5c"
+    },
+    {
+      "role": "warning_on_plan",
+      "source_commit": "3b853219b993049d3b335221ad488d68e9d9e8e7",
+      "path": "swebench/results/experiments/workspace-rag/v11-cleanroom-loopwarn-timeout4h-r3-plan.json",
+      "sha256": "23deef6cb328a5c98557cd6c99496d03aada1d4cb3ba97e4b71eb079694f3f0c"
+    },
+    {
+      "role": "warning_off_plan",
+      "source_commit": "9f68ff2338faf660e7202bbd779352627f26ea4c",
+      "path": "swebench/results/experiments/workspace-rag/v12-cleanroom-native-noloopwarn-timeout4h-r3-plan.json",
+      "sha256": "fb63729c716206a86f62742e1b12a7e7de9106e04bdd528dfd86bf0646af8481"
+    }
+  ],
+  "scope": {
+    "dataset": "princeton-nlp/SWE-bench_Verified",
+    "panel_cases": 500,
+    "repetitions_per_setting": 3,
+    "experimental_unit": "fresh 500-case run",
+    "case_list_sha256": "a6b0fd7c8c2969a0eef892e032250adcfa6d32362d395c246930e61b575ac9b9",
+    "cases_jsonl_sha256": "4b2a050a82d356963320cbfa8e2efdf6a133af8863f31b291a973ab4dd349d07",
+    "benchmark_revision": "a702c2f589996b96785b020a3d7f2df9438748d4",
+    "framework_revision": "358d376784889fd539a764190e1970ee4f4fc5f6",
+    "native_binary_sha256": "839a4f327704554697592335b1fa4a3fd9fac32ec9f8de19923a5e870806e4b8",
+    "model": "GLM-5.2",
+    "reasoning_effort": "high",
+    "observation_codec": "xml",
+    "command_timeout": "1m",
+    "case_timeout": "4h",
+    "single_llm_http_attempt_timeout": "300s",
+    "max_llm_calls": 250,
+    "offline_generation": true,
+    "sanitized_git_history": true,
+    "code_search": false,
+    "workers": 15,
+    "single_intended_generation_variable": "tool_loop_warning true versus false"
+  },
+  "rate_card": {
+    "cached_prompt_per_million": 2.0,
+    "uncached_prompt_per_million": 8.0,
+    "completion_per_million": 28.0,
+    "unit": "billing_unit"
+  },
+  "arms": {
+    "warning_on": {
+      "runs": [
+        {
+          "replicate": 1,
+          "run_id": "tag-cleanroom-loopwarn-timeout4h-native-20260729-r1",
+          "generation_terminal_counts": {"Submitted": 497, "Error": 1, "Timeout": 2},
+          "official_harness": {"resolved": 369, "resolved_rate": 0.738, "empty_patch": 4, "error": 0, "denominator": 500},
+          "model_metrics": {
+            "llm_calls": 14088,
+            "prompt_tokens": 316406803,
+            "cached_prompt_tokens": 294469696,
+            "uncached_prompt_tokens": 21937107,
+            "completion_tokens": 5362117,
+            "total_tokens": 321768920,
+            "actual_cost": 914.575524,
+            "all_prompt_uncached_cost": 2681.3937,
+            "fixed_prompt_cache_hit_rate_cost": {"0": 2681.3937, "0.9": 972.7969638, "0.95": 877.8749229, "0.98": 820.92169836, "1": 782.952882}
+          },
+          "agent_metrics": {"tool_calls": 15093, "case_duration_sum_ms": 375302432},
+          "warning_metrics": {"case_count": 4, "event_count": 4, "first_warning_llm_call_min": 18, "first_warning_llm_call_median": 19, "first_warning_llm_call_max": 33}
+        },
+        {
+          "replicate": 2,
+          "run_id": "tag-cleanroom-loopwarn-timeout4h-native-20260729-r2",
+          "generation_terminal_counts": {"Submitted": 500},
+          "official_harness": {"resolved": 369, "resolved_rate": 0.738, "empty_patch": 1, "error": 0, "denominator": 500},
+          "model_metrics": {
+            "llm_calls": 13336,
+            "prompt_tokens": 234592973,
+            "cached_prompt_tokens": 229582656,
+            "uncached_prompt_tokens": 5010317,
+            "completion_tokens": 4455521,
+            "total_tokens": 239048494,
+            "actual_cost": 624.002436,
+            "all_prompt_uncached_cost": 2001.498372,
+            "fixed_prompt_cache_hit_rate_cost": {"0": 2001.498372, "0.9": 734.6963178, "0.95": 664.3184259, "0.98": 622.09169076, "1": 593.940534}
+          },
+          "agent_metrics": {"tool_calls": 14190, "case_duration_sum_ms": 204500183},
+          "warning_metrics": {"case_count": 8, "event_count": 18, "first_warning_llm_call_min": 9, "first_warning_llm_call_median": 16, "first_warning_llm_call_max": 116}
+        },
+        {
+          "replicate": 3,
+          "run_id": "tag-cleanroom-loopwarn-timeout4h-native-20260729-r3",
+          "generation_terminal_counts": {"Submitted": 499, "Error": 1},
+          "official_harness": {"resolved": 367, "resolved_rate": 0.734, "empty_patch": 1, "error": 0, "denominator": 500},
+          "model_metrics": {
+            "llm_calls": 13766,
+            "prompt_tokens": 284591290,
+            "cached_prompt_tokens": 272142656,
+            "uncached_prompt_tokens": 12448634,
+            "completion_tokens": 4908498,
+            "total_tokens": 289499788,
+            "actual_cost": 781.312328,
+            "all_prompt_uncached_cost": 2414.168264,
+            "fixed_prompt_cache_hit_rate_cost": {"0": 2414.168264, "0.9": 877.375298, "0.95": 791.997911, "0.98": 740.7714788, "1": 706.620524}
+          },
+          "agent_metrics": {"tool_calls": 14709, "case_duration_sum_ms": 388665436},
+          "warning_metrics": {"case_count": 3, "event_count": 7, "first_warning_llm_call_min": 13, "first_warning_llm_call_median": 19, "first_warning_llm_call_max": 112}
+        }
+      ],
+      "run_level_statistics": {
+        "resolved_rate": {"mean": 0.7366666666666667, "sample_sd": 0.0023094010767585054, "min": 0.734, "max": 0.738},
+        "prompt_tokens": {"mean": 278530355.3333333, "sample_sd": 41242294.93605352, "min": 234592973, "max": 316406803},
+        "cached_prompt_tokens": {"mean": 265398336, "sample_sd": 32965078.176567394, "min": 229582656, "max": 294469696},
+        "uncached_prompt_tokens": {"mean": 13132019.333333334, "sample_sd": 8484062.503387533, "min": 5010317, "max": 21937107},
+        "completion_tokens": {"mean": 4908712, "sample_sd": 453298.03788567183, "min": 4455521, "max": 5362117},
+        "total_tokens": {"mean": 283439067.3333333, "sample_sd": 41691923.32640567, "min": 239048494, "max": 321768920},
+        "llm_calls": {"mean": 13730, "sample_sd": 377.2903391288995, "min": 13336, "max": 14088},
+        "tool_calls": {"mean": 14664, "sample_sd": 453.1787726714481, "min": 14190, "max": 15093},
+        "case_duration_sum_ms": {"mean": 322822683.6666667, "sample_sd": 102687891.65225862, "min": 204500183, "max": 388665436},
+        "actual_cost": {"mean": 773.2967626666666, "sample_sd": 145.45228369872243, "min": 624.002436, "max": 914.575524},
+        "all_prompt_uncached_cost": {"mean": 2365.6867786666667, "sample_sd": 342.5306629692466, "min": 2001.498372, "max": 2681.3937},
+        "fixed_prompt_cache_hit_rate_cost_mean": {"0": 2365.6867786666667, "0.9": 861.6228598666667, "0.95": 778.0637532666667, "0.98": 727.9282893066667, "1": 694.5046466666666},
+        "warning_case_count": {"mean": 5, "sample_sd": 2.6457513110645907, "min": 3, "max": 8},
+        "warning_event_count": {"mean": 9.666666666666666, "sample_sd": 7.371114795831994, "min": 4, "max": 18}
+      },
+      "repeatability": {
+        "resolution_frequency": {"zero_of_three": 104, "one_of_three": 24, "two_of_three": 35, "three_of_three": 337},
+        "mean_pairwise_binary_agreement": 0.9213333333333333,
+        "mean_pairwise_resolved_set_jaccard": 0.8986254295532646
+      }
+    },
+    "warning_off": {
+      "runs": [
+        {
+          "replicate": 1,
+          "run_id": "tag-cleanroom-noloopwarn-timeout4h-native-20260731-r1",
+          "generation_terminal_counts": {"Submitted": 498, "Error": 1, "Timeout": 1},
+          "official_harness": {"resolved": 377, "resolved_rate": 0.754, "completed": 497, "empty_patch": 2, "error": 1, "error_ids": ["sympy__sympy-19040"], "denominator": 500},
+          "model_metrics": {
+            "llm_calls": 13930,
+            "prompt_tokens": 301692458,
+            "cached_prompt_tokens": 286723968,
+            "uncached_prompt_tokens": 14968490,
+            "completion_tokens": 4956023,
+            "total_tokens": 306648481,
+            "actual_cost": 831.9645,
+            "all_prompt_uncached_cost": 2552.308308,
+            "fixed_prompt_cache_hit_rate_cost": {"0": 2552.308308, "0.9": 923.1690348, "0.95": 832.6612974, "0.98": 778.35665496, "1": 742.15356}
+          },
+          "agent_metrics": {
+            "tool_calls": 14890,
+            "case_duration_sum_ms": 422389345,
+            "duration_ms_quantiles": {"p0": 19142, "p50": 318442, "p90": 2137208, "p95": 3113734, "p98": 5599472, "p100": 14425030},
+            "llm_call_quantiles": {"p0": 4, "p50": 21, "p90": 57, "p95": 74, "p98": 93, "p100": 250}
+          }
+        },
+        {
+          "replicate": 2,
+          "run_id": "tag-cleanroom-noloopwarn-timeout4h-native-20260731-r2",
+          "generation_terminal_counts": {"Submitted": 499, "Error": 1},
+          "official_harness": {"resolved": 368, "resolved_rate": 0.736, "completed": 499, "empty_patch": 1, "error": 0, "denominator": 500},
+          "model_metrics": {
+            "llm_calls": 14331,
+            "prompt_tokens": 340283422,
+            "cached_prompt_tokens": 330612288,
+            "uncached_prompt_tokens": 9671134,
+            "completion_tokens": 5880987,
+            "total_tokens": 346164409,
+            "actual_cost": 903.261284,
+            "all_prompt_uncached_cost": 2886.935012,
+            "fixed_prompt_cache_hit_rate_cost": {"0": 2886.935012, "0.9": 1049.4045332, "0.95": 947.3195066, "0.98": 886.06849064, "1": 845.23448}
+          },
+          "agent_metrics": {
+            "tool_calls": 15312,
+            "case_duration_sum_ms": 420201917,
+            "duration_ms_quantiles": {"p0": 34560, "p50": 368910, "p90": 1923784, "p95": 2999156, "p98": 5822694, "p100": 11368042},
+            "llm_call_quantiles": {"p0": 4, "p50": 20, "p90": 60, "p95": 73, "p98": 113, "p100": 250}
+          }
+        },
+        {
+          "replicate": 3,
+          "run_id": "tag-cleanroom-noloopwarn-timeout4h-native-20260731-r3",
+          "generation_terminal_counts": {"Submitted": 498, "Timeout": 2},
+          "official_harness": {"resolved": 367, "resolved_rate": 0.734, "completed": 497, "empty_patch": 3, "error": 0, "denominator": 500},
+          "model_metrics": {
+            "llm_calls": 13387,
+            "prompt_tokens": 267984875,
+            "cached_prompt_tokens": 247049088,
+            "uncached_prompt_tokens": 20935787,
+            "completion_tokens": 4739833,
+            "total_tokens": 272724708,
+            "actual_cost": 794.299796,
+            "all_prompt_uncached_cost": 2276.594324,
+            "fixed_prompt_cache_hit_rate_cost": {"0": 2276.594324, "0.9": 829.475999, "0.95": 749.0805365, "0.98": 700.843259, "1": 668.685074}
+          },
+          "agent_metrics": {
+            "tool_calls": 14360,
+            "case_duration_sum_ms": 599616418,
+            "duration_ms_quantiles": {"p0": 26467, "p50": 459683, "p90": 3090189, "p95": 4651563, "p98": 7184462, "p100": 14427399},
+            "llm_call_quantiles": {"p0": 4, "p50": 20, "p90": 57, "p95": 70, "p98": 90, "p100": 164}
+          }
+        }
+      ],
+      "run_level_statistics": {
+        "resolved_rate": {"mean": 0.7413333333333333, "sample_sd": 0.011015141094572214, "min": 0.734, "max": 0.754},
+        "prompt_tokens": {"mean": 303320251.6666667, "sample_sd": 36176750.251283385, "min": 267984875, "max": 340283422},
+        "cached_prompt_tokens": {"mean": 288128448, "sample_sd": 41799300.49190775, "min": 247049088, "max": 330612288},
+        "uncached_prompt_tokens": {"mean": 15191803.666666666, "sample_sd": 5635645.7968801, "min": 9671134, "max": 20935787},
+        "completion_tokens": {"mean": 5192281, "sample_sd": 606153.0292360173, "min": 4739833, "max": 5880987},
+        "total_tokens": {"mean": 308512532.6666667, "sample_sd": 36755318.48868068, "min": 272724708, "max": 346164409},
+        "llm_calls": {"mean": 13882.666666666666, "sample_sd": 473.77667031348574, "min": 13387, "max": 14331},
+        "tool_calls": {"mean": 14854, "sample_sd": 477.01991572679646, "min": 14360, "max": 15312},
+        "case_duration_sum_ms": {"mean": 480735893.3333333, "sample_sd": 102959363.67849334, "min": 420201917, "max": 599616418},
+        "actual_cost": {"mean": 843.1751933333334, "sample_sd": 55.33905673711896, "min": 794.299796, "max": 903.261284},
+        "all_prompt_uncached_cost": {"mean": 2571.9458813333335, "sample_sd": 305.6438525013955, "min": 2276.594324, "max": 2886.935012},
+        "fixed_prompt_cache_hit_rate_cost_mean": {"0": 2571.9458813333335, "0.9": 934.0165223333333, "0.95": 843.0204468333333, "0.98": 788.4228015333333, "1": 752.0243713333333},
+        "generation_agent_failures": {"mean": 1.6666666666666667, "sample_sd": 0.5773502691896257, "min": 1, "max": 2},
+        "harness_errors": {"mean": 0.3333333333333333, "sample_sd": 0.5773502691896258, "min": 0, "max": 1}
+      },
+      "repeatability": {
+        "resolution_frequency": {"zero_of_three": 98, "one_of_three": 27, "two_of_three": 40, "three_of_three": 335},
+        "all_three_binary_agreement": 0.866,
+        "mean_pairwise_binary_agreement": 0.9106666666666667,
+        "mean_pairwise_resolved_set_jaccard": 0.8864503102766704
+      }
+    }
+  },
+  "comparison": {
+    "direction": "warning_on minus warning_off run-level mean",
+    "resolved_rate_percentage_points": -0.4666666666666597,
+    "total_tokens": -25073465.333333373,
+    "total_tokens_percent_of_warning_off": -8.127211273,
+    "llm_calls": -152.66666666666606,
+    "llm_calls_percent_of_warning_off": -1.099692662,
+    "actual_cost": -69.87843066666676,
+    "actual_cost_percent_of_warning_off": -8.287533981,
+    "fixed_cache_cost_percent_of_warning_off": {"0": -8.01957398, "0.9": -7.750790349, "0.95": -7.705233463, "0.98": -7.672851687, "1": -7.648651674},
+    "interpretation": "Warning-on has nearly the same mean RR in this six-run historical contrast while using lower token and cost volume. The comparison is non-contemporaneous and is not a strict causal estimate."
+  },
+  "shadow_replay": {
+    "method": "Replay the same exact consecutive complete tool-name, canonical-arguments, and model-visible-result detector over warning-off event streams without mutating history.",
+    "warning_off_case_runs_that_would_warn": 27,
+    "warning_off_unique_cases_that_would_warn": 24,
+    "warning_off_would_warn_events": 239,
+    "three_event_heaviest_trajectories_events": 160,
+    "three_event_heaviest_share": 0.669,
+    "warning_on_replay_matches_recorded_telemetry": true,
+    "warning_on_replay_case_level_differences": 0,
+    "boundary": "Replay locates injection points on observed warning-off trajectories; it cannot simulate the counterfactual model response after warning injection."
+  },
+  "reproducible_harness_error": {
+    "run_id": "tag-cleanroom-noloopwarn-timeout4h-native-20260731-r1",
+    "instance_id": "sympy__sympy-19040",
+    "official_classification": "error",
+    "cause": "The candidate patch's recursive factorization path reaches dmp_trial_division(1, [1]); division by the unit returns the same dividend with zero remainder, so the existing trial-division loop does not terminate.",
+    "reproduction": "The original official evaluation and an eligible clean single-case rerun with the same prediction both reached the exact 1800-second test timeout.",
+    "infrastructure_interpretation": "candidate-patch correctness failure, not resource, Docker, or harness infrastructure",
+    "disposition": "Preserve the original error bucket and 500-case denominator; do not rewrite it as unresolved."
+  },
+  "confidence": {
+    "exact_repeat_presence_in_warning_off_trajectories": "high; detector equivalence was checked against warning-on runtime telemetry and replay found 239 observed events",
+    "lower_token_and_cost_volume_in_the_observed_warning_on_runs": "moderate; the run-level direction is consistent after fixed-cache normalization, but n=3 per setting is small",
+    "causal_effect_of_warning_on_quality_or_cost": "low; the settings were run at different times rather than randomized contemporaneously, and warning injection changes subsequent model-visible history"
+  },
+  "limitations": [
+    "The same 500 cases recur in every run, so 1500 case-runs per setting are not independent observations.",
+    "Three run-level repetitions provide only a small estimate of stochastic run variation.",
+    "Warning-on and warning-off runs are non-contemporaneous; service state, time, and natural cache behavior can confound the contrast.",
+    "Generation wall time is not a performance endpoint because official-harness work overlapped some generation; canonical case-duration sums are retained instead.",
+    "Billing units are reproducible model-side accounting rather than monetary spend.",
+    "The public benchmark rebuild must be revalidated before these historical results are attributed to its runtime implementation."
+  ],
+  "validation": {
+    "preflight_passed_cases_per_experiment": 500,
+    "generation_gates_passed": 6,
+    "canonical_cases_per_run": 500,
+    "unrecovered_non_agent_generation_failures": 0,
+    "warning_off_recorded_warning_count": 0,
+    "warning_on_replay_matches_runtime": true,
+    "raw_responses_and_patches_committed": false,
+    "server_paths_and_endpoint_hostnames_committed": false
+  }
+}

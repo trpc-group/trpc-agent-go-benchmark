@@ -48,8 +48,15 @@ swebench/
   mini-swe-agent-impl/    # 外部参考 runner 说明。
   mini-swe-agent-go-impl/ # source-aligned Mini-Go 参考 runner。
   trpc-agent-go-impl/     # tRPC-Agent-Go 原生 runner。
-  results/                # 被忽略的运行产物与后续结果摘要。
+  results/                # 被忽略的运行产物与 canonical 结果摘要。
 ```
+
+## 已发布结果
+
+Observation codec、workspace representation、clean-room loop warning 与 Native baseline 的
+脱敏 full-panel 摘要统一由 [results/README.zh_CN.md](results/README.zh_CN.md) 索引。该索引
+分别报告 official-harness RR、tokens、模型侧成本、calls、errors、长尾、重复性、cache
+敏感性、provenance 与各项对比的因果边界。
 
 ## 数据契约
 

@@ -56,8 +56,16 @@ swebench/
   mini-swe-agent-impl/    # External reference-runner instructions.
   mini-swe-agent-go-impl/ # Source-aligned Mini-Go reference runner.
   trpc-agent-go-impl/     # Framework-native TAG runner.
-  results/                # Ignored runtime outputs and future summaries.
+  results/                # Ignored runtime outputs and canonical summaries.
 ```
+
+## Published Results
+
+Sanitized full-panel summaries for observation codecs, workspace
+representations, clean-room loop warnings, and the Native baseline are indexed
+in [results/README.md](results/README.md). The index reports official-harness RR,
+tokens, model-side cost, calls, errors, long tails, repeatability, cache
+sensitivity, provenance, and the causal boundary of each comparison.
 
 ## Dataset Contract
 

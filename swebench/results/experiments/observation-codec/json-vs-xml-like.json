@@ -1,0 +1,133 @@
+{
+  "schema_version": 1,
+  "result_id": "observation-codec-json-vs-xml-like-full500",
+  "status": "completed",
+  "evidence_status": "complete_single_sequential_run_per_arm",
+  "source_repository": "https://github.com/hr-chang/trpc-agent-go-benchmark",
+  "question": "On the same SWE-bench Verified 500-case panel and source-aligned Mini-Go agent, how do JSON and XML-like tool-result observations compare on official-harness quality and model-side usage?",
+  "source_artifact": {
+    "frozen_branch_head": "7264ec6d3946ec79b0c09ecfe4b5d8018c323d02",
+    "path": "swebench/results/experiments/observation-codec/json-vs-xml-e1.json",
+    "sha256": "b2a7ad7b7409e3a9683ecb46485190d511d2575c553a4c161a77419669508ed7"
+  },
+  "scope": {
+    "dataset": "princeton-nlp/SWE-bench_Verified",
+    "split": "test",
+    "panel_cases": 500,
+    "case_list_sha256": "a6b0fd7c8c2969a0eef892e032250adcfa6d32362d395c246930e61b575ac9b9",
+    "agent": "source-aligned Mini-Go reference",
+    "upstream_agent": "mini-SWE-agent 2.1.0",
+    "model": "GLM-5.2",
+    "source_revision": "02e07966e2946d8955df64253b96d080634c574c",
+    "observation_variable": "tool-result codec only",
+    "verifier": "official SWE-bench local harness, calibrated mode"
+  },
+  "rate_card": {
+    "cached_prompt_per_million": 2.0,
+    "uncached_prompt_per_million": 8.0,
+    "completion_per_million": 28.0,
+    "unit": "billing_unit"
+  },
+  "arms": {
+    "json": {
+      "run_id": "codec-json-e1",
+      "generation_terminal_counts": {
+        "Submitted": 499,
+        "LimitsExceeded": 1
+      },
+      "official_harness": {
+        "resolved": 388,
+        "resolved_rate": 0.776,
+        "completed": 499,
+        "unresolved": 111,
+        "empty_patch": 1,
+        "error": 0,
+        "denominator": 500
+      },
+      "usage": {
+        "response_records": 13657,
+        "prompt_tokens": 247438154,
+        "cached_prompt_tokens": 242340736,
+        "uncached_prompt_tokens": 5097418,
+        "completion_tokens": 3610350,
+        "total_tokens": 251048504,
+        "actual_cost": 626.5506,
+        "all_prompt_uncached_cost": 2080.595032,
+        "fixed_prompt_cache_hit_rate_cost": {
+          "0": 2080.595032,
+          "0.9": 744.429,
+          "0.95": 670.197554,
+          "0.98": 625.658686,
+          "1": 595.966108
+        }
+      },
+      "duration": "not retained in the sanitized source summary"
+    },
+    "xml_like": {
+      "run_id": "codec-xml-e1",
+      "generation_terminal_counts": {
+        "Submitted": 500
+      },
+      "official_harness": {
+        "resolved": 396,
+        "resolved_rate": 0.792,
+        "completed": 499,
+        "unresolved": 103,
+        "empty_patch": 0,
+        "error": 1,
+        "error_ids": [
+          "sympy__sympy-19040"
+        ],
+        "denominator": 500
+      },
+      "usage": {
+        "response_records": 13364,
+        "prompt_tokens": 212437059,
+        "cached_prompt_tokens": 207616384,
+        "uncached_prompt_tokens": 4820675,
+        "completion_tokens": 3550905,
+        "total_tokens": 215987964,
+        "actual_cost": 553.2235,
+        "all_prompt_uncached_cost": 1798.921812,
+        "fixed_prompt_cache_hit_rate_cost": {
+          "0": 1798.921812,
+          "0.9": 651.761693,
+          "0.95": 588.030576,
+          "0.98": 549.791905,
+          "1": 524.299458
+        }
+      },
+      "duration": "not retained in the sanitized source summary"
+    }
+  },
+  "comparison": {
+    "direction": "xml_like minus json",
+    "resolved_cases": 8,
+    "resolved_rate_percentage_points": 1.6,
+    "prompt_tokens_percent": -14.1,
+    "completion_tokens_percent": -1.6,
+    "total_tokens_percent": -14.0,
+    "actual_cost_percent": -11.7,
+    "cost_per_resolved_percent": -13.5,
+    "fixed_cache_cost_percent": {
+      "0": -13.538109,
+      "0.9": -12.448105,
+      "0.95": -12.260113,
+      "0.98": -12.125906,
+      "1": -12.02529
+    }
+  },
+  "interpretation": {
+    "engineering": "This full-panel result supports keeping XML-like tool-result observations as a validated configurable benchmark capability while retaining JSON for compatibility.",
+    "causal_boundary": "There is one sequential stochastic realization per arm. The result does not establish a model-independent serialization default or estimate run-to-run variance.",
+    "implementation_boundary": "The experiment validates an observation codec. It does not claim that this benchmark introduced or owns the framework-level formatter implementation."
+  },
+  "validation": {
+    "generation_cases_per_arm": 500,
+    "official_harness_used": true,
+    "billing_and_local_token_mismatch_json": 0,
+    "xml_billing_minus_local_total_tokens": 795053,
+    "fixed_cache_recalculation": "prompt*((1-hit)*8+hit*2)/1e6 + completion*28/1e6",
+    "raw_responses_and_patches_committed": false
+  }
+}
