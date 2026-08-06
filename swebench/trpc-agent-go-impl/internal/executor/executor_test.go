@@ -24,6 +24,7 @@ import (
 	"trpc.group/trpc-go/trpc-agent-go-benchmark/swebench/internal/observation"
 	"trpc.group/trpc-go/trpc-agent-go-benchmark/swebench/internal/sweenv"
 	"trpc.group/trpc-go/trpc-agent-go-benchmark/swebench/trpc-agent-go-impl/internal/protocol"
+	"trpc.group/trpc-go/trpc-agent-go/event"
 	"trpc.group/trpc-go/trpc-agent-go/model"
 )
 
@@ -347,12 +348,40 @@ func TestDoneResponseDoesNotWaitForSourceChannelClose(t *testing.T) {
 
 func TestEnvironmentAndEndpointFailuresAreClassified(t *testing.T) {
 	t.Run("environment", func(t *testing.T) {
-		result := Executor{
-			Factory:      fakeFactory{err: errors.New("docker unavailable")},
-			ModelFactory: func(modelconfig.EnvConfig) model.Model { return &scriptedModel{} },
-		}.Execute(context.Background(), contract.Case{InstanceID: "case-a"})
-		if result.Info.ErrorCategory != protocol.ErrorCategoryEnvironment || !result.Info.Retryable {
-			t.Fatalf("result = %+v", result)
+		for _, tc := range []struct {
+			name      string
+			err       error
+			cleanRoom bool
+			retryable bool
+		}{
+			{
+				name:      "online preserves historical retry",
+				err:       errors.New("docker unavailable"),
+				retryable: true,
+			},
+			{
+				name:      "clean-room unmarked deterministic",
+				err:       errors.New("invalid clean-room policy"),
+				cleanRoom: true,
+			},
+			{
+				name:      "clean-room explicit transient",
+				err:       sweenv.MarkStartErrorRetryable(errors.New("docker unavailable")),
+				cleanRoom: true,
+				retryable: true,
+			},
+		} {
+			t.Run(tc.name, func(t *testing.T) {
+				result := Executor{
+					Factory:      fakeFactory{err: tc.err},
+					ModelFactory: func(modelconfig.EnvConfig) model.Model { return &scriptedModel{} },
+					CleanRoom:    tc.cleanRoom,
+				}.Execute(context.Background(), contract.Case{InstanceID: "case-a"})
+				if result.Info.ErrorCategory != protocol.ErrorCategoryEnvironment ||
+					result.Info.Retryable != tc.retryable {
+					t.Fatalf("result = %+v", result)
+				}
+			})
 		}
 	})
 	t.Run("endpoint", func(t *testing.T) {
@@ -458,12 +487,13 @@ func TestEnvironmentFailureDoesNotConstructModel(t *testing.T) {
 			if spec.InstanceID != "case-a" {
 				t.Fatalf("case spec = %#v", spec)
 			}
-			return nil, errors.New("clean-room setup failed")
+			return nil, sweenv.MarkStartErrorRetryable(errors.New("clean-room setup failed"))
 		}},
 		ModelFactory: func(modelconfig.EnvConfig) model.Model {
 			modelFactoryCalls++
 			return &scriptedModel{}
 		},
+		CleanRoom: true,
 	}.Execute(context.Background(), contract.Case{InstanceID: "case-a"})
 
 	if modelFactoryCalls != 0 {
@@ -472,6 +502,58 @@ func TestEnvironmentFailureDoesNotConstructModel(t *testing.T) {
 	if result.Info.ExitStatus != "Error" || result.Info.ErrorCategory != protocol.ErrorCategoryEnvironment ||
 		!result.Info.Retryable {
 		t.Fatalf("result = %+v", result)
+	}
+	if !result.IsRetryableCleanRoomPreStartFailure() {
+		t.Fatalf("result was not recognized as a retryable clean-room pre-start failure: %+v", result)
+	}
+	if result.Info.VerifiedBaseCommit != "" || result.Info.EnvironmentProvenance != nil {
+		t.Fatalf("pre-start failure contains success-only attestations: %+v", result.Info)
+	}
+}
+
+func TestRetryableCleanRoomPreStartFailureRequiresExactShape(t *testing.T) {
+	base := CaseResult{
+		InstanceID: "case-a",
+		Info: CaseInfo{
+			CleanRoom:     true,
+			ExitStatus:    "Error",
+			Error:         "clean-room setup failed",
+			ErrorCategory: protocol.ErrorCategoryEnvironment,
+			Retryable:     true,
+		},
+	}
+	if !base.IsRetryableCleanRoomPreStartFailure() {
+		t.Fatal("exact pre-start failure was not recognized")
+	}
+
+	tests := []struct {
+		name   string
+		change func(*CaseResult)
+	}{
+		{name: "non-retryable", change: func(result *CaseResult) { result.Info.Retryable = false }},
+		{name: "wrong category", change: func(result *CaseResult) { result.Info.ErrorCategory = protocol.ErrorCategoryAgent }},
+		{name: "verified base", change: func(result *CaseResult) { result.Info.VerifiedBaseCommit = "base" }},
+		{name: "provenance", change: func(result *CaseResult) { result.Info.EnvironmentProvenance = &sweenv.Provenance{} }},
+		{name: "model call", change: func(result *CaseResult) { result.LLMCalls = 1 }},
+		{name: "tool call", change: func(result *CaseResult) { result.ToolCalls = 1 }},
+		{name: "response", change: func(result *CaseResult) { result.Responses = []*model.Response{{Done: true}} }},
+		{name: "event", change: func(result *CaseResult) { result.Events = []*event.Event{{}} }},
+		{name: "patch", change: func(result *CaseResult) { result.ModelPatch = "patch" }},
+		{name: "prompt usage", change: func(result *CaseResult) { result.Usage.PromptTokens = 1 }},
+		{name: "cached usage", change: func(result *CaseResult) { result.Usage.PromptTokensDetails.CachedTokens = 1 }},
+		{name: "completion usage", change: func(result *CaseResult) { result.Usage.CompletionTokens = 1 }},
+		{name: "timing usage", change: func(result *CaseResult) {
+			result.Usage.TimingInfo = &model.TimingInfo{FirstTokenDuration: time.Nanosecond}
+		}},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			result := base
+			tc.change(&result)
+			if result.IsRetryableCleanRoomPreStartFailure() {
+				t.Fatalf("non-pre-start result was accepted: %+v", result)
+			}
+		})
 	}
 }
 

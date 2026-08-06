@@ -10,7 +10,10 @@
 // Package sweenv defines the execution boundary for SWE-Bench testbeds.
 package sweenv
 
-import "context"
+import (
+	"context"
+	"errors"
+)
 
 // CommandResult is the stable command result passed between an environment
 // and a model-facing observation codec.
@@ -65,4 +68,27 @@ type Factory interface {
 // lose the expected base commit at the environment boundary.
 type CaseFactory interface {
 	StartCase(ctx context.Context, spec CaseSpec) (Environment, error)
+}
+
+type retryableStartError struct {
+	err error
+}
+
+func (e *retryableStartError) Error() string { return e.err.Error() }
+func (e *retryableStartError) Unwrap() error { return e.err }
+
+// MarkStartErrorRetryable marks a transient CaseFactory startup error without
+// changing the CaseFactory interface or losing the original error chain.
+func MarkStartErrorRetryable(err error) error {
+	if err == nil || IsStartErrorRetryable(err) {
+		return err
+	}
+	return &retryableStartError{err: err}
+}
+
+// IsStartErrorRetryable reports whether a CaseFactory explicitly classified a
+// startup error as transient. Unmarked startup errors fail closed.
+func IsStartErrorRetryable(err error) bool {
+	var retryable *retryableStartError
+	return errors.As(err, &retryable)
 }

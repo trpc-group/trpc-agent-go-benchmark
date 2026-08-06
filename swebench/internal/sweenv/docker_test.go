@@ -11,6 +11,7 @@ package sweenv
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"testing"
 	"time"
@@ -42,6 +43,17 @@ func (timeoutCommander) Run(ctx context.Context, _ []string, _ string, args ...s
 	}
 	<-ctx.Done()
 	return []byte("partial"), ctx.Err()
+}
+
+type failingStartCommander struct {
+	err error
+}
+
+func (c failingStartCommander) Run(_ context.Context, _ []string, _ string, args ...string) ([]byte, error) {
+	if len(args) > 0 && args[0] == "run" {
+		return []byte("daemon temporarily unavailable"), c.err
+	}
+	return nil, errors.New("unexpected command")
 }
 
 func TestImageForInstance(t *testing.T) {
@@ -112,6 +124,38 @@ func TestDockerFactoryUsesGenericContainerNamePrefixByDefault(t *testing.T) {
 	}
 	if len(name) > maxContainerNameLength {
 		t.Fatalf("container name length = %d, want <= %d", len(name), maxContainerNameLength)
+	}
+}
+
+func TestDockerFactoryMarksOnlyCleanRoomContainerStartFailureRetryable(t *testing.T) {
+	want := errors.New("temporary Docker communication failure")
+	instanceID := "repo__repo-1"
+	reference := ImageForInstance(instanceID)
+	factory := DockerFactory{
+		CleanRoom:   true,
+		Commander:   failingStartCommander{err: want},
+		CaseTimeout: time.Hour,
+		ResolvedImages: map[string]ImageIdentity{
+			reference: {Reference: reference, ID: testImageID},
+		},
+	}
+	_, err := factory.StartCase(context.Background(), CaseSpec{
+		InstanceID: instanceID,
+		Repo:       "repo/repo",
+		BaseCommit: strings.Repeat("1", 40),
+	})
+	if err == nil || !IsStartErrorRetryable(err) || !errors.Is(err, want) {
+		t.Fatalf("StartCase error = %v, retryable=%t", err, IsStartErrorRetryable(err))
+	}
+	if !strings.Contains(err.Error(), "start Docker testbed") ||
+		!strings.Contains(err.Error(), "daemon temporarily unavailable") {
+		t.Fatalf("StartCase error = %v", err)
+	}
+
+	online := DockerFactory{Commander: failingStartCommander{err: want}}
+	_, err = online.StartCase(context.Background(), CaseSpec{InstanceID: instanceID})
+	if err == nil || IsStartErrorRetryable(err) {
+		t.Fatalf("online StartCase error = %v, retryable marker=%t", err, IsStartErrorRetryable(err))
 	}
 }
 

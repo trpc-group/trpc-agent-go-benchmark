@@ -74,6 +74,30 @@ type CaseResult struct {
 	Responses       []*model.Response `json:"-"`
 }
 
+// IsRetryableCleanRoomPreStartFailure reports whether the case failed while
+// starting its clean-room environment, before the success-only base and image
+// provenance attestations or any model/tool activity could exist.
+func (r CaseResult) IsRetryableCleanRoomPreStartFailure() bool {
+	return r.Info.CleanRoom &&
+		r.Info.ExitStatus == "Error" &&
+		r.Info.ErrorCategory == protocol.ErrorCategoryEnvironment &&
+		r.Info.Retryable &&
+		strings.TrimSpace(r.Info.Error) != "" &&
+		r.Info.VerifiedBaseCommit == "" &&
+		r.Info.EnvironmentProvenance == nil &&
+		r.ModelPatch == "" &&
+		r.LLMCalls == 0 &&
+		r.ToolCalls == 0 &&
+		r.ResponseCount == 0 &&
+		len(r.Responses) == 0 &&
+		len(r.Events) == 0 &&
+		isZeroUsage(r.Usage)
+}
+
+func isZeroUsage(usage model.Usage) bool {
+	return usage == (model.Usage{})
+}
+
 // Executor owns the per-case model and environment lifecycle.
 type Executor struct {
 	Factory                 sweenv.CaseFactory
@@ -155,7 +179,10 @@ func (e Executor) Execute(ctx context.Context, c contract.Case) (result CaseResu
 		}
 		result.Info.Error = err.Error()
 		result.Info.ErrorCategory = protocol.ErrorCategoryEnvironment
-		result.Info.Retryable = true
+		// Preserve the default runner's historical retry behavior. Clean-room
+		// setup is stricter: only Docker startup failures explicitly marked by
+		// the environment boundary may be retried.
+		result.Info.Retryable = !e.CleanRoom || sweenv.IsStartErrorRetryable(err)
 		return result
 	}
 	defer func() {

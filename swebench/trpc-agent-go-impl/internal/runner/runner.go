@@ -501,7 +501,7 @@ func prepareResume(
 			if err != nil {
 				return nil, nil, nil, fmt.Errorf("cannot validate provenance for existing prediction %s: %w", c.InstanceID, err)
 			}
-			if err := validateResumeResult(c, result, identity); err != nil {
+			if err := validateResumeResultForMode(c, result, identity, redo); err != nil {
 				return nil, nil, nil, err
 			}
 			if !redo {
@@ -603,6 +603,15 @@ func isHexIdentifier(value string, lengths ...int) bool {
 }
 
 func validateResumeResult(c contract.Case, result executor.CaseResult, expected runIdentity) error {
+	return validateResumeResultForMode(c, result, expected, false)
+}
+
+func validateResumeResultForMode(
+	c contract.Case,
+	result executor.CaseResult,
+	expected runIdentity,
+	redo bool,
+) error {
 	instanceID := c.InstanceID
 	if result.InstanceID != instanceID {
 		return fmt.Errorf("existing prediction %s has result instance_id %q", instanceID, result.InstanceID)
@@ -661,29 +670,39 @@ func validateResumeResult(c contract.Case, result executor.CaseResult, expected 
 		}{
 			{"repo", info.Repo, c.Repo},
 			{"base commit", info.BaseCommit, c.BaseCommit},
-			{"verified base commit", info.VerifiedBaseCommit, c.BaseCommit},
 		} {
 			if check.actual != check.expected {
 				return fmt.Errorf("existing prediction %s has %s %q, want %q", instanceID, check.name, check.actual, check.expected)
 			}
 		}
-		if info.EnvironmentProvenance == nil {
-			return fmt.Errorf("existing prediction %s has no environment provenance", instanceID)
-		}
-		wantImage, ok := expected.DockerImages[sweenv.ImageForInstance(instanceID)]
-		if !ok || info.EnvironmentProvenance.Testbed != wantImage {
-			return fmt.Errorf("existing prediction %s has unexpected testbed image provenance", instanceID)
-		}
-		wantAuxiliary, err := expectedAuxiliaryImages(instanceID, expected.DockerImages, wantImage)
-		if err != nil {
-			return fmt.Errorf("existing prediction %s: %w", instanceID, err)
-		}
-		if len(info.EnvironmentProvenance.AuxiliaryImages) != len(wantAuxiliary) {
-			return fmt.Errorf("existing prediction %s has unexpected auxiliary image roles", instanceID)
-		}
-		for role, want := range wantAuxiliary {
-			if actual, ok := info.EnvironmentProvenance.AuxiliaryImages[role]; !ok || actual != want {
-				return fmt.Errorf("existing prediction %s has unexpected %s image provenance", instanceID, role)
+		allowPreStartRetry := redo && result.IsRetryableCleanRoomPreStartFailure()
+		if !allowPreStartRetry {
+			if info.VerifiedBaseCommit != c.BaseCommit {
+				return fmt.Errorf(
+					"existing prediction %s has verified base commit %q, want %q",
+					instanceID,
+					info.VerifiedBaseCommit,
+					c.BaseCommit,
+				)
+			}
+			if info.EnvironmentProvenance == nil {
+				return fmt.Errorf("existing prediction %s has no environment provenance", instanceID)
+			}
+			wantImage, ok := expected.DockerImages[sweenv.ImageForInstance(instanceID)]
+			if !ok || info.EnvironmentProvenance.Testbed != wantImage {
+				return fmt.Errorf("existing prediction %s has unexpected testbed image provenance", instanceID)
+			}
+			wantAuxiliary, err := expectedAuxiliaryImages(instanceID, expected.DockerImages, wantImage)
+			if err != nil {
+				return fmt.Errorf("existing prediction %s: %w", instanceID, err)
+			}
+			if len(info.EnvironmentProvenance.AuxiliaryImages) != len(wantAuxiliary) {
+				return fmt.Errorf("existing prediction %s has unexpected auxiliary image roles", instanceID)
+			}
+			for role, want := range wantAuxiliary {
+				if actual, ok := info.EnvironmentProvenance.AuxiliaryImages[role]; !ok || actual != want {
+					return fmt.Errorf("existing prediction %s has unexpected %s image provenance", instanceID, role)
+				}
 			}
 		}
 	} else if info.VerifiedBaseCommit != "" || info.EnvironmentProvenance != nil {

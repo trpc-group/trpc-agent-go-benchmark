@@ -100,6 +100,7 @@ func runImport(args []string) error {
 	if err != nil {
 		return err
 	}
+	selectionFromPredictions := strings.TrimSpace(*casesPath) == ""
 	cases, err := readCases(*casesPath, preds)
 	if err != nil {
 		return err
@@ -171,7 +172,7 @@ func runImport(args []string) error {
 				}
 				result.TracePath = relPath(*output, tracePath)
 				result.Usage = usage
-				nativeInfo, err = importedNativeInfo(caseRawDir, c)
+				nativeInfo, err = importedNativeInfo(caseRawDir, c, selectionFromPredictions)
 				if err != nil {
 					return fmt.Errorf("import native provenance for %s: %w", c.InstanceID, err)
 				}
@@ -193,13 +194,19 @@ func runImport(args []string) error {
 			Target:        *target,
 			Result:        result,
 		}
-		if nativeInfo != nil && nativeInfo.CleanRoom {
-			row.VerifiedBaseCommit = nativeInfo.VerifiedBaseCommit
-			row.CleanRoom = true
-			row.CleanRoomPolicySHA256 = nativeInfo.CleanRoomPolicySHA256
-			row.OfflineAssetsSHA256 = nativeInfo.OfflineAssetsSHA256
-			row.ImageSetSHA256 = nativeInfo.ImageSetSHA256
-			row.EnvironmentProvenance = cloneEnvironmentProvenance(nativeInfo.EnvironmentProvenance)
+		if nativeInfo != nil {
+			if selectionFromPredictions {
+				row.Repo = nativeInfo.Repo
+				row.BaseCommit = nativeInfo.BaseCommit
+			}
+			if nativeInfo.CleanRoom {
+				row.VerifiedBaseCommit = nativeInfo.VerifiedBaseCommit
+				row.CleanRoom = true
+				row.CleanRoomPolicySHA256 = nativeInfo.CleanRoomPolicySHA256
+				row.OfflineAssetsSHA256 = nativeInfo.OfflineAssetsSHA256
+				row.ImageSetSHA256 = nativeInfo.ImageSetSHA256
+				row.EnvironmentProvenance = cloneEnvironmentProvenance(nativeInfo.EnvironmentProvenance)
+			}
 		}
 		data, err := json.Marshal(row)
 		if err != nil {
@@ -839,7 +846,11 @@ func cloneEnvironmentProvenance(provenance *sweenv.Provenance) *sweenv.Provenanc
 	return &cloned
 }
 
-func importedNativeInfo(rawDir string, c contract.Case) (*nativeInfoEnvelope, error) {
+func importedNativeInfo(
+	rawDir string,
+	c contract.Case,
+	allowTraceCaseMetadata bool,
+) (*nativeInfoEnvelope, error) {
 	source, err := traceSourcePath(rawDir, c.InstanceID)
 	if err != nil {
 		return nil, err
@@ -854,6 +865,28 @@ func importedNativeInfo(rawDir string, c contract.Case) (*nativeInfoEnvelope, er
 	trace, err := parseNativeTraceEnvelope(data, c.InstanceID)
 	if err != nil {
 		return nil, err
+	}
+	if allowTraceCaseMetadata {
+		repoProvided := trace.Info.Repo != ""
+		baseCommitProvided := trace.Info.BaseCommit != ""
+		if !trace.Info.CleanRoom && !repoProvided && !baseCommitProvided {
+			return &trace.Info, nil
+		}
+		if repoProvided != baseCommitProvided {
+			return nil, fmt.Errorf(
+				"prediction-defined native import must provide trace info.repo and info.base_commit together",
+			)
+		}
+		if strings.TrimSpace(trace.Info.Repo) == "" {
+			return nil, fmt.Errorf("prediction-defined native import requires non-empty trace info.repo")
+		}
+		if !isHexIdentifier(trace.Info.BaseCommit, 40) {
+			return nil, fmt.Errorf(
+				"prediction-defined native import requires 40-hex trace info.base_commit, got %q",
+				trace.Info.BaseCommit,
+			)
+		}
+		return &trace.Info, nil
 	}
 	if !trace.Info.CleanRoom {
 		return &trace.Info, nil

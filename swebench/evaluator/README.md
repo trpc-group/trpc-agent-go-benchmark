@@ -38,6 +38,11 @@ source code.
   the source path, snapshot path, exact-byte SHA-256, and harness `-p` argument.
 - `import` writes schema version 1 with one explicit target and result per row;
   filtered or sliced runs can omit `--cases` so prediction IDs define the rows.
+  Clean-room Native traces must supply the selected case repository and base
+  commit; newer default-off traces may supply the same pair, while legacy
+  default-off traces may omit both. `run-config` binds any supplied values, or
+  the legacy row's selection identity, to the full prepared cases manifest, so
+  no synthetic subset case file is needed.
 - `run-config` accepts exactly one of `--run-mini-manifest`,
   `--runner-manifest`, or `--shards-manifest`, preserves the full prepared panel
   under `dataset`, records the actual prediction-backed run under `selection`,

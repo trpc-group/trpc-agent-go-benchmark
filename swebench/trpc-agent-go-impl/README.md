@@ -39,9 +39,14 @@ go run ./trpc-agent-go-impl \
 skipping instance IDs already present in `preds.json` only after the complete
 per-case bundle matches the run ID, source/binary, model/environment/cases,
 codec, timeout, worker-count, and selected-case fingerprints. Pass
-`--redo-existing` to rerun a matching bundle. Model configuration supports arbitrary
-OpenAI-compatible HTTP headers through the shared `modelconfig.HTTPHeaders`
-normalization.
+`--redo-existing` to rerun a matching bundle. In clean-room mode, that flag may
+also rerun a complete retryable environment failure produced before a successful
+`StartCase`, when the success-only verified-base and image-provenance
+attestations cannot yet exist. The immutable run identity and all available
+bundle fingerprints must still match; without the flag, or for any other
+missing or mismatched attestation, resume remains fail-closed. Model
+configuration supports arbitrary OpenAI-compatible HTTP headers through the
+shared `modelconfig.HTTPHeaders` normalization.
 
 Case bundles created before the worker-count and response-artifact fingerprints
 were added are rejected during resume. Keep them as historical evidence and use

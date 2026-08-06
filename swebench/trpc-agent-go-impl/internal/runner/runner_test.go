@@ -17,6 +17,7 @@ import (
 	"runtime/debug"
 	"strings"
 	"testing"
+	"time"
 
 	"trpc.group/trpc-go/trpc-agent-go-benchmark/swebench/internal/artifact"
 	"trpc.group/trpc-go/trpc-agent-go-benchmark/swebench/internal/contract"
@@ -64,6 +65,132 @@ func TestPrepareResumeRedoRemovesOnlySelectedPrediction(t *testing.T) {
 	}
 	if _, ok := preds["case-a"]; ok || !reflect.DeepEqual(pending, selected) || len(skipped) != 0 {
 		t.Fatalf("preds=%#v pending=%#v skipped=%#v", preds, pending, skipped)
+	}
+}
+
+func TestPrepareResumeCleanRoomPreStartFailureRequiresRedo(t *testing.T) {
+	selectedCase := contract.Case{
+		InstanceID: "org__repo-123",
+		Repo:       "org/repo",
+		BaseCommit: strings.Repeat("1", 40),
+	}
+	selected := []contract.Case{selectedCase}
+	identity := testCleanRoomIdentity(t, true, selectedCase.InstanceID)
+
+	for _, tc := range []struct {
+		name string
+		redo bool
+	}{
+		{name: "ordinary resume rejects missing success attestations", redo: false},
+		{name: "explicit redo accepts retryable pre-start failure", redo: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			output := t.TempDir()
+			path := filepath.Join(output, "preds.json")
+			if err := artifact.WriteJSON(path, map[string]contract.Prediction{
+				selectedCase.InstanceID: {InstanceID: selectedCase.InstanceID},
+			}); err != nil {
+				t.Fatal(err)
+			}
+			writeRetryablePreStartBundle(t, output, selectedCase, identity)
+
+			preds, pending, skipped, err := prepareResume(output, path, selected, tc.redo, identity)
+			if !tc.redo {
+				if err == nil || !strings.Contains(err.Error(), "verified base commit") {
+					t.Fatalf("error = %v", err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(preds) != 0 || !reflect.DeepEqual(pending, selected) || len(skipped) != 0 {
+				t.Fatalf("preds=%#v pending=%#v skipped=%#v", preds, pending, skipped)
+			}
+		})
+	}
+}
+
+func TestPrepareResumeRedoPreStartExceptionRemainsFailClosed(t *testing.T) {
+	selectedCase := contract.Case{
+		InstanceID: "org__repo-123",
+		Repo:       "org/repo",
+		BaseCommit: strings.Repeat("1", 40),
+	}
+	identity := testCleanRoomIdentity(t, true, selectedCase.InstanceID)
+	tests := []struct {
+		name      string
+		change    func(*executor.CaseResult)
+		wantError string
+	}{
+		{
+			name: "immutable identity mismatch",
+			change: func(result *executor.CaseResult) {
+				result.Info.ModelConfigSHA256 = strings.Repeat("9", 64)
+			},
+			wantError: "model config hash",
+		},
+		{
+			name: "non-retryable environment failure",
+			change: func(result *executor.CaseResult) {
+				result.Info.Retryable = false
+			},
+			wantError: "verified base commit",
+		},
+		{
+			name: "model activity is not pre-start",
+			change: func(result *executor.CaseResult) {
+				result.LLMCalls = 1
+			},
+			wantError: "verified base commit",
+		},
+		{
+			name: "prompt usage is not pre-start",
+			change: func(result *executor.CaseResult) {
+				result.Usage.PromptTokens = 1
+			},
+			wantError: "verified base commit",
+		},
+		{
+			name: "cached usage is not pre-start",
+			change: func(result *executor.CaseResult) {
+				result.Usage.PromptTokensDetails.CachedTokens = 1
+			},
+			wantError: "verified base commit",
+		},
+		{
+			name: "timing usage is not pre-start",
+			change: func(result *executor.CaseResult) {
+				result.Usage.TimingInfo = &model.TimingInfo{FirstTokenDuration: time.Nanosecond}
+			},
+			wantError: "verified base commit",
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			output := t.TempDir()
+			path := filepath.Join(output, "preds.json")
+			if err := artifact.WriteJSON(path, map[string]contract.Prediction{
+				selectedCase.InstanceID: {InstanceID: selectedCase.InstanceID},
+			}); err != nil {
+				t.Fatal(err)
+			}
+			result := retryablePreStartResult(t, selectedCase, identity)
+			tc.change(&result)
+			if err := writeCaseBundle(output, &result, artifact.WriteJSON); err != nil {
+				t.Fatal(err)
+			}
+
+			if _, _, _, err := prepareResume(
+				output,
+				path,
+				[]contract.Case{selectedCase},
+				true,
+				identity,
+			); err == nil || !strings.Contains(err.Error(), tc.wantError) {
+				t.Fatalf("error = %v, want substring %q", err, tc.wantError)
+			}
+		})
 	}
 }
 
@@ -370,6 +497,35 @@ func writeResumeBundleForCase(
 	if err := writeCaseBundle(output, &result, artifact.WriteJSON); err != nil {
 		t.Fatal(err)
 	}
+}
+
+func writeRetryablePreStartBundle(
+	t *testing.T,
+	output string,
+	selectedCase contract.Case,
+	identity runIdentity,
+) {
+	t.Helper()
+	result := retryablePreStartResult(t, selectedCase, identity)
+	if err := writeCaseBundle(output, &result, artifact.WriteJSON); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func retryablePreStartResult(
+	t *testing.T,
+	selectedCase contract.Case,
+	identity runIdentity,
+) executor.CaseResult {
+	t.Helper()
+	result := resumeCaseResult(t, selectedCase, "", identity)
+	result.Info.ExitStatus = "Error"
+	result.Info.Error = "clean-room setup failed"
+	result.Info.ErrorCategory = protocol.ErrorCategoryEnvironment
+	result.Info.Retryable = true
+	result.Info.VerifiedBaseCommit = ""
+	result.Info.EnvironmentProvenance = nil
+	return result
 }
 
 func resumeCaseResult(

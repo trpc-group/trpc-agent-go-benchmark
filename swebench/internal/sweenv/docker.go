@@ -140,7 +140,15 @@ func (f DockerFactory) start(ctx context.Context, spec CaseSpec) (Environment, e
 	args = append(args, "-w", "/testbed", image, "sleep", strconv.Itoa(int(caseTimeout.Seconds())+60))
 	out, err := commander.Run(ctx, dockerEnv(f.DockerHost), "docker", args...)
 	if err != nil {
-		return nil, fmt.Errorf("start Docker testbed: %w: %s", err, strings.TrimSpace(string(out)))
+		startErr := fmt.Errorf(
+			"start Docker testbed: %w: %s",
+			err,
+			strings.TrimSpace(string(out)),
+		)
+		if f.CleanRoom {
+			return nil, MarkStartErrorRetryable(startErr)
+		}
+		return nil, startErr
 	}
 	environment := &dockerEnvironment{
 		name:           name,

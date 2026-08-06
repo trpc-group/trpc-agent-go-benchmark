@@ -253,6 +253,9 @@ func TestRunImportReadsNativeTraceUsageAndRedactsSecrets(t *testing.T) {
 		t.Fatal(err)
 	}
 	nativeArtifact := validNativeArtifact()
+	nativeInfo := nativeArtifact["info"].(map[string]any)
+	nativeInfo["repo"] = "owner/repo"
+	nativeInfo["base_commit"] = strings.Repeat("a", 40)
 	nativeArtifact["llm_calls"] = 3
 	usage := nativeArtifact["usage"].(map[string]any)
 	usage["prompt_tokens"] = 100
@@ -316,6 +319,114 @@ func TestRunImportReadsNativeTraceUsageAndRedactsSecrets(t *testing.T) {
 	}
 	if row.CleanRoom || row.EnvironmentProvenance != nil {
 		t.Fatalf("legacy default-off native trace gained clean-room provenance: %+v", row)
+	}
+	if row.Repo != "owner/repo" || row.BaseCommit != strings.Repeat("a", 40) {
+		t.Fatalf("default-off native trace metadata was not imported: %+v", row)
+	}
+}
+
+func TestImportedNativeInfoValidatesPredictionDefinedTraceMetadata(t *testing.T) {
+	validBaseCommit := strings.Repeat("a", 40)
+	for _, tt := range []struct {
+		name      string
+		cleanRoom bool
+		edit      func(map[string]any)
+		wantRepo  string
+		wantBase  string
+		wantErr   string
+	}{
+		{name: "default-off legacy empty metadata"},
+		{
+			name: "default-off paired metadata",
+			edit: func(info map[string]any) {
+				info["repo"] = "owner/repo"
+				info["base_commit"] = validBaseCommit
+			},
+			wantRepo: "owner/repo",
+			wantBase: validBaseCommit,
+		},
+		{
+			name: "default-off repo only",
+			edit: func(info map[string]any) {
+				info["repo"] = "owner/repo"
+			},
+			wantErr: "info.repo and info.base_commit together",
+		},
+		{
+			name: "default-off base only",
+			edit: func(info map[string]any) {
+				info["base_commit"] = validBaseCommit
+			},
+			wantErr: "info.repo and info.base_commit together",
+		},
+		{
+			name: "default-off invalid base commit",
+			edit: func(info map[string]any) {
+				info["repo"] = "owner/repo"
+				info["base_commit"] = "abc"
+			},
+			wantErr: "40-hex trace info.base_commit",
+		},
+		{
+			name: "default-off blank repo",
+			edit: func(info map[string]any) {
+				info["repo"] = "   "
+				info["base_commit"] = validBaseCommit
+			},
+			wantErr: "non-empty trace info.repo",
+		},
+		{
+			name:      "clean-room missing repo",
+			cleanRoom: true,
+			edit: func(info map[string]any) {
+				delete(info, "repo")
+			},
+			wantErr: "required field info.repo",
+		},
+		{
+			name:      "clean-room invalid base commit",
+			cleanRoom: true,
+			edit: func(info map[string]any) {
+				info["base_commit"] = "abc"
+			},
+			wantErr: "invalid info.base_commit",
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			rawDir := t.TempDir()
+			caseDir := filepath.Join(rawDir, "case-a")
+			if err := os.MkdirAll(caseDir, 0o755); err != nil {
+				t.Fatal(err)
+			}
+			artifact := validNativeArtifact()
+			if tt.cleanRoom {
+				artifact, _, _ = cleanRoomNativeArtifact(t, "case-a", "owner/repo", validBaseCommit)
+			}
+			info := artifact["info"].(map[string]any)
+			if tt.edit != nil {
+				tt.edit(info)
+			}
+			if err := os.WriteFile(
+				filepath.Join(caseDir, "case-a.native.json"),
+				marshalJSONObject(t, artifact),
+				0o600,
+			); err != nil {
+				t.Fatal(err)
+			}
+			got, err := importedNativeInfo(rawDir, contract.Case{InstanceID: "case-a"}, true)
+			if tt.wantErr != "" {
+				if err == nil || !strings.Contains(err.Error(), tt.wantErr) {
+					t.Fatalf("importedNativeInfo() error = %v, want %q", err, tt.wantErr)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("importedNativeInfo() error = %v", err)
+			}
+			if got.Repo != tt.wantRepo || got.BaseCommit != tt.wantBase {
+				t.Fatalf("importedNativeInfo() = %+v, want repo/base %q/%q", got, tt.wantRepo, tt.wantBase)
+			}
+		})
 	}
 }
 

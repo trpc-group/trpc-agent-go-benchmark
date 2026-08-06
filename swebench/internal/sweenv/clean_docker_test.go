@@ -204,16 +204,16 @@ func TestDockerFactoryStartCaseKeepsNonCleanDefaultBehavior(t *testing.T) {
 func TestDockerFactoryCleanRoomRequiresCaseIdentity(t *testing.T) {
 	factory := DockerFactory{CleanRoom: true, Commander: &cleanRoomDockerCommander{}}
 	if _, err := factory.Start(context.Background(), "repo__repo-1"); err == nil ||
-		!strings.Contains(err.Error(), "requires StartCase") {
+		!strings.Contains(err.Error(), "requires StartCase") || IsStartErrorRetryable(err) {
 		t.Fatalf("Start error = %v", err)
 	}
 	if _, err := factory.StartCase(context.Background(), CaseSpec{InstanceID: "repo__repo-1"}); err == nil ||
-		!strings.Contains(err.Error(), "repo") {
+		!strings.Contains(err.Error(), "repo") || IsStartErrorRetryable(err) {
 		t.Fatalf("StartCase error = %v", err)
 	}
 	if _, err := factory.StartCase(context.Background(), CaseSpec{
 		InstanceID: "repo__repo-1", Repo: "repo/repo",
-	}); err == nil || !strings.Contains(err.Error(), "base commit") {
+	}); err == nil || !strings.Contains(err.Error(), "base commit") || IsStartErrorRetryable(err) {
 		t.Fatalf("StartCase base error = %v", err)
 	}
 	reference := ImageForInstance("repo__repo-1")
@@ -222,8 +222,30 @@ func TestDockerFactoryCleanRoomRequiresCaseIdentity(t *testing.T) {
 	}
 	if _, err := factory.StartCase(context.Background(), CaseSpec{
 		InstanceID: "repo__repo-1", Repo: "repo/repo", BaseCommit: strings.Repeat("1", 40),
-	}); err == nil || !strings.Contains(err.Error(), "identity") {
+	}); err == nil || !strings.Contains(err.Error(), "identity") || IsStartErrorRetryable(err) {
 		t.Fatalf("invalid resolved image error = %v", err)
+	}
+}
+
+func TestDockerFactoryCleanRoomGitFailureIsNotRetryable(t *testing.T) {
+	commander := &cleanRoomDockerCommander{failExec: true}
+	instanceID := "repo__repo-1"
+	reference := ImageForInstance(instanceID)
+	factory := DockerFactory{
+		CleanRoom: true,
+		Commander: commander,
+		ResolvedImages: map[string]ImageIdentity{
+			reference: {Reference: reference, ID: testImageID},
+		},
+	}
+	_, err := factory.StartCase(context.Background(), CaseSpec{
+		InstanceID: instanceID,
+		Repo:       "repo/repo",
+		BaseCommit: strings.Repeat("1", 40),
+	})
+	if err == nil || !strings.Contains(err.Error(), "sanitize testbed Git history") ||
+		IsStartErrorRetryable(err) {
+		t.Fatalf("StartCase error = %v, retryable=%t", err, IsStartErrorRetryable(err))
 	}
 }
 
@@ -241,7 +263,7 @@ func TestDockerFactoryCleanRoomSetupFailureCleansContainer(t *testing.T) {
 	_, err := factory.StartCase(context.Background(), CaseSpec{
 		InstanceID: instanceID, Repo: "repo/repo", BaseCommit: strings.Repeat("1", 40),
 	})
-	if err == nil || !strings.Contains(err.Error(), "uses image") {
+	if err == nil || !strings.Contains(err.Error(), "uses image") || IsStartErrorRetryable(err) {
 		t.Fatalf("StartCase error = %v", err)
 	}
 	if len(commander.commands) != 3 || strings.Join(commander.commands[2].args, " ") !=
@@ -443,7 +465,8 @@ func TestDockerFactoryCopiedOfflineAssetChecksumMismatchFailsClosed(t *testing.T
 				Repo:       "psf/requests",
 				BaseCommit: strings.Repeat("2", 40),
 			})
-			if err == nil || !strings.Contains(err.Error(), "checksum mismatch") {
+			if err == nil || !strings.Contains(err.Error(), "checksum mismatch") ||
+				IsStartErrorRetryable(err) {
 				t.Fatalf("StartCase error = %v", err)
 			}
 			for _, forbidden := range test.forbiddenCommands {
