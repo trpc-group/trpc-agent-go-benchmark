@@ -43,6 +43,11 @@ source code.
   default-off traces may omit both. `run-config` binds any supplied values, or
   the legacy row's selection identity, to the full prepared cases manifest, so
   no synthetic subset case file is needed.
+- Native import validates and projects the opt-in exact tool-loop warning
+  setting and its per-case count, first receiving model-call number, and ordered
+  call-number list. Legacy Native artifacts that omit these fields are read as
+  `tool_loop_warning=false` with zero events. Any warning telemetry attached to
+  a disabled trace is rejected.
 - `run-config` accepts exactly one of `--run-mini-manifest`,
   `--runner-manifest`, or `--shards-manifest`, preserves the full prepared panel
   under `dataset`, records the actual prediction-backed run under `selection`,
@@ -52,7 +57,10 @@ source code.
   verify command run ID, and report digest before accepting per-case outcomes.
   Native finalization additionally requires the current runner predictions to
   match the verify-time snapshot digest. Legacy Mini manifests may omit this
-  newer attestation.
+  newer attestation. For Native runs it also binds the warning setting to each
+  raw trace and verifies that normalized per-case telemetry, runner totals, and
+  shard aggregates agree. The setting is part of shard identity; mixed enabled
+  and disabled shards cannot be merged.
 - `summarize-shards` accepts external mini-SWE-agent, Mini-Go, and Native runner
   manifests while applying the same fixed-plan coverage checks. For clean-room
   Native shards, it also requires one consistent policy and offline asset-tree

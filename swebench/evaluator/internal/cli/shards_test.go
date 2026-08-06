@@ -233,6 +233,59 @@ func TestNativeCleanRoomIdentityRequiresProtocolAndUpstreamCommit(t *testing.T) 
 	}
 }
 
+func TestValidateNativeAgentProtocolBindsToolLoopWarning(t *testing.T) {
+	tests := []struct {
+		name            string
+		protocol        string
+		cleanRoom       bool
+		toolLoopWarning bool
+		wantError       bool
+	}{
+		{name: "legacy default", protocol: "mini-swe-agent-v2.1-on-trpc-agent-go"},
+		{name: "warning", protocol: "mini-swe-agent-v2.1-on-trpc-agent-go+tool-loop-warning-v1", toolLoopWarning: true},
+		{name: "clean warning", protocol: "mini-swe-agent-v2.1-on-trpc-agent-go+clean-room-v1+tool-loop-warning-v1", cleanRoom: true, toolLoopWarning: true},
+		{name: "missing warning suffix", protocol: "mini-swe-agent-v2.1-on-trpc-agent-go", toolLoopWarning: true, wantError: true},
+		{name: "unexpected warning suffix", protocol: "mini-swe-agent-v2.1-on-trpc-agent-go+tool-loop-warning-v1", wantError: true},
+		{name: "wrong suffix order", protocol: "mini-swe-agent-v2.1-on-trpc-agent-go+tool-loop-warning-v1+clean-room-v1", cleanRoom: true, toolLoopWarning: true, wantError: true},
+		{name: "duplicate clean suffix enabled", protocol: "mini-swe-agent-v2.1-on-trpc-agent-go+clean-room-v1+clean-room-v1", cleanRoom: true, wantError: true},
+		{name: "duplicate clean suffix disabled", protocol: "mini-swe-agent-v2.1-on-trpc-agent-go+clean-room-v1+clean-room-v1", wantError: true},
+		{name: "duplicate warning suffix", protocol: "mini-swe-agent-v2.1-on-trpc-agent-go+tool-loop-warning-v1+tool-loop-warning-v1", toolLoopWarning: true, wantError: true},
+		{name: "duplicate warning suffix disabled", protocol: "mini-swe-agent-v2.1-on-trpc-agent-go+tool-loop-warning-v1+tool-loop-warning-v1", wantError: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validateNativeAgentProtocol(tt.protocol, tt.cleanRoom, tt.toolLoopWarning)
+			if (err != nil) != tt.wantError {
+				t.Fatalf("validateNativeAgentProtocol() error = %v, wantError=%t", err, tt.wantError)
+			}
+		})
+	}
+}
+
+func TestValidateToolLoopWarningManifest(t *testing.T) {
+	for _, tt := range []struct {
+		name                string
+		enabled             bool
+		count, cases, total int
+		wantError           bool
+	}{
+		{name: "legacy missing fields", total: 500},
+		{name: "enabled no events", enabled: true, total: 500},
+		{name: "enabled events", enabled: true, count: 3, cases: 2, total: 500},
+		{name: "disabled telemetry", count: 1, cases: 1, total: 500, wantError: true},
+		{name: "negative", enabled: true, count: -1, total: 500, wantError: true},
+		{name: "zero mismatch", enabled: true, count: 1, total: 500, wantError: true},
+		{name: "too many cases", enabled: true, count: 2, cases: 2, total: 1, wantError: true},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validateToolLoopWarningManifest("test manifest", tt.enabled, tt.count, tt.cases, tt.total)
+			if (err != nil) != tt.wantError {
+				t.Fatalf("validateToolLoopWarningManifest() error = %v, wantError=%t", err, tt.wantError)
+			}
+		})
+	}
+}
+
 func TestSummarizeShardPlanAcceptsCaseLevelResults(t *testing.T) {
 	dir := t.TempDir()
 	plan := testBatchPlan([]batchPlanItem{

@@ -44,6 +44,7 @@ type runIdentity struct {
 	CaseTimeout             string
 	SelectedInstancesSHA256 string
 	CleanRoom               bool
+	ToolLoopWarning         bool
 	CleanRoomPolicySHA256   string
 	OfflineAssetsSHA256     string
 	ImageSetSHA256          string

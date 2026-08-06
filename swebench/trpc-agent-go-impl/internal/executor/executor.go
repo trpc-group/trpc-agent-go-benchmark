@@ -45,6 +45,7 @@ type CaseInfo struct {
 	CaseTimeout             string             `json:"case_timeout,omitempty"`
 	SelectedInstancesSHA256 string             `json:"selected_instances_sha256,omitempty"`
 	CleanRoom               bool               `json:"clean_room"`
+	ToolLoopWarning         bool               `json:"tool_loop_warning"`
 	CleanRoomPolicySHA256   string             `json:"clean_room_policy_sha256,omitempty"`
 	OfflineAssetsSHA256     string             `json:"offline_assets_sha256,omitempty"`
 	ImageSetSHA256          string             `json:"image_set_sha256,omitempty"`
@@ -61,17 +62,20 @@ type CaseInfo struct {
 
 // CaseResult is the framework-native result artifact for one instance.
 type CaseResult struct {
-	InstanceID      string            `json:"instance_id"`
-	Info            CaseInfo          `json:"info"`
-	ModelPatch      string            `json:"model_patch"`
-	DurationMS      int64             `json:"duration_ms"`
-	LLMCalls        int               `json:"llm_calls"`
-	ToolCalls       int               `json:"tool_calls"`
-	Usage           model.Usage       `json:"usage"`
-	Events          []*event.Event    `json:"events,omitempty"`
-	ResponseCount   int               `json:"response_count"`
-	ResponsesSHA256 string            `json:"responses_sha256"`
-	Responses       []*model.Response `json:"-"`
+	InstanceID                  string            `json:"instance_id"`
+	Info                        CaseInfo          `json:"info"`
+	ModelPatch                  string            `json:"model_patch"`
+	DurationMS                  int64             `json:"duration_ms"`
+	LLMCalls                    int               `json:"llm_calls"`
+	ToolCalls                   int               `json:"tool_calls"`
+	ToolLoopWarningCount        int               `json:"tool_loop_warning_count"`
+	FirstToolLoopWarningLLMCall *int              `json:"first_tool_loop_warning_llm_call"`
+	ToolLoopWarningLLMCalls     []int             `json:"tool_loop_warning_llm_calls"`
+	Usage                       model.Usage       `json:"usage"`
+	Events                      []*event.Event    `json:"events,omitempty"`
+	ResponseCount               int               `json:"response_count"`
+	ResponsesSHA256             string            `json:"responses_sha256"`
+	Responses                   []*model.Response `json:"-"`
 }
 
 // IsRetryableCleanRoomPreStartFailure reports whether the case failed while
@@ -88,6 +92,9 @@ func (r CaseResult) IsRetryableCleanRoomPreStartFailure() bool {
 		r.ModelPatch == "" &&
 		r.LLMCalls == 0 &&
 		r.ToolCalls == 0 &&
+		r.ToolLoopWarningCount == 0 &&
+		r.FirstToolLoopWarningLLMCall == nil &&
+		len(r.ToolLoopWarningLLMCalls) == 0 &&
 		r.ResponseCount == 0 &&
 		len(r.Responses) == 0 &&
 		len(r.Events) == 0 &&
@@ -114,6 +121,7 @@ type Executor struct {
 	CaseTimeout             time.Duration
 	SelectedInstancesSHA256 string
 	CleanRoom               bool
+	ToolLoopWarning         bool
 	CleanRoomPolicySHA256   string
 	OfflineAssetsSHA256     string
 	ImageSetSHA256          string
@@ -127,6 +135,11 @@ type Executor struct {
 func (e Executor) Execute(ctx context.Context, c contract.Case) (result CaseResult) {
 	started := time.Now()
 	result.InstanceID = c.InstanceID
+	// New artifacts always encode an explicit array, including failures that
+	// happen before agent state exists. This keeps warning-on artifacts valid at
+	// both the resume and evaluator boundaries while legacy warning-off artifacts
+	// remain readable.
+	result.ToolLoopWarningLLMCalls = []int{}
 	result.Info = CaseInfo{
 		RunID:                   e.RunID,
 		ObservationCodec:        string(e.ObservationCodec),
@@ -140,6 +153,7 @@ func (e Executor) Execute(ctx context.Context, c contract.Case) (result CaseResu
 		CaseTimeout:             e.CaseTimeout.String(),
 		SelectedInstancesSHA256: e.SelectedInstancesSHA256,
 		CleanRoom:               e.CleanRoom,
+		ToolLoopWarning:         e.ToolLoopWarning,
 		CleanRoomPolicySHA256:   e.CleanRoomPolicySHA256,
 		OfflineAssetsSHA256:     e.OfflineAssetsSHA256,
 		ImageSetSHA256:          e.ImageSetSHA256,
@@ -228,7 +242,14 @@ func (e Executor) Execute(ctx context.Context, c contract.Case) (result CaseResu
 	}
 	modelImpl = validatedNonStreamingModel{Model: modelImpl}
 	state := &tagagent.State{}
-	agentImpl := tagagent.New(modelImpl, environment, e.ObservationCodec, generationConfig(e.ModelConfig), state, e.CleanRoom)
+	agentImpl := tagagent.New(
+		modelImpl,
+		environment,
+		e.ObservationCodec,
+		generationConfig(e.ModelConfig),
+		state,
+		tagagent.Config{CleanRoom: e.CleanRoom, ToolLoopWarning: e.ToolLoopWarning},
+	)
 	run := tagrunner.NewRunner("swebench", agentImpl)
 	defer run.Close()
 
@@ -326,6 +347,13 @@ func applySnapshot(result *CaseResult, snapshot tagagent.Snapshot) {
 	result.ModelPatch = snapshot.Submission
 	result.LLMCalls = snapshot.LLMCalls
 	result.ToolCalls = snapshot.ToolCalls
+	result.ToolLoopWarningCount = snapshot.ToolLoopWarningCount
+	result.FirstToolLoopWarningLLMCall = nil
+	if snapshot.ToolLoopWarningCount > 0 {
+		firstCall := snapshot.FirstToolLoopWarningLLMCall
+		result.FirstToolLoopWarningLLMCall = &firstCall
+	}
+	result.ToolLoopWarningLLMCalls = append([]int{}, snapshot.ToolLoopWarningLLMCalls...)
 	result.Usage = snapshot.Usage
 	result.Responses = snapshot.Responses
 }

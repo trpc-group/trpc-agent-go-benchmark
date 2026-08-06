@@ -17,7 +17,9 @@ the native `llmagent` runner.
 The native TAG lane applies the same pinned model-facing protocol through the
 public tRPC-Agent-Go lifecycle (`llmagent.New`, `runner.NewRunner`, and
 `runner.Run`). Its default tool set contains only `bash`; repository retrieval
-and loop-warning instrumentation are deliberately outside this layer.
+is deliberately outside this layer. Exact repeated tool-use/result warning is
+available only as explicit, default-off benchmark instrumentation; it is not a
+tRPC-Agent-Go framework default.
 
 ## Scope
 
@@ -33,6 +35,9 @@ The committed core includes:
 - an opt-in clean-room protocol with network-none generation, recursive Git
   sanitation, closed-world offline assets, immutable local image identities,
   and a model-free preflight;
+- opt-in exact tool-loop warning telemetry plus an offline shadow-replay tool
+  that applies the same detector to current Native and frozen V12 TAG
+  warning-off trajectories;
 - the unmodified upstream local harness invocation;
 - batch planning, resumable shard inspection, and deterministic prediction
   merging.

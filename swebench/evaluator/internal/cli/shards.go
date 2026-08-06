@@ -26,25 +26,45 @@ import (
 )
 
 type shardsManifest struct {
-	GeneratedAt          time.Time           `json:"generated_at"`
-	PlanPath             string              `json:"plan_path"`
-	RunsRoot             string              `json:"runs_root"`
-	RawSubdir            string              `json:"raw_subdir"`
-	ExpectedCases        int                 `json:"expected_cases"`
-	AcceptedCases        int                 `json:"accepted_cases"`
-	MissingCases         int                 `json:"missing_cases"`
-	InvalidCases         int                 `json:"invalid_cases"`
-	DuplicateCases       int                 `json:"duplicate_cases"`
-	MissingIDs           []string            `json:"missing_ids"`
-	InvalidIDs           []string            `json:"invalid_ids"`
-	DuplicateIDs         []string            `json:"duplicate_ids"`
-	StartedAt            string              `json:"started_at,omitempty"`
-	FinishedAt           string              `json:"finished_at,omitempty"`
-	WallDurationMS       int64               `json:"wall_duration_ms,omitempty"`
-	CumulativeDurationMS int64               `json:"cumulative_duration_ms"`
-	ExitStatusCounts     map[string]int      `json:"exit_status_counts"`
-	RunnerIdentity       shardRunnerIdentity `json:"runner_identity"`
-	Shards               []shardSummary      `json:"shards"`
+	GeneratedAt              time.Time           `json:"generated_at"`
+	PlanPath                 string              `json:"plan_path"`
+	RunsRoot                 string              `json:"runs_root"`
+	RawSubdir                string              `json:"raw_subdir"`
+	ExpectedCases            int                 `json:"expected_cases"`
+	AcceptedCases            int                 `json:"accepted_cases"`
+	MissingCases             int                 `json:"missing_cases"`
+	InvalidCases             int                 `json:"invalid_cases"`
+	DuplicateCases           int                 `json:"duplicate_cases"`
+	MissingIDs               []string            `json:"missing_ids"`
+	InvalidIDs               []string            `json:"invalid_ids"`
+	DuplicateIDs             []string            `json:"duplicate_ids"`
+	StartedAt                string              `json:"started_at,omitempty"`
+	FinishedAt               string              `json:"finished_at,omitempty"`
+	WallDurationMS           int64               `json:"wall_duration_ms,omitempty"`
+	CumulativeDurationMS     int64               `json:"cumulative_duration_ms"`
+	ExitStatusCounts         map[string]int      `json:"exit_status_counts"`
+	ToolLoopWarningCount     int                 `json:"tool_loop_warning_count"`
+	ToolLoopWarningCaseCount int                 `json:"tool_loop_warning_case_count"`
+	RunnerIdentity           shardRunnerIdentity `json:"runner_identity"`
+	Shards                   []shardSummary      `json:"shards"`
+	toolLoopWarningCountSet  bool                `json:"-"`
+	toolLoopWarningCasesSet  bool                `json:"-"`
+}
+
+func (m *shardsManifest) UnmarshalJSON(data []byte) error {
+	type plain shardsManifest
+	var decoded plain
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(data, &fields); err != nil {
+		return err
+	}
+	*m = shardsManifest(decoded)
+	m.toolLoopWarningCountSet = nonNullJSONField(fields, "tool_loop_warning_count")
+	m.toolLoopWarningCasesSet = nonNullJSONField(fields, "tool_loop_warning_case_count")
+	return nil
 }
 
 type shardRunnerIdentity struct {
@@ -65,6 +85,7 @@ type shardRunnerIdentity struct {
 	CommandTimeout          string                          `json:"command_timeout,omitempty"`
 	CaseTimeout             string                          `json:"case_timeout,omitempty"`
 	CleanRoom               bool                            `json:"clean_room"`
+	ToolLoopWarning         bool                            `json:"tool_loop_warning"`
 	CleanRoomPolicySHA256   string                          `json:"clean_room_policy_sha256,omitempty"`
 	OfflineAssets           *sweenv.OfflineAssetIdentity    `json:"offline_assets,omitempty"`
 	ImageSetSHA256          string                          `json:"image_set_sha256,omitempty"`
@@ -72,40 +93,61 @@ type shardRunnerIdentity struct {
 }
 
 type shardSummary struct {
-	Index                   int                 `json:"index"`
-	Name                    string              `json:"name"`
-	RunID                   string              `json:"run_id"`
-	RawDir                  string              `json:"raw_dir"`
-	Status                  string              `json:"status"`
-	FailureReason           string              `json:"failure_reason,omitempty"`
-	ExpectedCount           int                 `json:"expected_count"`
-	PredictionsCount        int                 `json:"predictions_count"`
-	PredictionsSHA256       string              `json:"predictions_sha256,omitempty"`
-	SelectedInstancesSHA256 string              `json:"selected_instances_sha256,omitempty"`
-	AcceptedCount           int                 `json:"accepted_count"`
-	MissingCount            int                 `json:"missing_count"`
-	InvalidCount            int                 `json:"invalid_count"`
-	EmptyPatchCount         int                 `json:"empty_patch_count"`
-	Workers                 int                 `json:"workers,omitempty"`
-	StartedAt               string              `json:"started_at,omitempty"`
-	FinishedAt              string              `json:"finished_at,omitempty"`
-	DurationMS              int64               `json:"duration_ms,omitempty"`
-	ExitStatusCounts        map[string]int      `json:"exit_status_counts"`
-	RunnerIdentity          shardRunnerIdentity `json:"runner_identity"`
-	ExpectedIDs             []string            `json:"expected_ids"`
-	Cases                   []shardCaseSummary  `json:"cases"`
-	identityValidated       bool                `json:"-"`
+	Index                    int                 `json:"index"`
+	Name                     string              `json:"name"`
+	RunID                    string              `json:"run_id"`
+	RawDir                   string              `json:"raw_dir"`
+	Status                   string              `json:"status"`
+	FailureReason            string              `json:"failure_reason,omitempty"`
+	ExpectedCount            int                 `json:"expected_count"`
+	PredictionsCount         int                 `json:"predictions_count"`
+	PredictionsSHA256        string              `json:"predictions_sha256,omitempty"`
+	SelectedInstancesSHA256  string              `json:"selected_instances_sha256,omitempty"`
+	AcceptedCount            int                 `json:"accepted_count"`
+	MissingCount             int                 `json:"missing_count"`
+	InvalidCount             int                 `json:"invalid_count"`
+	EmptyPatchCount          int                 `json:"empty_patch_count"`
+	Workers                  int                 `json:"workers,omitempty"`
+	StartedAt                string              `json:"started_at,omitempty"`
+	FinishedAt               string              `json:"finished_at,omitempty"`
+	DurationMS               int64               `json:"duration_ms,omitempty"`
+	ExitStatusCounts         map[string]int      `json:"exit_status_counts"`
+	ToolLoopWarningCount     int                 `json:"tool_loop_warning_count"`
+	ToolLoopWarningCaseCount int                 `json:"tool_loop_warning_case_count"`
+	RunnerIdentity           shardRunnerIdentity `json:"runner_identity"`
+	ExpectedIDs              []string            `json:"expected_ids"`
+	Cases                    []shardCaseSummary  `json:"cases"`
+	identityValidated        bool                `json:"-"`
+	toolLoopWarningCountSet  bool                `json:"-"`
+	toolLoopWarningCasesSet  bool                `json:"-"`
+}
+
+func (s *shardSummary) UnmarshalJSON(data []byte) error {
+	type plain shardSummary
+	var decoded plain
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(data, &fields); err != nil {
+		return err
+	}
+	*s = shardSummary(decoded)
+	s.toolLoopWarningCountSet = nonNullJSONField(fields, "tool_loop_warning_count")
+	s.toolLoopWarningCasesSet = nonNullJSONField(fields, "tool_loop_warning_case_count")
+	return nil
 }
 
 type shardCaseSummary struct {
-	InstanceID    string `json:"instance_id"`
-	Status        string `json:"status"`
-	ExitStatus    string `json:"exit_status,omitempty"`
-	Reason        string `json:"reason,omitempty"`
-	HasPrediction bool   `json:"has_prediction"`
-	EmptyPatch    bool   `json:"empty_patch,omitempty"`
-	PatchChars    int    `json:"patch_chars,omitempty"`
-	TracePath     string `json:"trace_path,omitempty"`
+	InstanceID           string `json:"instance_id"`
+	Status               string `json:"status"`
+	ExitStatus           string `json:"exit_status,omitempty"`
+	Reason               string `json:"reason,omitempty"`
+	HasPrediction        bool   `json:"has_prediction"`
+	EmptyPatch           bool   `json:"empty_patch,omitempty"`
+	PatchChars           int    `json:"patch_chars,omitempty"`
+	TracePath            string `json:"trace_path,omitempty"`
+	ToolLoopWarningCount int    `json:"tool_loop_warning_count"`
 }
 
 func runSummarizeShards(args []string) error {
@@ -182,6 +224,8 @@ func summarizeShardPlan(plan batchPlan, planPath, runsRoot, rawSubdir string) (s
 		manifest.MissingCases += shard.MissingCount
 		manifest.InvalidCases += shard.InvalidCount
 		manifest.CumulativeDurationMS += shard.DurationMS
+		manifest.ToolLoopWarningCount += shard.ToolLoopWarningCount
+		manifest.ToolLoopWarningCaseCount += shard.ToolLoopWarningCaseCount
 		for status, count := range shard.ExitStatusCounts {
 			manifest.ExitStatusCounts[status] += count
 		}
@@ -363,6 +407,32 @@ func summarizeShard(batch batchPlanItem, runsRoot, rawSubdir string) shardSummar
 			shard.InvalidCount++
 		}
 	}
+	if shard.RunnerIdentity.ManifestKind == "native" && shard.MissingCount == 0 && shard.InvalidCount == 0 {
+		observedWarningCount := 0
+		observedWarningCaseCount := 0
+		for _, caseSummary := range shard.Cases {
+			if caseSummary.Status != "accepted" {
+				continue
+			}
+			observedWarningCount += caseSummary.ToolLoopWarningCount
+			if caseSummary.ToolLoopWarningCount > 0 {
+				observedWarningCaseCount++
+			}
+		}
+		if observedWarningCount != shard.ToolLoopWarningCount ||
+			observedWarningCaseCount != shard.ToolLoopWarningCaseCount {
+			if shard.FailureReason != "" {
+				shard.FailureReason += "; "
+			}
+			shard.FailureReason += fmt.Sprintf(
+				"tool-loop warning totals count/cases %d/%d do not match accepted traces %d/%d",
+				shard.ToolLoopWarningCount,
+				shard.ToolLoopWarningCaseCount,
+				observedWarningCount,
+				observedWarningCaseCount,
+			)
+		}
+	}
 	switch {
 	case shard.FailureReason != "":
 		shard.Status = "failed"
@@ -479,6 +549,8 @@ func loadNativeShardManifest(batch batchPlanItem, rawDir, manifestPath string, s
 	shard.StartedAt = formatTime(manifest.StartedAt)
 	shard.FinishedAt = formatTime(manifest.FinishedAt)
 	shard.DurationMS = manifest.DurationMS
+	shard.ToolLoopWarningCount = manifest.ToolLoopWarningCount
+	shard.ToolLoopWarningCaseCount = manifest.ToolLoopWarningCaseCount
 	shard.SelectedInstancesSHA256 = manifest.SelectedInstancesSHA256
 	identity, identityErr := normalizeShardRunnerIdentity(nativeRunnerIdentity(manifest))
 	shard.RunnerIdentity = identity
@@ -499,6 +571,9 @@ func validateMiniGoShardManifest(batch batchPlanItem, rawDir string, manifest ru
 	}
 	if manifest.RunnerType != "mini-swe-agent-go" {
 		return fmt.Errorf("mini-go runner_type %q is not %q", manifest.RunnerType, "mini-swe-agent-go")
+	}
+	if manifest.ToolLoopWarning || manifest.ToolLoopWarningCount != 0 || manifest.ToolLoopWarningCaseCount != 0 {
+		return fmt.Errorf("mini-go runner manifest does not support tool-loop warning fields")
 	}
 	if _, err := normalizeShardRunnerIdentity(miniGoShardRunnerIdentity(manifest)); err != nil {
 		return fmt.Errorf("mini-go runner identity is invalid: %w", err)
@@ -550,6 +625,9 @@ func validateNativeShardManifest(batch batchPlanItem, rawDir string, manifest ru
 	if manifest.RunnerType != "trpc-agent-go-native" {
 		return fmt.Errorf("native runner_type %q is not %q", manifest.RunnerType, "trpc-agent-go-native")
 	}
+	if err := validateRunnerWarningAggregatePresence("native runner manifest", manifest); err != nil {
+		return err
+	}
 	if _, err := normalizeShardRunnerIdentity(nativeRunnerIdentity(manifest)); err != nil {
 		return fmt.Errorf("native runner identity is invalid: %w", err)
 	}
@@ -590,6 +668,15 @@ func validateNativeShardManifest(batch batchPlanItem, rawDir string, manifest ru
 	if manifest.Status != "completed" && manifest.Status != "completed_with_errors" {
 		return fmt.Errorf("native status %q is not terminal", manifest.Status)
 	}
+	if err := validateToolLoopWarningManifest(
+		"native runner manifest",
+		manifest.ToolLoopWarning,
+		manifest.ToolLoopWarningCount,
+		manifest.ToolLoopWarningCaseCount,
+		manifest.CaseCount,
+	); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -609,6 +696,7 @@ func miniGoShardRunnerIdentity(manifest runnerManifest) shardRunnerIdentity {
 		CommandTimeout:          manifest.CommandTimeout,
 		CaseTimeout:             manifest.CaseTimeout,
 		CleanRoom:               manifest.CleanRoom,
+		ToolLoopWarning:         manifest.ToolLoopWarning,
 		CleanRoomPolicySHA256:   manifest.CleanRoomPolicySHA256,
 		OfflineAssets:           cloneOfflineAssetIdentity(manifest.OfflineAssets),
 		ImageSetSHA256:          manifest.ImageSetSHA256,
@@ -631,6 +719,12 @@ func validateShardRunnerIdentity(identity shardRunnerIdentity) error {
 }
 
 func normalizeShardRunnerIdentity(identity shardRunnerIdentity) (shardRunnerIdentity, error) {
+	if identity.ManifestKind != "native" && identity.ToolLoopWarning {
+		return shardRunnerIdentity{}, fmt.Errorf(
+			"manifest_kind %q does not support tool_loop_warning=true",
+			identity.ManifestKind,
+		)
+	}
 	expectedRunnerType := ""
 	switch identity.ManifestKind {
 	case "legacy-run-mini":
@@ -672,13 +766,10 @@ func normalizeShardRunnerIdentity(identity shardRunnerIdentity) (shardRunnerIden
 		if !isHexIdentifier(identity.UpstreamCommit, 40, 64) {
 			return shardRunnerIdentity{}, fmt.Errorf("upstream_commit %q is not a full Git revision", identity.UpstreamCommit)
 		}
+		if err := validateNativeAgentProtocol(identity.AgentProtocol, identity.CleanRoom, identity.ToolLoopWarning); err != nil {
+			return shardRunnerIdentity{}, err
+		}
 		if identity.CleanRoom {
-			if !strings.HasSuffix(identity.AgentProtocol, "+clean-room-v1") {
-				return shardRunnerIdentity{}, fmt.Errorf(
-					"clean-room native agent_protocol %q does not end with +clean-room-v1",
-					identity.AgentProtocol,
-				)
-			}
 			if !isHexIdentifier(identity.UpstreamCommit, 40, 64) {
 				return shardRunnerIdentity{}, fmt.Errorf(
 					"clean-room native upstream_commit %q is not a full Git revision",
@@ -744,6 +835,70 @@ func positiveDuration(name, value string) (time.Duration, error) {
 		return 0, fmt.Errorf("%s %q is not a positive duration", name, value)
 	}
 	return duration, nil
+}
+
+func validateNativeAgentProtocol(value string, cleanRoom, toolLoopWarning bool) error {
+	const cleanRoomSuffix = "+clean-room-v1"
+	const toolLoopWarningSuffix = "+tool-loop-warning-v1"
+	cleanRoomCount := strings.Count(value, cleanRoomSuffix)
+	toolLoopWarningCount := strings.Count(value, toolLoopWarningSuffix)
+	wantCleanRoomCount := 0
+	if cleanRoom {
+		wantCleanRoomCount = 1
+	}
+	if cleanRoomCount != wantCleanRoomCount {
+		return fmt.Errorf("agent_protocol %q does not match clean_room=%t", value, cleanRoom)
+	}
+	wantToolLoopWarningCount := 0
+	if toolLoopWarning {
+		wantToolLoopWarningCount = 1
+	}
+	if toolLoopWarningCount != wantToolLoopWarningCount {
+		return fmt.Errorf("agent_protocol %q does not match tool_loop_warning=%t", value, toolLoopWarning)
+	}
+	expectedSuffix := ""
+	if cleanRoom {
+		expectedSuffix += cleanRoomSuffix
+	}
+	if toolLoopWarning {
+		expectedSuffix += toolLoopWarningSuffix
+	}
+	if expectedSuffix != "" && !strings.HasSuffix(value, expectedSuffix) {
+		return fmt.Errorf("agent_protocol %q does not end with canonical suffix %q", value, expectedSuffix)
+	}
+	return nil
+}
+
+func validateToolLoopWarningManifest(label string, enabled bool, count, caseCount, totalCases int) error {
+	if count < 0 || caseCount < 0 {
+		return fmt.Errorf(
+			"%s has negative tool-loop warning totals: count=%d case_count=%d",
+			label,
+			count,
+			caseCount,
+		)
+	}
+	if caseCount > totalCases || caseCount > count {
+		return fmt.Errorf(
+			"%s has inconsistent tool-loop warning totals: count=%d case_count=%d total_cases=%d",
+			label,
+			count,
+			caseCount,
+			totalCases,
+		)
+	}
+	if (count == 0) != (caseCount == 0) {
+		return fmt.Errorf(
+			"%s has inconsistent zero tool-loop warning totals: count=%d case_count=%d",
+			label,
+			count,
+			caseCount,
+		)
+	}
+	if !enabled && (count != 0 || caseCount != 0) {
+		return fmt.Errorf("%s has tool-loop warning totals with tool_loop_warning=false", label)
+	}
+	return nil
 }
 
 func selectedInstancesSHA256(instanceIDs []string) (string, error) {
@@ -827,6 +982,13 @@ func shardRunnerIdentityMismatch(canonical, candidate shardRunnerIdentity) strin
 	}
 	if canonical.CleanRoom != candidate.CleanRoom {
 		return fmt.Sprintf("clean_room %t does not match canonical %t", candidate.CleanRoom, canonical.CleanRoom)
+	}
+	if canonical.ToolLoopWarning != candidate.ToolLoopWarning {
+		return fmt.Sprintf(
+			"tool_loop_warning %t does not match canonical %t",
+			candidate.ToolLoopWarning,
+			canonical.ToolLoopWarning,
+		)
 	}
 	if !equalOfflineAssetIdentity(canonical.OfflineAssets, candidate.OfflineAssets) {
 		return fmt.Sprintf(
@@ -942,13 +1104,14 @@ func summarizeShardCase(
 	}
 	patch := pred.ModelPatch
 	return shardCaseSummary{
-		InstanceID:    instanceID,
-		Status:        "accepted",
-		ExitStatus:    exitStatus,
-		HasPrediction: true,
-		EmptyPatch:    strings.TrimSpace(patch) == "",
-		PatchChars:    len(patch),
-		TracePath:     relTrace,
+		InstanceID:           instanceID,
+		Status:               "accepted",
+		ExitStatus:           exitStatus,
+		HasPrediction:        true,
+		EmptyPatch:           strings.TrimSpace(patch) == "",
+		PatchChars:           len(patch),
+		TracePath:            relTrace,
+		ToolLoopWarningCount: nativeTrace.ToolLoopWarningCount,
 	}
 }
 

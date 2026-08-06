@@ -38,19 +38,43 @@ type importedCase struct {
 	OfflineAssetsSHA256   string             `json:"offline_assets_sha256,omitempty"`
 	ImageSetSHA256        string             `json:"image_set_sha256,omitempty"`
 	EnvironmentProvenance *sweenv.Provenance `json:"environment_provenance,omitempty"`
+	ToolLoopWarning       bool               `json:"tool_loop_warning"`
 	Target                string             `json:"target"`
 	Result                targetResult       `json:"result"`
 }
 
 type targetResult struct {
-	MainStatus        string              `json:"main_status"`
-	FailureReason     string              `json:"failure_reason,omitempty"`
-	ModelNameOrPath   string              `json:"model_name_or_path,omitempty"`
-	PatchPath         string              `json:"patch_path,omitempty"`
-	TracePath         string              `json:"trace_path,omitempty"`
-	VerifierResultRef string              `json:"verifier_result_ref,omitempty"`
-	PatchStats        artifact.PatchStats `json:"patch_stats"`
-	Usage             usageStats          `json:"usage"`
+	MainStatus                  string              `json:"main_status"`
+	FailureReason               string              `json:"failure_reason,omitempty"`
+	ModelNameOrPath             string              `json:"model_name_or_path,omitempty"`
+	PatchPath                   string              `json:"patch_path,omitempty"`
+	TracePath                   string              `json:"trace_path,omitempty"`
+	VerifierResultRef           string              `json:"verifier_result_ref,omitempty"`
+	PatchStats                  artifact.PatchStats `json:"patch_stats"`
+	Usage                       usageStats          `json:"usage"`
+	ToolLoopWarningCount        int                 `json:"tool_loop_warning_count"`
+	FirstToolLoopWarningLLMCall *int                `json:"first_tool_loop_warning_llm_call"`
+	ToolLoopWarningLLMCalls     []int               `json:"tool_loop_warning_llm_calls"`
+	toolLoopWarningCountSet     bool                `json:"-"`
+	firstToolLoopWarningCallSet bool                `json:"-"`
+	toolLoopWarningCallsSet     bool                `json:"-"`
+}
+
+func (r *targetResult) UnmarshalJSON(data []byte) error {
+	type plain targetResult
+	var decoded plain
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(data, &fields); err != nil {
+		return err
+	}
+	*r = targetResult(decoded)
+	r.toolLoopWarningCountSet = nonNullJSONField(fields, "tool_loop_warning_count")
+	_, r.firstToolLoopWarningCallSet = fields["first_tool_loop_warning_llm_call"]
+	r.toolLoopWarningCallsSet = nonNullJSONField(fields, "tool_loop_warning_llm_calls")
+	return nil
 }
 
 type usageStats struct {
@@ -149,8 +173,11 @@ func runImport(args []string) error {
 			return err
 		}
 		pred, hasPred := preds[c.InstanceID]
-		result := targetResult{PatchStats: artifact.PatchStats{ChangedFiles: []string{}}}
-		var nativeInfo *nativeInfoEnvelope
+		result := targetResult{
+			PatchStats:              artifact.PatchStats{ChangedFiles: []string{}},
+			ToolLoopWarningLLMCalls: []int{},
+		}
+		var nativeTrace *nativeTraceEnvelope
 		if hasPred {
 			result.ModelNameOrPath = pred.ModelNameOrPath
 			if strings.TrimSpace(pred.ModelPatch) != "" {
@@ -172,9 +199,14 @@ func runImport(args []string) error {
 				}
 				result.TracePath = relPath(*output, tracePath)
 				result.Usage = usage
-				nativeInfo, err = importedNativeInfo(caseRawDir, c, selectionFromPredictions)
+				nativeTrace, err = importedNativeTrace(caseRawDir, c, selectionFromPredictions)
 				if err != nil {
 					return fmt.Errorf("import native provenance for %s: %w", c.InstanceID, err)
+				}
+				if nativeTrace != nil {
+					result.ToolLoopWarningCount = nativeTrace.ToolLoopWarningCount
+					result.FirstToolLoopWarningLLMCall = cloneInt(nativeTrace.FirstToolLoopWarningLLMCall)
+					result.ToolLoopWarningLLMCalls = append([]int{}, nativeTrace.ToolLoopWarningLLMCalls...)
 				}
 			}
 		}
@@ -194,7 +226,9 @@ func runImport(args []string) error {
 			Target:        *target,
 			Result:        result,
 		}
-		if nativeInfo != nil {
+		if nativeTrace != nil {
+			nativeInfo := &nativeTrace.Info
+			row.ToolLoopWarning = nativeInfo.ToolLoopWarning
 			if selectionFromPredictions {
 				row.Repo = nativeInfo.Repo
 				row.BaseCommit = nativeInfo.BaseCommit
@@ -479,15 +513,18 @@ func traceSourcePath(rawDir, instanceID string) (string, error) {
 // Keep it package-private so run-config validation can reuse the exact same
 // artifact contract without importing another command's internal package.
 type nativeTraceEnvelope struct {
-	InstanceID      string
-	Info            nativeInfoEnvelope
-	ModelPatch      string
-	DurationMS      int64
-	LLMCalls        int
-	ToolCalls       int
-	Usage           nativeUsageEnvelope
-	ResponseCount   int
-	ResponsesSHA256 string
+	InstanceID                  string
+	Info                        nativeInfoEnvelope
+	ModelPatch                  string
+	DurationMS                  int64
+	LLMCalls                    int
+	ToolCalls                   int
+	ToolLoopWarningCount        int
+	FirstToolLoopWarningLLMCall *int
+	ToolLoopWarningLLMCalls     []int
+	Usage                       nativeUsageEnvelope
+	ResponseCount               int
+	ResponsesSHA256             string
 }
 
 type nativeInfoEnvelope struct {
@@ -504,6 +541,7 @@ type nativeInfoEnvelope struct {
 	SelectedInstancesSHA256 string
 	CleanRoom               bool
 	CleanRoomDeclared       bool
+	ToolLoopWarning         bool
 	CleanRoomPolicySHA256   string
 	OfflineAssetsSHA256     string
 	ImageSetSHA256          string
@@ -543,15 +581,18 @@ type nativeTimingEnvelope struct {
 }
 
 type nativeTraceJSON struct {
-	InstanceID      *string         `json:"instance_id"`
-	Info            json.RawMessage `json:"info"`
-	ModelPatch      *string         `json:"model_patch"`
-	DurationMS      *int64          `json:"duration_ms"`
-	LLMCalls        *int            `json:"llm_calls"`
-	ToolCalls       *int            `json:"tool_calls"`
-	Usage           json.RawMessage `json:"usage"`
-	ResponseCount   *int            `json:"response_count"`
-	ResponsesSHA256 *string         `json:"responses_sha256"`
+	InstanceID                  *string         `json:"instance_id"`
+	Info                        json.RawMessage `json:"info"`
+	ModelPatch                  *string         `json:"model_patch"`
+	DurationMS                  *int64          `json:"duration_ms"`
+	LLMCalls                    *int            `json:"llm_calls"`
+	ToolCalls                   *int            `json:"tool_calls"`
+	ToolLoopWarningCount        *int            `json:"tool_loop_warning_count"`
+	FirstToolLoopWarningLLMCall *int            `json:"first_tool_loop_warning_llm_call"`
+	ToolLoopWarningLLMCalls     []int           `json:"tool_loop_warning_llm_calls"`
+	Usage                       json.RawMessage `json:"usage"`
+	ResponseCount               *int            `json:"response_count"`
+	ResponsesSHA256             *string         `json:"responses_sha256"`
 }
 
 type nativeInfoJSON struct {
@@ -567,6 +608,7 @@ type nativeInfoJSON struct {
 	CaseTimeout             string             `json:"case_timeout,omitempty"`
 	SelectedInstancesSHA256 string             `json:"selected_instances_sha256,omitempty"`
 	CleanRoom               *bool              `json:"clean_room,omitempty"`
+	ToolLoopWarning         bool               `json:"tool_loop_warning"`
 	CleanRoomPolicySHA256   string             `json:"clean_room_policy_sha256,omitempty"`
 	OfflineAssetsSHA256     string             `json:"offline_assets_sha256,omitempty"`
 	ImageSetSHA256          string             `json:"image_set_sha256,omitempty"`
@@ -626,6 +668,10 @@ func parseNativeTraceEnvelope(data []byte, instanceID string) (nativeTraceEnvelo
 	if err := json.Unmarshal(data, &raw); err != nil {
 		return nativeTraceEnvelope{}, fmt.Errorf("parse native trace for %s: %w", instanceID, err)
 	}
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(data, &fields); err != nil {
+		return nativeTraceEnvelope{}, fmt.Errorf("parse native trace fields for %s: %w", instanceID, err)
+	}
 	if raw.InstanceID == nil {
 		return nativeTraceEnvelope{}, missingNativeFieldError(instanceID, "instance_id")
 	}
@@ -662,6 +708,20 @@ func parseNativeTraceEnvelope(data []byte, instanceID string) (nativeTraceEnvelo
 	if err != nil {
 		return nativeTraceEnvelope{}, err
 	}
+	if info.ToolLoopWarning {
+		for _, field := range []struct {
+			name    string
+			present bool
+		}{
+			{"tool_loop_warning_count", raw.ToolLoopWarningCount != nil},
+			{"first_tool_loop_warning_llm_call", fields["first_tool_loop_warning_llm_call"] != nil},
+			{"tool_loop_warning_llm_calls", raw.ToolLoopWarningLLMCalls != nil},
+		} {
+			if !field.present {
+				return nativeTraceEnvelope{}, missingNativeFieldError(instanceID, field.name)
+			}
+		}
+	}
 	usage, err := parseNativeUsage(raw.Usage, instanceID)
 	if err != nil {
 		return nativeTraceEnvelope{}, err
@@ -688,6 +748,20 @@ func parseNativeTraceEnvelope(data []byte, instanceID string) (nativeTraceEnvelo
 			*raw.DurationMS,
 		)
 	}
+	toolLoopWarningCount := 0
+	if raw.ToolLoopWarningCount != nil {
+		toolLoopWarningCount = *raw.ToolLoopWarningCount
+	}
+	if err := validateNativeToolLoopWarningTelemetry(
+		instanceID,
+		info.ToolLoopWarning,
+		toolLoopWarningCount,
+		raw.FirstToolLoopWarningLLMCall,
+		raw.ToolLoopWarningLLMCalls,
+		*raw.LLMCalls,
+	); err != nil {
+		return nativeTraceEnvelope{}, err
+	}
 	if !isSHA256Hex(*raw.ResponsesSHA256) {
 		return nativeTraceEnvelope{}, fmt.Errorf(
 			"native trace for %s has invalid responses_sha256 %q: want 64 hexadecimal characters",
@@ -696,15 +770,18 @@ func parseNativeTraceEnvelope(data []byte, instanceID string) (nativeTraceEnvelo
 		)
 	}
 	return nativeTraceEnvelope{
-		InstanceID:      *raw.InstanceID,
-		Info:            info,
-		ModelPatch:      *raw.ModelPatch,
-		DurationMS:      *raw.DurationMS,
-		LLMCalls:        *raw.LLMCalls,
-		ToolCalls:       *raw.ToolCalls,
-		Usage:           usage,
-		ResponseCount:   *raw.ResponseCount,
-		ResponsesSHA256: *raw.ResponsesSHA256,
+		InstanceID:                  *raw.InstanceID,
+		Info:                        info,
+		ModelPatch:                  *raw.ModelPatch,
+		DurationMS:                  *raw.DurationMS,
+		LLMCalls:                    *raw.LLMCalls,
+		ToolCalls:                   *raw.ToolCalls,
+		ToolLoopWarningCount:        toolLoopWarningCount,
+		FirstToolLoopWarningLLMCall: cloneInt(raw.FirstToolLoopWarningLLMCall),
+		ToolLoopWarningLLMCalls:     append([]int{}, raw.ToolLoopWarningLLMCalls...),
+		Usage:                       usage,
+		ResponseCount:               *raw.ResponseCount,
+		ResponsesSHA256:             *raw.ResponsesSHA256,
 	}, nil
 }
 
@@ -750,6 +827,7 @@ func parseNativeInfo(data json.RawMessage, instanceID string) (nativeInfoEnvelop
 		SelectedInstancesSHA256: raw.SelectedInstancesSHA256,
 		CleanRoom:               cleanRoom,
 		CleanRoomDeclared:       raw.CleanRoom != nil,
+		ToolLoopWarning:         raw.ToolLoopWarning,
 		CleanRoomPolicySHA256:   raw.CleanRoomPolicySHA256,
 		OfflineAssetsSHA256:     raw.OfflineAssetsSHA256,
 		ImageSetSHA256:          raw.ImageSetSHA256,
@@ -763,6 +841,63 @@ func parseNativeInfo(data json.RawMessage, instanceID string) (nativeInfoEnvelop
 		ErrorCategory:           raw.ErrorCategory,
 		Retryable:               raw.Retryable,
 	}, nil
+}
+
+func cloneInt(value *int) *int {
+	if value == nil {
+		return nil
+	}
+	cloned := *value
+	return &cloned
+}
+
+func validateNativeToolLoopWarningTelemetry(
+	instanceID string,
+	enabled bool,
+	count int,
+	first *int,
+	calls []int,
+	llmCalls int,
+) error {
+	if count < 0 {
+		return fmt.Errorf("native trace for %s has negative tool_loop_warning_count %d", instanceID, count)
+	}
+	if len(calls) != count {
+		return fmt.Errorf(
+			"native trace for %s has %d tool_loop_warning_llm_calls, want count %d",
+			instanceID,
+			len(calls),
+			count,
+		)
+	}
+	if !enabled && count != 0 {
+		return fmt.Errorf("native trace for %s has tool-loop warning telemetry with info.tool_loop_warning=false", instanceID)
+	}
+	if count == 0 {
+		if first != nil {
+			return fmt.Errorf("native trace for %s has first_tool_loop_warning_llm_call without a warning", instanceID)
+		}
+		return nil
+	}
+	if first == nil || *first != calls[0] {
+		return fmt.Errorf("native trace for %s has inconsistent first_tool_loop_warning_llm_call", instanceID)
+	}
+	previous := 0
+	for _, call := range calls {
+		if call <= previous {
+			return fmt.Errorf("native trace for %s tool_loop_warning_llm_calls are not strictly increasing", instanceID)
+		}
+		if call > llmCalls {
+			return fmt.Errorf(
+				"native trace for %s has tool-loop warning at LLM call %d beyond llm_calls=%d",
+				instanceID,
+				call,
+				llmCalls,
+			)
+		}
+		previous = call
+	}
+	return nil
 }
 
 func validateNativeCleanRoomInfo(raw nativeInfoJSON, instanceID string) error {
@@ -851,6 +986,18 @@ func importedNativeInfo(
 	c contract.Case,
 	allowTraceCaseMetadata bool,
 ) (*nativeInfoEnvelope, error) {
+	trace, err := importedNativeTrace(rawDir, c, allowTraceCaseMetadata)
+	if err != nil || trace == nil {
+		return nil, err
+	}
+	return &trace.Info, nil
+}
+
+func importedNativeTrace(
+	rawDir string,
+	c contract.Case,
+	allowTraceCaseMetadata bool,
+) (*nativeTraceEnvelope, error) {
 	source, err := traceSourcePath(rawDir, c.InstanceID)
 	if err != nil {
 		return nil, err
@@ -870,7 +1017,7 @@ func importedNativeInfo(
 		repoProvided := trace.Info.Repo != ""
 		baseCommitProvided := trace.Info.BaseCommit != ""
 		if !trace.Info.CleanRoom && !repoProvided && !baseCommitProvided {
-			return &trace.Info, nil
+			return &trace, nil
 		}
 		if repoProvided != baseCommitProvided {
 			return nil, fmt.Errorf(
@@ -886,10 +1033,10 @@ func importedNativeInfo(
 				trace.Info.BaseCommit,
 			)
 		}
-		return &trace.Info, nil
+		return &trace, nil
 	}
 	if !trace.Info.CleanRoom {
-		return &trace.Info, nil
+		return &trace, nil
 	}
 	if strings.TrimSpace(c.Repo) == "" || !isHexIdentifier(c.BaseCommit, 40) {
 		return nil, fmt.Errorf("clean-room native import requires canonical repo/base_commit case metadata")
@@ -904,7 +1051,7 @@ func importedNativeInfo(
 			c.BaseCommit,
 		)
 	}
-	return &trace.Info, nil
+	return &trace, nil
 }
 
 func validateCaseEnvironmentProvenance(

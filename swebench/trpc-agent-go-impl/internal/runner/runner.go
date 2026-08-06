@@ -12,6 +12,7 @@ package runner
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -39,50 +40,53 @@ var artifactNamePattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]*$`)
 const offlineHTTPBinImageReference = "docker.io/kennethreitz/httpbin:latest"
 
 type manifest struct {
-	RunID                   string                          `json:"run_id"`
-	RunnerType              string                          `json:"runner_type"`
-	FrameworkModule         string                          `json:"framework_module"`
-	FrameworkVersion        string                          `json:"framework_version"`
-	AgentProtocol           string                          `json:"agent_protocol"`
-	UpstreamCommit          string                          `json:"upstream_commit"`
-	ObservationCodec        string                          `json:"observation_codec"`
-	SourceRevision          string                          `json:"source_revision,omitempty"`
-	SourceModified          bool                            `json:"source_modified"`
-	BinarySHA256            string                          `json:"binary_sha256,omitempty"`
-	CasesSHA256             string                          `json:"cases_sha256"`
-	ModelConfigSHA256       string                          `json:"model_config_sha256"`
-	EnvironmentConfigSHA256 string                          `json:"environment_config_sha256"`
-	SelectedInstancesSHA256 string                          `json:"selected_instances_sha256"`
-	CleanRoom               bool                            `json:"clean_room"`
-	CleanRoomPolicySHA256   string                          `json:"clean_room_policy_sha256,omitempty"`
-	OfflineAssets           *sweenv.OfflineAssetIdentity    `json:"offline_assets,omitempty"`
-	ImageSetSHA256          string                          `json:"image_set_sha256,omitempty"`
-	DockerImages            map[string]sweenv.ImageIdentity `json:"docker_images,omitempty"`
-	StartedAt               time.Time                       `json:"started_at"`
-	FinishedAt              time.Time                       `json:"finished_at"`
-	DurationMS              int64                           `json:"duration_ms"`
-	Cases                   string                          `json:"cases"`
-	OutputDir               string                          `json:"output_dir"`
-	Filter                  string                          `json:"filter,omitempty"`
-	CaseCount               int                             `json:"case_count"`
-	AttemptedCount          int                             `json:"attempted_count"`
-	SkippedExisting         int                             `json:"skipped_existing"`
-	CompletedCount          int                             `json:"completed_count"`
-	PredictionCount         int                             `json:"prediction_count"`
-	Workers                 int                             `json:"workers"`
-	RedoExisting            bool                            `json:"redo_existing"`
-	Predictions             string                          `json:"predictions"`
-	Progress                string                          `json:"progress"`
-	ModelConfig             map[string]string               `json:"model_config,omitempty"`
-	Environment             string                          `json:"environment_config"`
-	CommandTimeout          string                          `json:"command_timeout"`
-	CaseTimeout             string                          `json:"case_timeout"`
-	ExitStatusCounts        map[string]int                  `json:"exit_status_counts"`
-	LLMCalls                int                             `json:"llm_calls"`
-	ToolCalls               int                             `json:"tool_calls"`
-	Usage                   usageSummary                    `json:"usage"`
-	Status                  string                          `json:"status"`
-	Notes                   []string                        `json:"notes,omitempty"`
+	RunID                    string                          `json:"run_id"`
+	RunnerType               string                          `json:"runner_type"`
+	FrameworkModule          string                          `json:"framework_module"`
+	FrameworkVersion         string                          `json:"framework_version"`
+	AgentProtocol            string                          `json:"agent_protocol"`
+	UpstreamCommit           string                          `json:"upstream_commit"`
+	ObservationCodec         string                          `json:"observation_codec"`
+	SourceRevision           string                          `json:"source_revision,omitempty"`
+	SourceModified           bool                            `json:"source_modified"`
+	BinarySHA256             string                          `json:"binary_sha256,omitempty"`
+	CasesSHA256              string                          `json:"cases_sha256"`
+	ModelConfigSHA256        string                          `json:"model_config_sha256"`
+	EnvironmentConfigSHA256  string                          `json:"environment_config_sha256"`
+	SelectedInstancesSHA256  string                          `json:"selected_instances_sha256"`
+	CleanRoom                bool                            `json:"clean_room"`
+	ToolLoopWarning          bool                            `json:"tool_loop_warning"`
+	CleanRoomPolicySHA256    string                          `json:"clean_room_policy_sha256,omitempty"`
+	OfflineAssets            *sweenv.OfflineAssetIdentity    `json:"offline_assets,omitempty"`
+	ImageSetSHA256           string                          `json:"image_set_sha256,omitempty"`
+	DockerImages             map[string]sweenv.ImageIdentity `json:"docker_images,omitempty"`
+	StartedAt                time.Time                       `json:"started_at"`
+	FinishedAt               time.Time                       `json:"finished_at"`
+	DurationMS               int64                           `json:"duration_ms"`
+	Cases                    string                          `json:"cases"`
+	OutputDir                string                          `json:"output_dir"`
+	Filter                   string                          `json:"filter,omitempty"`
+	CaseCount                int                             `json:"case_count"`
+	AttemptedCount           int                             `json:"attempted_count"`
+	SkippedExisting          int                             `json:"skipped_existing"`
+	CompletedCount           int                             `json:"completed_count"`
+	PredictionCount          int                             `json:"prediction_count"`
+	Workers                  int                             `json:"workers"`
+	RedoExisting             bool                            `json:"redo_existing"`
+	Predictions              string                          `json:"predictions"`
+	Progress                 string                          `json:"progress"`
+	ModelConfig              map[string]string               `json:"model_config,omitempty"`
+	Environment              string                          `json:"environment_config"`
+	CommandTimeout           string                          `json:"command_timeout"`
+	CaseTimeout              string                          `json:"case_timeout"`
+	ExitStatusCounts         map[string]int                  `json:"exit_status_counts"`
+	LLMCalls                 int                             `json:"llm_calls"`
+	ToolCalls                int                             `json:"tool_calls"`
+	ToolLoopWarningCount     int                             `json:"tool_loop_warning_count"`
+	ToolLoopWarningCaseCount int                             `json:"tool_loop_warning_case_count"`
+	Usage                    usageSummary                    `json:"usage"`
+	Status                   string                          `json:"status"`
+	Notes                    []string                        `json:"notes,omitempty"`
 }
 
 type usageSummary struct {
@@ -100,12 +104,23 @@ type progressDocument struct {
 }
 
 type progressCase struct {
-	Status        string `json:"status"`
-	ErrorCategory string `json:"error_category,omitempty"`
-	PatchBytes    int    `json:"patch_bytes"`
-	LLMCalls      int    `json:"llm_calls"`
-	ToolCalls     int    `json:"tool_calls"`
-	DurationMS    int64  `json:"duration_ms"`
+	Status               string `json:"status"`
+	ErrorCategory        string `json:"error_category,omitempty"`
+	PatchBytes           int    `json:"patch_bytes"`
+	LLMCalls             int    `json:"llm_calls"`
+	ToolCalls            int    `json:"tool_calls"`
+	ToolLoopWarningCount int    `json:"tool_loop_warning_count"`
+	DurationMS           int64  `json:"duration_ms"`
+}
+
+type resultAggregate struct {
+	ExitStatusCounts         map[string]int
+	LLMCalls                 int
+	ToolCalls                int
+	ToolLoopWarningCount     int
+	ToolLoopWarningCaseCount int
+	Usage                    usageSummary
+	HasErrors                bool
 }
 
 // Run executes the tRPC-Agent-Go SWE-Bench runner CLI.
@@ -122,6 +137,7 @@ func Run(args []string) error {
 	caseTimeout := fs.Duration("case-timeout", 2*time.Hour, "timeout for each case")
 	dockerHost := fs.String("docker-host", "", "optional Docker daemon endpoint")
 	cleanRoom := fs.Bool("clean-room", false, "enable network-none generation and recursive Git sanitation")
+	toolLoopWarning := fs.Bool("tool-loop-warning", false, "warn on the next model call after an exact repeated tool-use/result batch")
 	offlineAssetsDir := fs.String(
 		"offline-assets-dir",
 		"",
@@ -248,8 +264,9 @@ func Run(args []string) error {
 		EnvironmentConfigSHA256: environmentHash, CasesSHA256: casesHash,
 		CommandTimeout: *commandTimeout, CaseTimeout: *caseTimeout,
 		SelectedInstancesSHA256: selectedHash,
-		CleanRoom:               *cleanRoom, CleanRoomPolicySHA256: cleanRoomPolicySHA256,
-		OfflineAssetsSHA256: offlineAssetsIdentity.SHA256, ImageSetSHA256: imageSetSHA256,
+		CleanRoom:               *cleanRoom, ToolLoopWarning: *toolLoopWarning,
+		CleanRoomPolicySHA256: cleanRoomPolicySHA256,
+		OfflineAssetsSHA256:   offlineAssetsIdentity.SHA256, ImageSetSHA256: imageSetSHA256,
 		DockerImages: resolvedImages,
 		Workers:      *workers,
 	}
@@ -264,8 +281,9 @@ func Run(args []string) error {
 		ModelConfigSHA256: modelHash, EnvironmentConfigSHA256: environmentHash,
 		CasesSHA256: casesHash, CommandTimeout: commandTimeout.String(),
 		CaseTimeout: caseTimeout.String(), SelectedInstancesSHA256: selectedHash,
-		CleanRoom: *cleanRoom, CleanRoomPolicySHA256: cleanRoomPolicySHA256,
-		OfflineAssetsSHA256: offlineAssetsIdentity.SHA256, ImageSetSHA256: imageSetSHA256,
+		CleanRoom: *cleanRoom, ToolLoopWarning: *toolLoopWarning,
+		CleanRoomPolicySHA256: cleanRoomPolicySHA256,
+		OfflineAssetsSHA256:   offlineAssetsIdentity.SHA256, ImageSetSHA256: imageSetSHA256,
 		DockerImages: resolvedImages,
 		Workers:      *workers,
 	}
@@ -297,11 +315,7 @@ func Run(args []string) error {
 		}
 		results[id] = result
 		loadedSkipped++
-		progress.Cases[id] = progressCase{
-			Status: result.Info.ExitStatus, ErrorCategory: result.Info.ErrorCategory,
-			PatchBytes: len(result.ModelPatch), LLMCalls: result.LLMCalls,
-			ToolCalls: result.ToolCalls, DurationMS: result.DurationMS,
-		}
+		progress.Cases[id] = progressCaseFromResult(result)
 	}
 	progress.UpdatedAt = time.Now().UTC()
 	if err := artifact.WriteJSON(progressPath, progress); err != nil {
@@ -316,7 +330,10 @@ func Run(args []string) error {
 			defer wg.Done()
 			for c := range jobs {
 				caseResult := exec.Execute(context.Background(), c)
-				bundleErr := writeCaseBundle(*output, &caseResult, artifact.WriteJSON)
+				bundleErr := validateToolLoopWarningTelemetry(c.InstanceID, caseResult)
+				if bundleErr == nil {
+					bundleErr = writeCaseBundle(*output, &caseResult, artifact.WriteJSON)
+				}
 
 				mu.Lock()
 				if bundleErr == nil {
@@ -326,11 +343,7 @@ func Run(args []string) error {
 					}
 				}
 				results[c.InstanceID] = caseResult
-				progress.Cases[c.InstanceID] = progressCase{
-					Status: caseResult.Info.ExitStatus, ErrorCategory: caseResult.Info.ErrorCategory,
-					PatchBytes: len(caseResult.ModelPatch), LLMCalls: caseResult.LLMCalls,
-					ToolCalls: caseResult.ToolCalls, DurationMS: caseResult.DurationMS,
-				}
+				progress.Cases[c.InstanceID] = progressCaseFromResult(caseResult)
 				progress.UpdatedAt = time.Now().UTC()
 				predErr := persistPredictions(predictionsPath, preds)
 				progressErr := artifact.WriteJSON(progressPath, progress)
@@ -358,39 +371,28 @@ func Run(args []string) error {
 	artifactWriteErr := errors.Join(artifactWriteErrors...)
 
 	finished := time.Now()
-	exitCounts := map[string]int{}
+	aggregate := aggregateResults(results)
 	if missingSkipped := len(skipped) - loadedSkipped; missingSkipped > 0 {
-		exitCounts["ExistingPrediction"] = missingSkipped
+		aggregate.ExitStatusCounts["ExistingPrediction"] = missingSkipped
 	}
-	var llmCalls, toolCalls int
-	var usage usageSummary
 	status := "completed"
 	if len(skipped) != loadedSkipped || artifactWriteErr != nil {
 		status = "completed_with_errors"
 	}
-	for _, result := range results {
-		exitCounts[result.Info.ExitStatus]++
-		llmCalls += result.LLMCalls
-		toolCalls += result.ToolCalls
-		usage.PromptTokens += result.Usage.PromptTokens
-		usage.CachedTokens += result.Usage.PromptTokensDetails.CachedTokens
-		usage.CompletionTokens += result.Usage.CompletionTokens
-		usage.ReasoningTokens += result.Usage.CompletionTokensDetails.ReasoningTokens
-		usage.TotalTokens += result.Usage.TotalTokens
-		if result.Info.ExitStatus == "Error" || result.Info.ExitStatus == "ArtifactError" {
-			status = "completed_with_errors"
-		}
+	if aggregate.HasErrors {
+		status = "completed_with_errors"
 	}
 	doc := manifest{
 		RunID: *runID, RunnerType: "trpc-agent-go-native", FrameworkModule: build.FrameworkModule,
 		FrameworkVersion: build.FrameworkVersion,
-		AgentProtocol:    agentProtocol(codec, *cleanRoom), UpstreamCommit: protocol.UpstreamCommit,
+		AgentProtocol:    agentProtocol(codec, *cleanRoom, *toolLoopWarning), UpstreamCommit: protocol.UpstreamCommit,
 		ObservationCodec: string(codec), SourceRevision: build.SourceRevision,
 		SourceModified: build.SourceModified, BinarySHA256: build.BinarySHA256,
 		CasesSHA256: casesHash, ModelConfigSHA256: modelHash,
 		EnvironmentConfigSHA256: environmentHash, SelectedInstancesSHA256: selectedHash,
-		CleanRoom: *cleanRoom, CleanRoomPolicySHA256: cleanRoomPolicySHA256,
-		ImageSetSHA256: imageSetSHA256, DockerImages: resolvedImages,
+		CleanRoom: *cleanRoom, ToolLoopWarning: *toolLoopWarning,
+		CleanRoomPolicySHA256: cleanRoomPolicySHA256,
+		ImageSetSHA256:        imageSetSHA256, DockerImages: resolvedImages,
 		StartedAt:  started.UTC(),
 		FinishedAt: finished.UTC(), DurationMS: finished.Sub(started).Milliseconds(),
 		Cases: artifact.AbsPath(*casesPath), OutputDir: artifact.AbsPath(*output), Filter: *filter,
@@ -400,7 +402,9 @@ func Run(args []string) error {
 		Predictions: artifact.AbsPath(predictionsPath), Progress: artifact.AbsPath(progressPath),
 		ModelConfig: modelManifestConfig(modelCfg), Environment: artifact.AbsPath(*environmentConfigPath),
 		CommandTimeout: commandTimeout.String(), CaseTimeout: caseTimeout.String(),
-		ExitStatusCounts: exitCounts, LLMCalls: llmCalls, ToolCalls: toolCalls, Usage: usage,
+		ExitStatusCounts: aggregate.ExitStatusCounts, LLMCalls: aggregate.LLMCalls,
+		ToolCalls: aggregate.ToolCalls, ToolLoopWarningCount: aggregate.ToolLoopWarningCount,
+		ToolLoopWarningCaseCount: aggregate.ToolLoopWarningCaseCount, Usage: aggregate.Usage,
 		Status: status,
 		Notes: []string{
 			"Each case runs through tRPC-Agent-Go llmagent and runner lifecycles in an independent official SWE-Bench container.",
@@ -415,6 +419,11 @@ func Run(args []string) error {
 			"Clean-room cases use local immutable image IDs, Docker network=none, recursive Git sanitation, and exact base-commit verification before the first model call.",
 		)
 	}
+	if *toolLoopWarning {
+		doc.Notes = append(doc.Notes,
+			"Exact repeated complete tool-use/result batches inject one warning immediately before the next real model call; telemetry records those injection call numbers.",
+		)
+	}
 	manifestPath := filepath.Join(*output, "native-runner-manifest.json")
 	if err := artifact.WriteJSON(manifestPath, doc); err != nil {
 		return err
@@ -427,13 +436,47 @@ func Run(args []string) error {
 	return nil
 }
 
-func agentProtocol(codec observation.ObservationCodec, cleanRoom bool) string {
+func progressCaseFromResult(result executor.CaseResult) progressCase {
+	return progressCase{
+		Status: result.Info.ExitStatus, ErrorCategory: result.Info.ErrorCategory,
+		PatchBytes: len(result.ModelPatch), LLMCalls: result.LLMCalls,
+		ToolCalls: result.ToolCalls, ToolLoopWarningCount: result.ToolLoopWarningCount,
+		DurationMS: result.DurationMS,
+	}
+}
+
+func aggregateResults(results map[string]executor.CaseResult) resultAggregate {
+	aggregate := resultAggregate{ExitStatusCounts: map[string]int{}}
+	for _, result := range results {
+		aggregate.ExitStatusCounts[result.Info.ExitStatus]++
+		aggregate.LLMCalls += result.LLMCalls
+		aggregate.ToolCalls += result.ToolCalls
+		aggregate.ToolLoopWarningCount += result.ToolLoopWarningCount
+		if result.ToolLoopWarningCount > 0 {
+			aggregate.ToolLoopWarningCaseCount++
+		}
+		aggregate.Usage.PromptTokens += result.Usage.PromptTokens
+		aggregate.Usage.CachedTokens += result.Usage.PromptTokensDetails.CachedTokens
+		aggregate.Usage.CompletionTokens += result.Usage.CompletionTokens
+		aggregate.Usage.ReasoningTokens += result.Usage.CompletionTokensDetails.ReasoningTokens
+		aggregate.Usage.TotalTokens += result.Usage.TotalTokens
+		if result.Info.ExitStatus == "Error" || result.Info.ExitStatus == "ArtifactError" {
+			aggregate.HasErrors = true
+		}
+	}
+	return aggregate
+}
+
+func agentProtocol(codec observation.ObservationCodec, cleanRoom, toolLoopWarning bool) string {
 	base := "mini-swe-agent-v2.1-on-trpc-agent-go"
 	if codec != observation.ObservationCodecXML {
 		base += "+codec-" + string(codec)
 	}
 	if cleanRoom {
 		base += "+clean-room-v1"
+	}
+	if toolLoopWarning {
+		base += "+tool-loop-warning-v1"
 	}
 	return base
 }
@@ -620,6 +663,17 @@ func validateResumeResultForMode(
 	if info.CleanRoom != expected.CleanRoom {
 		return fmt.Errorf("existing prediction %s has clean_room=%t, want %t", instanceID, info.CleanRoom, expected.CleanRoom)
 	}
+	if info.ToolLoopWarning != expected.ToolLoopWarning {
+		return fmt.Errorf(
+			"existing prediction %s has tool_loop_warning=%t, want %t",
+			instanceID,
+			info.ToolLoopWarning,
+			expected.ToolLoopWarning,
+		)
+	}
+	if err := validateToolLoopWarningTelemetry(instanceID, result); err != nil {
+		return err
+	}
 	checks := []struct {
 		name     string
 		actual   string
@@ -714,6 +768,53 @@ func validateResumeResultForMode(
 	return nil
 }
 
+func validateToolLoopWarningTelemetry(instanceID string, result executor.CaseResult) error {
+	count := result.ToolLoopWarningCount
+	calls := result.ToolLoopWarningLLMCalls
+	if count < 0 {
+		return fmt.Errorf("existing prediction %s has negative tool_loop_warning_count %d", instanceID, count)
+	}
+	if len(calls) != count {
+		return fmt.Errorf(
+			"existing prediction %s has %d tool_loop_warning_llm_calls, want count %d",
+			instanceID,
+			len(calls),
+			count,
+		)
+	}
+	if !result.Info.ToolLoopWarning && count != 0 {
+		return fmt.Errorf(
+			"existing prediction %s has tool-loop warning telemetry with tool_loop_warning=false",
+			instanceID,
+		)
+	}
+	if count == 0 {
+		if result.FirstToolLoopWarningLLMCall != nil {
+			return fmt.Errorf("existing prediction %s has first_tool_loop_warning_llm_call without a warning", instanceID)
+		}
+		return nil
+	}
+	if result.FirstToolLoopWarningLLMCall == nil || *result.FirstToolLoopWarningLLMCall != calls[0] {
+		return fmt.Errorf("existing prediction %s has inconsistent first_tool_loop_warning_llm_call", instanceID)
+	}
+	previous := 0
+	for _, call := range calls {
+		if call <= previous {
+			return fmt.Errorf("existing prediction %s tool_loop_warning_llm_calls are not strictly increasing", instanceID)
+		}
+		if call > result.LLMCalls {
+			return fmt.Errorf(
+				"existing prediction %s has tool-loop warning at LLM call %d beyond llm_calls=%d",
+				instanceID,
+				call,
+				result.LLMCalls,
+			)
+		}
+		previous = call
+	}
+	return nil
+}
+
 func expectedAuxiliaryImages(
 	instanceID string,
 	images map[string]sweenv.ImageIdentity,
@@ -768,9 +869,9 @@ func writeCaseBundle(output string, result *executor.CaseResult, writeJSON func(
 
 func loadExistingCaseBundle(output, instanceID string, prediction contract.Prediction) (executor.CaseResult, error) {
 	caseDir := filepath.Join(output, instanceID)
-	var result executor.CaseResult
 	resultPath := filepath.Join(caseDir, instanceID+".native.json")
-	if err := artifact.ReadJSONFile(resultPath, &result); err != nil {
+	result, err := readExistingCaseResult(resultPath, instanceID)
+	if err != nil {
 		return result, fmt.Errorf("validate existing prediction %s result artifact: %w", instanceID, err)
 	}
 	var responses []*model.Response
@@ -808,6 +909,46 @@ func loadExistingCaseBundle(output, instanceID string, prediction contract.Predi
 		return result, fmt.Errorf("existing prediction %s patch does not match result artifact", instanceID)
 	}
 	result.Responses = responses
+	return result, nil
+}
+
+func readExistingCaseResult(path, instanceID string) (executor.CaseResult, error) {
+	var result executor.CaseResult
+	payload, err := os.ReadFile(path)
+	if err != nil {
+		return result, err
+	}
+	if err := json.Unmarshal(payload, &result); err != nil {
+		return result, err
+	}
+	if !result.Info.ToolLoopWarning {
+		return result, nil
+	}
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(payload, &fields); err != nil {
+		return result, err
+	}
+	for _, field := range []string{
+		"tool_loop_warning_count",
+		"first_tool_loop_warning_llm_call",
+		"tool_loop_warning_llm_calls",
+	} {
+		value, ok := fields[field]
+		if !ok {
+			return result, fmt.Errorf(
+				"tool-loop warning enabled result %s is missing required field %q",
+				instanceID,
+				field,
+			)
+		}
+		if field != "first_tool_loop_warning_llm_call" && strings.TrimSpace(string(value)) == "null" {
+			return result, fmt.Errorf(
+				"tool-loop warning enabled result %s has null required field %q",
+				instanceID,
+				field,
+			)
+		}
+	}
 	return result, nil
 }
 

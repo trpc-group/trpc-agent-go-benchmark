@@ -22,7 +22,15 @@ import (
 
 const (
 	// SubmissionMarker is the first successful output line that ends a case.
-	SubmissionMarker    = "COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT"
+	SubmissionMarker = "COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT"
+	// SubmissionStopMessage is the benchmark-owned StopError message emitted
+	// after a successful submission. The offline replay uses the same constant
+	// to bind the otherwise unpersisted terminal tool-result boundary.
+	SubmissionStopMessage = "SWE-Bench submission accepted"
+	// SubmissionStopEventMessage is the pinned framework wrapper persisted on
+	// the flow error event produced from SubmissionStopMessage.
+	SubmissionStopEventMessage = "tool callback error: " + SubmissionStopMessage
+
 	formatErrorTemplate = `Tool call error:
 
 <error>

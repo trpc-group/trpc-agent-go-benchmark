@@ -53,6 +53,10 @@ were added are rejected during resume. Keep them as historical evidence and use
 a new output directory (or explicitly rerun them) instead of mixing old and new
 bundle schemas.
 
+The optional tool-loop warning setting is also part of the immutable run
+identity. Resume rejects a case bundle whose recorded setting differs from the
+current command, even when every other fingerprint matches.
+
 Each output directory contains:
 
 ```text
@@ -65,6 +69,67 @@ native-runner-progress.json
 
 The manifest reads the linked tRPC-Agent-Go module version from Go build
 information. It does not hardcode a development revision.
+
+## Optional exact tool-loop warning
+
+The warning is a benchmark protocol option, not a tRPC-Agent-Go framework
+default. It is disabled unless `--tool-loop-warning=true` is supplied. When
+enabled, the runner compares consecutive, complete assistant tool-call batches
+after all calls in each batch have produced their final model-visible results.
+A batch is an exact repeat only when its ordered tool names, canonical JSON
+arguments, and result observations match. JSON object key order and
+insignificant argument whitespace do not change the comparison; tool order or
+any name, argument value, or visible result change does.
+
+On a match, the runner appends one fixed `<tool_loop_detected>` instruction to
+the history immediately before the next real model request. The warning does
+not create an extra model request, tool call, retry, or hidden recovery turn.
+After a match the detector resets, so a three-batch `T,T,T` sequence warns only
+before the model request following the second batch.
+
+The setting and observations remain auditable across the artifact pipeline:
+
+- each case `info` records `tool_loop_warning`; its result records
+  `tool_loop_warning_count`, nullable `first_tool_loop_warning_llm_call`, and
+  the ordered `tool_loop_warning_llm_calls` list;
+- progress records the per-case count, while the runner manifest records the
+  setting plus total warning-event and warning-case counts, including valid
+  cases loaded through resume; and
+- the Native `agent_protocol` gains the `+tool-loop-warning-v1` suffix (after
+  `+clean-room-v1` when both options are enabled).
+
+The recorded call number is the real model call that received the warning.
+When no warning occurred, the count is zero, the first-call field is `null`,
+and the call list is empty.
+
+For a warning-off run, apply the exact same detector offline without modifying
+any source artifact. Current Native output uses the per-case identity layout:
+
+```bash
+go run ./trpc-agent-go-impl/cmd/tool-loop-shadow-replay \
+  --run-dir results/runs/<run-id>/raw/native \
+  --output results/runs/<run-id>/tool-loop-shadow-replay.json
+```
+
+The frozen V12 clean-room runs use the legacy TAG layout instead:
+
+```bash
+go run ./trpc-agent-go-impl/cmd/tool-loop-shadow-replay \
+  --run-dir results/runs/<run-id>/raw/tag \
+  --output results/runs/<run-id>/tool-loop-shadow-replay.json
+```
+
+That adapter accepts only the fixed root `tag-runner-manifest.json` plus an
+exact 500-case set of per-case `.tag.json` and `.responses.json` artifacts. It
+does not mix current and legacy layouts. Because the legacy manifest did not
+record a `clean_room` field, its report emits `run_identity.clean_room: null`;
+this means "not recorded in this artifact schema", not `false`.
+
+The deterministic report fingerprints every admitted trajectory and detached
+response artifact. It records would-warn cases and events, first/all LLM-call
+positions, and the terminal outcome plus remaining call-count summary after
+the first warning point. Input paths are validated fail-closed and the report
+is replaced atomically.
 
 ## Optional clean-room generation
 
