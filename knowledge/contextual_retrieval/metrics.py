@@ -13,12 +13,45 @@ from __future__ import annotations
 import math
 import random
 from collections import defaultdict
+from functools import lru_cache
 from statistics import mean
 from typing import Any, Dict, List, Mapping, Sequence
 
 
 DEFAULT_CUTOFFS = (4, 10, 20)
 PRIMARY_METRIC = "all_evidence_recall_at_10"
+
+
+def _attainable_ideal_dcg(
+    evidence_chunks: Mapping[str, set[str]],
+    cutoff: int,
+) -> float:
+    """Return the best evidence-novelty DCG allowed by the gold mapping."""
+    evidence_bits = {
+        evidence_id: 1 << index
+        for index, evidence_id in enumerate(evidence_chunks)
+    }
+    chunk_masks: Dict[str, int] = defaultdict(int)
+    for evidence_id, chunk_ids in evidence_chunks.items():
+        for chunk_id in chunk_ids:
+            chunk_masks[chunk_id] |= evidence_bits[evidence_id]
+    candidate_masks = tuple(sorted(set(chunk_masks.values())))
+    all_evidence = (1 << len(evidence_chunks)) - 1
+
+    @lru_cache(maxsize=None)
+    def best(covered: int, rank: int) -> float:
+        if covered == all_evidence or rank > cutoff:
+            return 0.0
+        candidates = []
+        for mask in candidate_masks:
+            newly_covered = mask & ~covered
+            if not newly_covered:
+                continue
+            gain = newly_covered.bit_count() / math.log2(rank + 1)
+            candidates.append(gain + best(covered | mask, rank + 1))
+        return max(candidates, default=0.0)
+
+    return best(0, 1)
 
 
 def score_ranking(
@@ -105,11 +138,11 @@ def score_ranking(
         if newly_covered:
             dcg += len(newly_covered) / math.log2(rank + 1)
             covered.update(newly_covered)
-    ideal_hits = min(len(evidence_chunks), ndcg_cutoff)
-    ideal_dcg = sum(
-        1.0 / math.log2(rank + 1) for rank in range(1, ideal_hits + 1)
-    )
-    metrics[f"ndcg_at_{ndcg_cutoff}"] = dcg / ideal_dcg if ideal_dcg else 0.0
+    ideal_dcg = _attainable_ideal_dcg(evidence_chunks, ndcg_cutoff)
+    ndcg = dcg / ideal_dcg if ideal_dcg else 0.0
+    if ndcg > 1.0 + 1e-12:
+        raise ValueError("evidence-novelty nDCG exceeds its attainable ideal")
+    metrics[f"ndcg_at_{ndcg_cutoff}"] = min(ndcg, 1.0)
     return {
         "metrics": metrics,
         "hits": hits,

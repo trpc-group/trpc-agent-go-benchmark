@@ -47,6 +47,57 @@ class ContextualRetrievalMetricsTest(unittest.TestCase):
         self.assertEqual(0.5, result["metrics"]["mrr"])
         self.assertEqual(["e1"], result["hits"]["at_2"]["evidence_ids"])
 
+    def test_ndcg_uses_attainable_multi_evidence_ideal(self):
+        case = {
+            "case_id": "case-1",
+            "evidence": [
+                {
+                    "evidence_id": evidence_id,
+                    "parent_document_id": "p1",
+                    "chunk_ids": ["all-evidence"],
+                }
+                for evidence_id in ("e1", "e2", "e3")
+            ],
+        }
+        ranking = [
+            {"chunk_id": "all-evidence", "parent_document_id": "p1"},
+        ]
+
+        result = score_ranking(case, ranking)
+
+        self.assertEqual(1.0, result["metrics"]["ndcg_at_20"])
+
+    def test_ndcg_discounts_suboptimal_evidence_coverage_order(self):
+        case = {
+            "case_id": "case-1",
+            "evidence": [
+                {
+                    "evidence_id": "e1",
+                    "parent_document_id": "p1",
+                    "chunk_ids": ["two-evidence"],
+                },
+                {
+                    "evidence_id": "e2",
+                    "parent_document_id": "p1",
+                    "chunk_ids": ["two-evidence"],
+                },
+                {
+                    "evidence_id": "e3",
+                    "parent_document_id": "p2",
+                    "chunk_ids": ["one-evidence"],
+                },
+            ],
+        }
+        ranking = [
+            {"chunk_id": "one-evidence", "parent_document_id": "p2"},
+            {"chunk_id": "two-evidence", "parent_document_id": "p1"},
+        ]
+
+        result = score_ranking(case, ranking)
+
+        self.assertGreater(result["metrics"]["ndcg_at_20"], 0.0)
+        self.assertLess(result["metrics"]["ndcg_at_20"], 1.0)
+
     def test_paired_comparison_preserves_case_alignment(self):
         baseline = []
         contextual = []

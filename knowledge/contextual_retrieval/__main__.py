@@ -32,6 +32,7 @@ from contextual_retrieval.dataset import (
     map_evidence_to_chunks,
     prepare_dataset,
 )
+from contextual_retrieval.rescore import rescore_retrieval_samples
 from contextual_retrieval.runner import run_retrieval_ab
 
 
@@ -112,6 +113,22 @@ def _parser() -> argparse.ArgumentParser:
     run.add_argument("--bootstrap-seed", type=int, default=20260722)
     run.add_argument("--limit", type=int)
     run.add_argument("--smoke-per-type", type=int)
+
+    rescore = subparsers.add_parser(
+        "rescore-retrieval",
+        help="Recompute metrics from frozen retrieval rankings",
+    )
+    rescore.add_argument("--cases", required=True)
+    rescore.add_argument("--source-manifest", required=True)
+    rescore.add_argument("--source-samples", required=True)
+    rescore.add_argument("--output", required=True)
+    rescore.add_argument("--bootstrap-resamples", type=int)
+    rescore.add_argument("--bootstrap-seed", type=int)
+    rescore.add_argument(
+        "--allow-case-manifest-change",
+        action="store_true",
+        help="Allow an explicitly audited corrected case manifest",
+    )
 
     agentic = subparsers.add_parser(
         "run-agentic",
@@ -304,6 +321,16 @@ def _run(args: argparse.Namespace) -> Dict[str, Any]:
             bootstrap_seed=args.bootstrap_seed,
             limit=args.limit,
             smoke_per_type=args.smoke_per_type,
+        )
+    if args.command == "rescore-retrieval":
+        return rescore_retrieval_samples(
+            args.cases,
+            args.source_manifest,
+            args.source_samples,
+            args.output,
+            bootstrap_resamples=args.bootstrap_resamples,
+            bootstrap_seed=args.bootstrap_seed,
+            allow_case_manifest_change=args.allow_case_manifest_change,
         )
     if args.command == "run-agentic":
         return run_agentic_ab(

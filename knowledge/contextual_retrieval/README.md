@@ -80,7 +80,7 @@ artifacts.
 
 ## CLI overview
 
-The package exposes eleven commands:
+The package exposes twelve commands:
 
 | Command | Purpose |
 |---|---|
@@ -90,6 +90,7 @@ The package exposes eleven commands:
 | `generate-contexts` | Generate or resume the append-only Context cache. |
 | `summarize-contexts` | Validate an existing Context cache and seal its summary. |
 | `run` | Run a paired retrieval-only A/B against existing services. |
+| `rescore-retrieval` | Recompute metrics from sealed retrieval rankings without contacting services. |
 | `run-server-smoke` | Build/reuse isolated indexes and run guarded I1 smoke. |
 | `run-server-formal` | Reuse promoted indexes for guarded I1 formal evaluation. |
 | `run-agentic` | Freeze Agent answers against existing services; uncontrolled without controller lineage. |
@@ -227,6 +228,31 @@ python -m contextual_retrieval run-server-formal \
 
 `run-server-formal` first repeats the conformance smoke and never calls `/load`
 for the frozen complete indexes.
+
+I1 reports document, evidence, and all-evidence recall, MRR, and
+evidence-novelty nDCG. At each rank, nDCG gain is the number of evidence items
+covered for the first time. Its ideal DCG is the best ordering attainable from
+the case's sealed chunk-to-evidence mapping, so an ideal ranking scores `1.0`
+even when one chunk covers several evidence items.
+
+Scoring fixes do not require another retrieval run. Recompute metrics from a
+sealed manifest and its complete frozen rankings into a new artifact:
+
+```bash
+python -m contextual_retrieval rescore-retrieval \
+  --cases "$CR_WORKDIR/artifacts/cases.json" \
+  --source-manifest "$CR_WORKDIR/runs/i1-formal/formal.manifest.json" \
+  --source-samples "$CR_WORKDIR/runs/i1-formal/formal.samples.json" \
+  --output "$CR_WORKDIR/runs/i1-formal/formal.rescore.json"
+```
+
+The command verifies the sealed source lineage, uses the source bootstrap seed
+and resample count by default, and writes an aggregate-only artifact with
+provenance digests.
+It never calls HTTP, PostgreSQL, an embedding service, or a model, and never
+overwrites the source artifacts. A corrected case manifest is rejected unless
+`--allow-case-manifest-change` is supplied for an explicitly audited mapping
+correction; both source and corrected case digests remain in the output.
 
 ## 4. Freeze I2 Agent answers
 

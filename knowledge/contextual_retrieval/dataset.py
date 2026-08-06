@@ -425,7 +425,7 @@ def map_evidence_to_chunks(
                 )
                 if any(
                     chunk_start < evidence_end
-                    and chunk_end + 1 > evidence_start
+                    and chunk_end > evidence_start
                     for evidence_start, evidence_end in occurrence_intervals
                 )
             ]
