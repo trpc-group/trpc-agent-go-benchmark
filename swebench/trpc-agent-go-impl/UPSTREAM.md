@@ -43,3 +43,11 @@ mini-SWE-agent and are not tRPC-Agent-Go framework defaults. The default-off
 Native path keeps the source-aligned prompts and Docker behavior described
 above; enabling clean-room mode adds an accurate offline capability notice to
 the model-facing prompt and records the distinct protocol identity.
+
+The optional exact tool-loop warning is also benchmark-local and default-off.
+It uses runner callbacks and persisted telemetry for a controlled SWE-Bench
+ablation; it does not add loop policy to the root tRPC-Agent-Go framework. The
+offline shadow-replay command consumes supported immutable warning-off
+trajectories, including the frozen V12 TAG layout, and shares the runtime
+detector implementation, so reported would-warn positions use the same frozen
+semantics.

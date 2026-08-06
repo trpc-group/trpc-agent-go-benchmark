@@ -74,21 +74,24 @@ type runConfigModel struct {
 }
 
 type runConfigRunner struct {
-	Type                  string                          `json:"type"`
-	AgentProtocol         string                          `json:"agent_protocol,omitempty"`
-	UpstreamCommit        string                          `json:"upstream_commit,omitempty"`
-	MiniSWEAgentVersion   string                          `json:"mini_swe_agent_version,omitempty"`
-	MiniExtra             string                          `json:"mini_extra,omitempty"`
-	BaseConfig            string                          `json:"base_config,omitempty"`
-	PrivateConfig         string                          `json:"private_config,omitempty"`
-	StartedAt             string                          `json:"started_at,omitempty"`
-	FinishedAt            string                          `json:"finished_at,omitempty"`
-	DurationMS            int64                           `json:"duration_ms,omitempty"`
-	CleanRoom             bool                            `json:"clean_room"`
-	CleanRoomPolicySHA256 string                          `json:"clean_room_policy_sha256,omitempty"`
-	OfflineAssets         *sweenv.OfflineAssetIdentity    `json:"offline_assets,omitempty"`
-	ImageSetSHA256        string                          `json:"image_set_sha256,omitempty"`
-	DockerImages          map[string]sweenv.ImageIdentity `json:"docker_images,omitempty"`
+	Type                     string                          `json:"type"`
+	AgentProtocol            string                          `json:"agent_protocol,omitempty"`
+	UpstreamCommit           string                          `json:"upstream_commit,omitempty"`
+	MiniSWEAgentVersion      string                          `json:"mini_swe_agent_version,omitempty"`
+	MiniExtra                string                          `json:"mini_extra,omitempty"`
+	BaseConfig               string                          `json:"base_config,omitempty"`
+	PrivateConfig            string                          `json:"private_config,omitempty"`
+	StartedAt                string                          `json:"started_at,omitempty"`
+	FinishedAt               string                          `json:"finished_at,omitempty"`
+	DurationMS               int64                           `json:"duration_ms,omitempty"`
+	CleanRoom                bool                            `json:"clean_room"`
+	ToolLoopWarning          bool                            `json:"tool_loop_warning"`
+	ToolLoopWarningCount     int                             `json:"tool_loop_warning_count"`
+	ToolLoopWarningCaseCount int                             `json:"tool_loop_warning_case_count"`
+	CleanRoomPolicySHA256    string                          `json:"clean_room_policy_sha256,omitempty"`
+	OfflineAssets            *sweenv.OfflineAssetIdentity    `json:"offline_assets,omitempty"`
+	ImageSetSHA256           string                          `json:"image_set_sha256,omitempty"`
+	DockerImages             map[string]sweenv.ImageIdentity `json:"docker_images,omitempty"`
 }
 
 type runConfigConcurrency struct {
@@ -146,36 +149,84 @@ type runConfigSourceFiles struct {
 }
 
 type runnerManifest struct {
-	RunID                   string                          `json:"run_id"`
-	RunnerType              string                          `json:"runner_type"`
-	AgentProtocol           string                          `json:"agent_protocol,omitempty"`
-	UpstreamCommit          string                          `json:"upstream_commit,omitempty"`
-	ObservationCodec        string                          `json:"observation_codec,omitempty"`
-	FrameworkModule         string                          `json:"framework_module,omitempty"`
-	FrameworkVersion        string                          `json:"framework_version,omitempty"`
-	SourceRevision          string                          `json:"source_revision,omitempty"`
-	SourceModified          bool                            `json:"source_modified"`
-	BinarySHA256            string                          `json:"binary_sha256,omitempty"`
-	CasesSHA256             string                          `json:"cases_sha256,omitempty"`
-	ModelConfigSHA256       string                          `json:"model_config_sha256,omitempty"`
-	EnvironmentConfigSHA256 string                          `json:"environment_config_sha256,omitempty"`
-	SelectedInstancesSHA256 string                          `json:"selected_instances_sha256,omitempty"`
-	CommandTimeout          string                          `json:"command_timeout,omitempty"`
-	CaseTimeout             string                          `json:"case_timeout,omitempty"`
-	CleanRoom               bool                            `json:"clean_room"`
-	CleanRoomPolicySHA256   string                          `json:"clean_room_policy_sha256,omitempty"`
-	OfflineAssets           *sweenv.OfflineAssetIdentity    `json:"offline_assets,omitempty"`
-	ImageSetSHA256          string                          `json:"image_set_sha256,omitempty"`
-	DockerImages            map[string]sweenv.ImageIdentity `json:"docker_images,omitempty"`
-	StartedAt               time.Time                       `json:"started_at"`
-	FinishedAt              time.Time                       `json:"finished_at"`
-	DurationMS              int64                           `json:"duration_ms"`
-	OutputDir               string                          `json:"output_dir"`
-	CaseCount               int                             `json:"case_count"`
-	Workers                 int                             `json:"workers,omitempty"`
-	Predictions             string                          `json:"predictions"`
-	ModelConfig             map[string]string               `json:"model_config,omitempty"`
-	Status                  string                          `json:"status,omitempty"`
+	RunID                    string                          `json:"run_id"`
+	RunnerType               string                          `json:"runner_type"`
+	AgentProtocol            string                          `json:"agent_protocol,omitempty"`
+	UpstreamCommit           string                          `json:"upstream_commit,omitempty"`
+	ObservationCodec         string                          `json:"observation_codec,omitempty"`
+	FrameworkModule          string                          `json:"framework_module,omitempty"`
+	FrameworkVersion         string                          `json:"framework_version,omitempty"`
+	SourceRevision           string                          `json:"source_revision,omitempty"`
+	SourceModified           bool                            `json:"source_modified"`
+	BinarySHA256             string                          `json:"binary_sha256,omitempty"`
+	CasesSHA256              string                          `json:"cases_sha256,omitempty"`
+	ModelConfigSHA256        string                          `json:"model_config_sha256,omitempty"`
+	EnvironmentConfigSHA256  string                          `json:"environment_config_sha256,omitempty"`
+	SelectedInstancesSHA256  string                          `json:"selected_instances_sha256,omitempty"`
+	CommandTimeout           string                          `json:"command_timeout,omitempty"`
+	CaseTimeout              string                          `json:"case_timeout,omitempty"`
+	CleanRoom                bool                            `json:"clean_room"`
+	ToolLoopWarning          bool                            `json:"tool_loop_warning"`
+	ToolLoopWarningCount     int                             `json:"tool_loop_warning_count"`
+	ToolLoopWarningCaseCount int                             `json:"tool_loop_warning_case_count"`
+	CleanRoomPolicySHA256    string                          `json:"clean_room_policy_sha256,omitempty"`
+	OfflineAssets            *sweenv.OfflineAssetIdentity    `json:"offline_assets,omitempty"`
+	ImageSetSHA256           string                          `json:"image_set_sha256,omitempty"`
+	DockerImages             map[string]sweenv.ImageIdentity `json:"docker_images,omitempty"`
+	StartedAt                time.Time                       `json:"started_at"`
+	FinishedAt               time.Time                       `json:"finished_at"`
+	DurationMS               int64                           `json:"duration_ms"`
+	OutputDir                string                          `json:"output_dir"`
+	CaseCount                int                             `json:"case_count"`
+	Workers                  int                             `json:"workers,omitempty"`
+	Predictions              string                          `json:"predictions"`
+	ModelConfig              map[string]string               `json:"model_config,omitempty"`
+	Status                   string                          `json:"status,omitempty"`
+	toolLoopWarningCountSet  bool                            `json:"-"`
+	toolLoopWarningCasesSet  bool                            `json:"-"`
+}
+
+func (m *runnerManifest) UnmarshalJSON(data []byte) error {
+	type plain runnerManifest
+	var decoded plain
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(data, &fields); err != nil {
+		return err
+	}
+	*m = runnerManifest(decoded)
+	m.toolLoopWarningCountSet = nonNullJSONField(fields, "tool_loop_warning_count")
+	m.toolLoopWarningCasesSet = nonNullJSONField(fields, "tool_loop_warning_case_count")
+	return nil
+}
+
+func nonNullJSONField(fields map[string]json.RawMessage, name string) bool {
+	value, ok := fields[name]
+	return ok && !bytes.Equal(bytes.TrimSpace(value), []byte("null"))
+}
+
+func validateRunnerWarningAggregatePresence(label string, manifest runnerManifest) error {
+	return validateWarningAggregatePresence(
+		label,
+		manifest.ToolLoopWarning,
+		manifest.toolLoopWarningCountSet,
+		manifest.toolLoopWarningCasesSet,
+	)
+}
+
+func validateWarningAggregatePresence(label string, enabled, countSet, casesSet bool) error {
+	if !enabled {
+		return nil
+	}
+	if !countSet {
+		return fmt.Errorf("%s is missing tool_loop_warning_count for tool_loop_warning=true", label)
+	}
+	if !casesSet {
+		return fmt.Errorf("%s is missing tool_loop_warning_case_count for tool_loop_warning=true", label)
+	}
+	return nil
 }
 
 func cloneOfflineAssetIdentity(identity *sweenv.OfflineAssetIdentity) *sweenv.OfflineAssetIdentity {
@@ -431,6 +482,9 @@ func runRunConfig(args []string) error {
 	miniRawDir := outputDir
 	miniLog := runnerLog
 	runnerCleanRoom := false
+	runnerToolLoopWarning := false
+	runnerToolLoopWarningCount := 0
+	runnerToolLoopWarningCaseCount := 0
 	runnerAgentProtocol := ""
 	runnerUpstreamCommit := ""
 	runnerCleanRoomPolicySHA256 := ""
@@ -449,6 +503,9 @@ func runRunConfig(args []string) error {
 		miniRawDir = ""
 		miniLog = ""
 		runnerCleanRoom = genericManifest.CleanRoom
+		runnerToolLoopWarning = genericManifest.ToolLoopWarning
+		runnerToolLoopWarningCount = genericManifest.ToolLoopWarningCount
+		runnerToolLoopWarningCaseCount = genericManifest.ToolLoopWarningCaseCount
 		runnerAgentProtocol = genericManifest.AgentProtocol
 		runnerUpstreamCommit = genericManifest.UpstreamCommit
 		runnerCleanRoomPolicySHA256 = genericManifest.CleanRoomPolicySHA256
@@ -476,6 +533,9 @@ func runRunConfig(args []string) error {
 		miniRawDir = ""
 		miniLog = ""
 		runnerCleanRoom = shardManifest.RunnerIdentity.CleanRoom
+		runnerToolLoopWarning = shardManifest.RunnerIdentity.ToolLoopWarning
+		runnerToolLoopWarningCount = shardManifest.ToolLoopWarningCount
+		runnerToolLoopWarningCaseCount = shardManifest.ToolLoopWarningCaseCount
 		runnerAgentProtocol = shardManifest.RunnerIdentity.AgentProtocol
 		runnerUpstreamCommit = shardManifest.RunnerIdentity.UpstreamCommit
 		runnerCleanRoomPolicySHA256 = shardManifest.RunnerIdentity.CleanRoomPolicySHA256
@@ -509,21 +569,24 @@ func runRunConfig(args []string) error {
 			ConfigReference: configReference,
 		},
 		Runner: runConfigRunner{
-			Type:                  runnerType,
-			AgentProtocol:         runnerAgentProtocol,
-			UpstreamCommit:        runnerUpstreamCommit,
-			MiniSWEAgentVersion:   miniSWEAgentVersion(doctor),
-			MiniExtra:             miniExtra,
-			BaseConfig:            baseConfig,
-			PrivateConfig:         privateConfig,
-			StartedAt:             runnerStartedAt,
-			FinishedAt:            runnerFinishedAt,
-			DurationMS:            runnerDurationMS,
-			CleanRoom:             runnerCleanRoom,
-			CleanRoomPolicySHA256: runnerCleanRoomPolicySHA256,
-			OfflineAssets:         runnerOfflineAssets,
-			ImageSetSHA256:        runnerImageSetSHA256,
-			DockerImages:          runnerDockerImages,
+			Type:                     runnerType,
+			AgentProtocol:            runnerAgentProtocol,
+			UpstreamCommit:           runnerUpstreamCommit,
+			MiniSWEAgentVersion:      miniSWEAgentVersion(doctor),
+			MiniExtra:                miniExtra,
+			BaseConfig:               baseConfig,
+			PrivateConfig:            privateConfig,
+			StartedAt:                runnerStartedAt,
+			FinishedAt:               runnerFinishedAt,
+			DurationMS:               runnerDurationMS,
+			CleanRoom:                runnerCleanRoom,
+			ToolLoopWarning:          runnerToolLoopWarning,
+			ToolLoopWarningCount:     runnerToolLoopWarningCount,
+			ToolLoopWarningCaseCount: runnerToolLoopWarningCaseCount,
+			CleanRoomPolicySHA256:    runnerCleanRoomPolicySHA256,
+			OfflineAssets:            runnerOfflineAssets,
+			ImageSetSHA256:           runnerImageSetSHA256,
+			DockerImages:             runnerDockerImages,
 		},
 		Concurrency: runConfigConcurrency{
 			AgentGenerationWorkers: agentWorkers,
@@ -676,6 +739,14 @@ func validateRunConfigInputs(
 		if err != nil {
 			return fmt.Errorf("shards runner identity is invalid: %w", err)
 		}
+		if err := validateWarningAggregatePresence(
+			"shards manifest",
+			canonicalIdentity.ToolLoopWarning,
+			shards.toolLoopWarningCountSet,
+			shards.toolLoopWarningCasesSet,
+		); err != nil {
+			return err
+		}
 		if shards.ExpectedCases != selectedCaseCount {
 			return fmt.Errorf(
 				"shards expected cases %d does not match selected case count %d",
@@ -696,6 +767,8 @@ func validateRunConfigInputs(
 		aggregatedIdentity := cloneShardRunnerIdentity(canonicalIdentity)
 		aggregatedIdentity.DockerImages = nil
 		aggregatedIdentity.ImageSetSHA256 = ""
+		aggregatedToolLoopWarningCount := 0
+		aggregatedToolLoopWarningCaseCount := 0
 		for _, shard := range shards.Shards {
 			if shard.Status != "accepted" || shard.FailureReason != "" {
 				return fmt.Errorf("shard %q is not accepted: status=%q reason=%q", shard.RunID, shard.Status, shard.FailureReason)
@@ -707,6 +780,25 @@ func validateRunConfigInputs(
 			if mismatch := shardRunnerIdentityMismatch(canonicalIdentity, shardIdentity); mismatch != "" {
 				return fmt.Errorf("shard %q runner identity mismatch: %s", shard.RunID, mismatch)
 			}
+			if err := validateWarningAggregatePresence(
+				fmt.Sprintf("shard %q", shard.RunID),
+				shardIdentity.ToolLoopWarning,
+				shard.toolLoopWarningCountSet,
+				shard.toolLoopWarningCasesSet,
+			); err != nil {
+				return err
+			}
+			if err := validateToolLoopWarningManifest(
+				fmt.Sprintf("shard %q", shard.RunID),
+				shardIdentity.ToolLoopWarning,
+				shard.ToolLoopWarningCount,
+				shard.ToolLoopWarningCaseCount,
+				shard.ExpectedCount,
+			); err != nil {
+				return err
+			}
+			aggregatedToolLoopWarningCount += shard.ToolLoopWarningCount
+			aggregatedToolLoopWarningCaseCount += shard.ToolLoopWarningCaseCount
 			if err := mergeShardDockerImages(&aggregatedIdentity, shardIdentity); err != nil {
 				return fmt.Errorf("shard %q runner image provenance mismatch: %w", shard.RunID, err)
 			}
@@ -722,6 +814,25 @@ func validateRunConfigInputs(
 					selectedSHA256,
 				)
 			}
+		}
+		if err := validateToolLoopWarningManifest(
+			"shards manifest",
+			canonicalIdentity.ToolLoopWarning,
+			shards.ToolLoopWarningCount,
+			shards.ToolLoopWarningCaseCount,
+			shards.ExpectedCases,
+		); err != nil {
+			return err
+		}
+		if aggregatedToolLoopWarningCount != shards.ToolLoopWarningCount ||
+			aggregatedToolLoopWarningCaseCount != shards.ToolLoopWarningCaseCount {
+			return fmt.Errorf(
+				"shards tool-loop warning totals %d/%d do not match shard aggregate %d/%d",
+				shards.ToolLoopWarningCount,
+				shards.ToolLoopWarningCaseCount,
+				aggregatedToolLoopWarningCount,
+				aggregatedToolLoopWarningCaseCount,
+			)
 		}
 		if canonicalIdentity.CleanRoom {
 			aggregatedImageSetSHA256, err := sweenv.ImageSetSHA256(aggregatedIdentity.DockerImages)
@@ -751,6 +862,10 @@ func validateRunConfigInputs(
 		if generic.CleanRoom && generic.RunnerType != "trpc-agent-go-native" {
 			return fmt.Errorf("runner type %q does not support clean_room=true", generic.RunnerType)
 		}
+		if generic.RunnerType != "trpc-agent-go-native" &&
+			(generic.ToolLoopWarning || generic.ToolLoopWarningCount != 0 || generic.ToolLoopWarningCaseCount != 0) {
+			return fmt.Errorf("runner type %q does not support tool-loop warning fields", generic.RunnerType)
+		}
 		if err := validateCleanRoomIdentity(
 			"runner manifest",
 			generic.CleanRoom,
@@ -768,6 +883,18 @@ func validateRunConfigInputs(
 			identity := miniGoShardRunnerIdentity(generic)
 			if generic.RunnerType == "trpc-agent-go-native" {
 				identity = nativeRunnerIdentity(generic)
+				if err := validateRunnerWarningAggregatePresence("runner manifest", generic); err != nil {
+					return err
+				}
+				if err := validateToolLoopWarningManifest(
+					"runner manifest",
+					generic.ToolLoopWarning,
+					generic.ToolLoopWarningCount,
+					generic.ToolLoopWarningCaseCount,
+					generic.CaseCount,
+				); err != nil {
+					return err
+				}
 			}
 			if _, err := normalizeShardRunnerIdentity(identity); err != nil {
 				return fmt.Errorf("runner identity is invalid: %w", err)
@@ -923,6 +1050,20 @@ func validateRunConfigSelection(
 	if err != nil {
 		return runConfigSelection{}, fmt.Errorf("read imported cases for selection validation: %w", err)
 	}
+	nativeRunner := generic.RunnerType == "trpc-agent-go-native" ||
+		(hasShards && shards.RunnerIdentity.RunnerType == "trpc-agent-go-native")
+	if !nativeRunner {
+		for _, imported := range importedCases {
+			if imported.ToolLoopWarning || imported.Result.ToolLoopWarningCount != 0 ||
+				imported.Result.FirstToolLoopWarningLLMCall != nil ||
+				len(imported.Result.ToolLoopWarningLLMCalls) != 0 {
+				return runConfigSelection{}, fmt.Errorf(
+					"imported non-Native case %s has tool-loop warning fields",
+					imported.InstanceID,
+				)
+			}
+		}
+	}
 	importedIDs := make([]string, 0, len(importedCases))
 	for _, imported := range importedCases {
 		importedIDs = append(importedIDs, imported.InstanceID)
@@ -954,6 +1095,9 @@ func validateRunConfigSelection(
 			generic,
 			selection,
 		); err != nil {
+			return runConfigSelection{}, err
+		}
+		if err := validateNativeToolLoopWarningAggregate("runner manifest", importedCases, generic); err != nil {
 			return runConfigSelection{}, err
 		}
 	} else if hasShards && shards.RunnerIdentity.RunnerType == "trpc-agent-go-native" {
@@ -1383,6 +1527,15 @@ func validateNativeImportedBundles(
 				usage,
 			)
 		}
+		if row.ToolLoopWarning != trace.Info.ToolLoopWarning ||
+			row.Result.ToolLoopWarningCount != trace.ToolLoopWarningCount ||
+			!equalOptionalInt(row.Result.FirstToolLoopWarningLLMCall, trace.FirstToolLoopWarningLLMCall) ||
+			!equalInts(row.Result.ToolLoopWarningLLMCalls, trace.ToolLoopWarningLLMCalls) {
+			return fmt.Errorf(
+				"imported native tool-loop warning projection for %s does not match raw bundle",
+				row.InstanceID,
+			)
+		}
 
 		responsesPath := filepath.Join(caseDir, row.InstanceID+".responses.json")
 		responsesData, err := readRegularArtifact(responsesPath)
@@ -1422,6 +1575,7 @@ func validateShardedNativeImportedBundles(
 	shards shardsManifest,
 ) error {
 	byInstance := make(map[string]shardSummary, len(rows))
+	rowsByRunID := make(map[string][]importedCase, len(shards.Shards))
 	for _, shard := range shards.Shards {
 		for _, instanceID := range shard.ExpectedIDs {
 			if existing, ok := byInstance[instanceID]; ok {
@@ -1455,6 +1609,42 @@ func validateShardedNativeImportedBundles(
 		); err != nil {
 			return fmt.Errorf("validate native shard %s: %w", shard.RunID, err)
 		}
+		rowsByRunID[shard.RunID] = append(rowsByRunID[shard.RunID], row)
+	}
+	for _, shard := range shards.Shards {
+		if err := validateNativeToolLoopWarningAggregate(
+			fmt.Sprintf("native shard %s", shard.RunID),
+			rowsByRunID[shard.RunID],
+			runnerManifestForNativeShard(shard),
+		); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func validateNativeToolLoopWarningAggregate(
+	label string,
+	rows []importedCase,
+	manifest runnerManifest,
+) error {
+	count := 0
+	caseCount := 0
+	for _, row := range rows {
+		count += row.Result.ToolLoopWarningCount
+		if row.Result.ToolLoopWarningCount > 0 {
+			caseCount++
+		}
+	}
+	if count != manifest.ToolLoopWarningCount || caseCount != manifest.ToolLoopWarningCaseCount {
+		return fmt.Errorf(
+			"%s tool-loop warning totals %d/%d do not match imported case aggregate %d/%d",
+			label,
+			manifest.ToolLoopWarningCount,
+			manifest.ToolLoopWarningCaseCount,
+			count,
+			caseCount,
+		)
 	}
 	return nil
 }
@@ -1467,6 +1657,8 @@ func runnerManifestForNativeShard(shard shardSummary) runnerManifest {
 	manifest.OutputDir = shard.RawDir
 	manifest.CaseCount = shard.ExpectedCount
 	manifest.Workers = shard.Workers
+	manifest.ToolLoopWarningCount = shard.ToolLoopWarningCount
+	manifest.ToolLoopWarningCaseCount = shard.ToolLoopWarningCaseCount
 	return manifest
 }
 
@@ -1487,6 +1679,7 @@ func runnerManifestForNativeShardIdentity(identity shardRunnerIdentity) runnerMa
 		CommandTimeout:          identity.CommandTimeout,
 		CaseTimeout:             identity.CaseTimeout,
 		CleanRoom:               identity.CleanRoom,
+		ToolLoopWarning:         identity.ToolLoopWarning,
 		CleanRoomPolicySHA256:   identity.CleanRoomPolicySHA256,
 		OfflineAssets:           cloneOfflineAssetIdentity(identity.OfflineAssets),
 		ImageSetSHA256:          identity.ImageSetSHA256,
@@ -1552,6 +1745,14 @@ func validateNativeTraceIdentity(
 			manifest.CleanRoom,
 		)
 	}
+	if trace.Info.ToolLoopWarning != manifest.ToolLoopWarning {
+		return fmt.Errorf(
+			"native result bundle for %s info.tool_loop_warning=%t does not match runner manifest %t",
+			instanceID,
+			trace.Info.ToolLoopWarning,
+			manifest.ToolLoopWarning,
+		)
+	}
 	if trace.Info.Workers != manifest.Workers {
 		return fmt.Errorf(
 			"native result bundle for %s info.workers=%d does not match runner manifest %d",
@@ -1614,6 +1815,25 @@ func validateNativeTraceIdentity(
 		return err
 	}
 	return nil
+}
+
+func equalOptionalInt(left, right *int) bool {
+	if left == nil || right == nil {
+		return left == nil && right == nil
+	}
+	return *left == *right
+}
+
+func equalInts(left, right []int) bool {
+	if len(left) != len(right) {
+		return false
+	}
+	for i := range left {
+		if left[i] != right[i] {
+			return false
+		}
+	}
+	return true
 }
 
 func equalEnvironmentProvenance(a, b *sweenv.Provenance) bool {
@@ -1740,6 +1960,35 @@ func readAndValidateImportedCases(
 				row.InstanceID,
 				row.Result.MainStatus,
 			)
+		}
+		if row.ToolLoopWarning {
+			for _, field := range []struct {
+				name    string
+				present bool
+			}{
+				{"tool_loop_warning_count", row.Result.toolLoopWarningCountSet},
+				{"first_tool_loop_warning_llm_call", row.Result.firstToolLoopWarningCallSet},
+				{"tool_loop_warning_llm_calls", row.Result.toolLoopWarningCallsSet},
+			} {
+				if !field.present {
+					return nil, fmt.Errorf(
+						"line %d instance %q is missing result.%s for tool_loop_warning=true",
+						lineNumber,
+						row.InstanceID,
+						field.name,
+					)
+				}
+			}
+		}
+		if err := validateNativeToolLoopWarningTelemetry(
+			row.InstanceID,
+			row.ToolLoopWarning,
+			row.Result.ToolLoopWarningCount,
+			row.Result.FirstToolLoopWarningLLMCall,
+			row.Result.ToolLoopWarningLLMCalls,
+			row.Result.Usage.APICalls,
+		); err != nil {
+			return nil, fmt.Errorf("line %d has invalid tool-loop warning projection: %w", lineNumber, err)
 		}
 		counts[row.Result.MainStatus]++
 		rows = append(rows, row)

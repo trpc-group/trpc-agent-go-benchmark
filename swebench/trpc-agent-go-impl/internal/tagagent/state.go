@@ -17,13 +17,16 @@ import (
 
 // State captures one case's terminal value and model accounting.
 type State struct {
-	mu         sync.Mutex
-	submission string
-	submitted  bool
-	llmCalls   int
-	toolCalls  int
-	usage      model.Usage
-	responses  []*model.Response
+	mu                          sync.Mutex
+	submission                  string
+	submitted                   bool
+	llmCalls                    int
+	toolCalls                   int
+	toolLoopWarningCount        int
+	firstToolLoopWarningLLMCall int
+	toolLoopWarningLLMCalls     []int
+	usage                       model.Usage
+	responses                   []*model.Response
 }
 
 func (s *State) setSubmission(patch string) {
@@ -33,10 +36,21 @@ func (s *State) setSubmission(patch string) {
 	s.submitted = true
 }
 
-func (s *State) recordModelCall() {
+func (s *State) recordModelCall() int {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.llmCalls++
+	return s.llmCalls
+}
+
+func (s *State) recordToolLoopWarning(llmCall int) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.toolLoopWarningCount == 0 {
+		s.firstToolLoopWarningLLMCall = llmCall
+	}
+	s.toolLoopWarningCount++
+	s.toolLoopWarningLLMCalls = append(s.toolLoopWarningLLMCalls, llmCall)
 }
 
 func (s *State) recordResponse(response *model.Response) {
@@ -70,22 +84,29 @@ func (s *State) Snapshot() Snapshot {
 	for i, response := range s.responses {
 		responses[i] = response.Clone()
 	}
+	warningCalls := append([]int(nil), s.toolLoopWarningLLMCalls...)
 	return Snapshot{
-		Submission: s.submission,
-		Submitted:  s.submitted,
-		LLMCalls:   s.llmCalls,
-		ToolCalls:  s.toolCalls,
-		Usage:      s.usage,
-		Responses:  responses,
+		Submission:                  s.submission,
+		Submitted:                   s.submitted,
+		LLMCalls:                    s.llmCalls,
+		ToolCalls:                   s.toolCalls,
+		ToolLoopWarningCount:        s.toolLoopWarningCount,
+		FirstToolLoopWarningLLMCall: s.firstToolLoopWarningLLMCall,
+		ToolLoopWarningLLMCalls:     warningCalls,
+		Usage:                       s.usage,
+		Responses:                   responses,
 	}
 }
 
 // Snapshot is the immutable case state consumed by the runner.
 type Snapshot struct {
-	Submission string
-	Submitted  bool
-	LLMCalls   int
-	ToolCalls  int
-	Usage      model.Usage
-	Responses  []*model.Response
+	Submission                  string
+	Submitted                   bool
+	LLMCalls                    int
+	ToolCalls                   int
+	ToolLoopWarningCount        int
+	FirstToolLoopWarningLLMCall int
+	ToolLoopWarningLLMCalls     []int
+	Usage                       model.Usage
+	Responses                   []*model.Response
 }

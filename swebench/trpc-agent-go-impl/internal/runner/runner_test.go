@@ -10,6 +10,7 @@
 package runner
 
 import (
+	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
@@ -22,6 +23,7 @@ import (
 	"trpc.group/trpc-go/trpc-agent-go-benchmark/swebench/internal/artifact"
 	"trpc.group/trpc-go/trpc-agent-go-benchmark/swebench/internal/contract"
 	"trpc.group/trpc-go/trpc-agent-go-benchmark/swebench/internal/modelconfig"
+	"trpc.group/trpc-go/trpc-agent-go-benchmark/swebench/internal/observation"
 	"trpc.group/trpc-go/trpc-agent-go-benchmark/swebench/internal/sweenv"
 	"trpc.group/trpc-go/trpc-agent-go-benchmark/swebench/trpc-agent-go-impl/internal/executor"
 	"trpc.group/trpc-go/trpc-agent-go-benchmark/swebench/trpc-agent-go-impl/internal/protocol"
@@ -45,6 +47,66 @@ func TestPrepareResumeUsesPredictionsAsBoundary(t *testing.T) {
 	}
 	if len(preds) != 1 || !reflect.DeepEqual(pending, []contract.Case{{InstanceID: "case-b"}}) || !reflect.DeepEqual(skipped, []string{"case-a"}) {
 		t.Fatalf("preds=%#v pending=%#v skipped=%#v", preds, pending, skipped)
+	}
+}
+
+func TestToolLoopWarningFlagDefaultsOffAndAcceptsExplicitValues(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		arg  string
+	}{
+		{name: "default off"},
+		{name: "explicit off", arg: "-tool-loop-warning=false"},
+		{name: "explicit on", arg: "-tool-loop-warning=true"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			args := []string{
+				"trpc-agent-go-impl",
+				"-run-id=test",
+				"-model-config=unused",
+				"-cases=" + filepath.Join(t.TempDir(), "missing.jsonl"),
+			}
+			if tc.arg != "" {
+				args = append(args, tc.arg)
+			}
+			err := Run(args)
+			if err == nil || !strings.Contains(err.Error(), "hash cases") {
+				t.Fatalf("error = %v, want flag parsing to reach cases hashing", err)
+			}
+		})
+	}
+}
+
+func TestAgentProtocolRecordsToolLoopWarning(t *testing.T) {
+	for _, tc := range []struct {
+		name            string
+		codec           string
+		cleanRoom       bool
+		toolLoopWarning bool
+		want            string
+	}{
+		{
+			name: "default off", codec: "xml",
+			want: "mini-swe-agent-v2.1-on-trpc-agent-go",
+		},
+		{
+			name: "warning only", codec: "xml", toolLoopWarning: true,
+			want: "mini-swe-agent-v2.1-on-trpc-agent-go+tool-loop-warning-v1",
+		},
+		{
+			name: "clean room warning", codec: "json", cleanRoom: true, toolLoopWarning: true,
+			want: "mini-swe-agent-v2.1-on-trpc-agent-go+codec-json+clean-room-v1+tool-loop-warning-v1",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := agentProtocol(
+				observation.ObservationCodec(tc.codec),
+				tc.cleanRoom,
+				tc.toolLoopWarning,
+			); got != tc.want {
+				t.Fatalf("agentProtocol() = %q, want %q", got, tc.want)
+			}
+		})
 	}
 }
 
@@ -165,6 +227,16 @@ func TestPrepareResumeRedoPreStartExceptionRemainsFailClosed(t *testing.T) {
 			},
 			wantError: "verified base commit",
 		},
+		{
+			name: "warning telemetry is not pre-start",
+			change: func(result *executor.CaseResult) {
+				first := 1
+				result.ToolLoopWarningCount = 1
+				result.FirstToolLoopWarningLLMCall = &first
+				result.ToolLoopWarningLLMCalls = []int{1}
+			},
+			wantError: "tool_loop_warning=false",
+		},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -248,6 +320,22 @@ func TestPrepareResumeRejectsOutsideSelectionAndIdentityMismatch(t *testing.T) {
 		changed := identity
 		changed.Workers++
 		if _, _, _, err := prepareResume(output, path, selected, false, changed); err == nil || !strings.Contains(err.Error(), "workers") {
+			t.Fatalf("error = %v", err)
+		}
+	})
+	t.Run("tool loop warning mismatch", func(t *testing.T) {
+		output := t.TempDir()
+		path := filepath.Join(output, "preds.json")
+		if err := artifact.WriteJSON(path, map[string]contract.Prediction{
+			"case-a": {InstanceID: "case-a", ModelPatch: "patch"},
+		}); err != nil {
+			t.Fatal(err)
+		}
+		writeResumeBundle(t, output, "case-a", "patch", identity)
+		changed := identity
+		changed.ToolLoopWarning = true
+		if _, _, _, err := prepareResume(output, path, selected, false, changed); err == nil ||
+			!strings.Contains(err.Error(), "tool_loop_warning") {
 			t.Fatalf("error = %v", err)
 		}
 	})
@@ -391,6 +479,81 @@ func TestValidateRunIdentityCleanRoomRequirements(t *testing.T) {
 			t.Fatalf("error = %v", err)
 		}
 	})
+}
+
+func TestValidateToolLoopWarningTelemetry(t *testing.T) {
+	first := 2
+	base := executor.CaseResult{
+		LLMCalls:                    4,
+		ToolLoopWarningCount:        2,
+		FirstToolLoopWarningLLMCall: &first,
+		ToolLoopWarningLLMCalls:     []int{2, 4},
+		Info:                        executor.CaseInfo{ToolLoopWarning: true},
+	}
+	if err := validateToolLoopWarningTelemetry("case-a", base); err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct {
+		name   string
+		change func(*executor.CaseResult)
+		want   string
+	}{
+		{name: "disabled with telemetry", change: func(result *executor.CaseResult) {
+			result.Info.ToolLoopWarning = false
+		}, want: "tool_loop_warning=false"},
+		{name: "count mismatch", change: func(result *executor.CaseResult) {
+			result.ToolLoopWarningCount = 1
+		}, want: "want count"},
+		{name: "first mismatch", change: func(result *executor.CaseResult) {
+			value := 3
+			result.FirstToolLoopWarningLLMCall = &value
+		}, want: "inconsistent first"},
+		{name: "unsorted", change: func(result *executor.CaseResult) {
+			result.ToolLoopWarningLLMCalls = []int{2, 2}
+		}, want: "strictly increasing"},
+		{name: "beyond calls", change: func(result *executor.CaseResult) {
+			result.ToolLoopWarningLLMCalls = []int{2, 5}
+		}, want: "beyond llm_calls"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			result := base
+			result.ToolLoopWarningLLMCalls = append([]int(nil), base.ToolLoopWarningLLMCalls...)
+			tc.change(&result)
+			if err := validateToolLoopWarningTelemetry("case-a", result); err == nil ||
+				!strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("error = %v, want %q", err, tc.want)
+			}
+		})
+	}
+
+	if err := validateToolLoopWarningTelemetry("legacy", executor.CaseResult{}); err != nil {
+		t.Fatalf("legacy missing=false/count=0 telemetry rejected: %v", err)
+	}
+}
+
+func TestProgressAndAggregateIncludeSkippedWarningTelemetry(t *testing.T) {
+	first := 3
+	results := map[string]executor.CaseResult{
+		"fresh": {
+			Info:     executor.CaseInfo{ExitStatus: "Submitted"},
+			LLMCalls: 2, ToolCalls: 1,
+		},
+		"skipped": {
+			Info:       executor.CaseInfo{ExitStatus: "Submitted", ToolLoopWarning: true},
+			ModelPatch: "patch", DurationMS: 10, LLMCalls: 5, ToolCalls: 4,
+			ToolLoopWarningCount: 2, FirstToolLoopWarningLLMCall: &first,
+			ToolLoopWarningLLMCalls: []int{3, 5},
+		},
+	}
+	progress := progressCaseFromResult(results["skipped"])
+	if progress.ToolLoopWarningCount != 2 || progress.LLMCalls != 5 || progress.PatchBytes != 5 {
+		t.Fatalf("progress = %+v", progress)
+	}
+	aggregate := aggregateResults(results)
+	if aggregate.ToolLoopWarningCount != 2 || aggregate.ToolLoopWarningCaseCount != 1 ||
+		aggregate.LLMCalls != 7 || aggregate.ToolCalls != 5 || aggregate.ExitStatusCounts["Submitted"] != 2 {
+		t.Fatalf("aggregate = %+v", aggregate)
+	}
 }
 
 func TestValidateResumeResultRequiresExactAuxiliaryImageRoles(t *testing.T) {
@@ -547,6 +710,7 @@ func resumeCaseResult(
 			CaseTimeout:             identity.CaseTimeout,
 			SelectedInstancesSHA256: identity.SelectedInstancesSHA256,
 			CleanRoom:               identity.CleanRoom,
+			ToolLoopWarning:         identity.ToolLoopWarning,
 			CleanRoomPolicySHA256:   identity.CleanRoomPolicySHA256,
 			OfflineAssetsSHA256:     identity.OfflineAssetsSHA256,
 			ImageSetSHA256:          identity.ImageSetSHA256,
@@ -648,6 +812,93 @@ func TestLoadExistingCaseBundleRequiresMatchingCompleteArtifacts(t *testing.T) {
 	}
 	if _, err := loadExistingCaseBundle(output, "case-a", prediction); err == nil {
 		t.Fatal("missing response artifact was accepted")
+	}
+}
+
+func TestLoadExistingCaseBundleRequiresWarningTelemetryFields(t *testing.T) {
+	for _, field := range []string{
+		"tool_loop_warning_count",
+		"first_tool_loop_warning_llm_call",
+		"tool_loop_warning_llm_calls",
+	} {
+		t.Run("missing "+field, func(t *testing.T) {
+			output := t.TempDir()
+			result := executor.CaseResult{
+				InstanceID: "case-a", ModelPatch: "patch",
+				Info:                    executor.CaseInfo{ExitStatus: "Submitted", ToolLoopWarning: true},
+				ToolLoopWarningLLMCalls: []int{},
+			}
+			if err := writeCaseBundle(output, &result, artifact.WriteJSON); err != nil {
+				t.Fatal(err)
+			}
+			resultPath := filepath.Join(output, "case-a", "case-a.native.json")
+			var fields map[string]json.RawMessage
+			if err := artifact.ReadJSONFile(resultPath, &fields); err != nil {
+				t.Fatal(err)
+			}
+			delete(fields, field)
+			if err := artifact.WriteJSON(resultPath, fields); err != nil {
+				t.Fatal(err)
+			}
+			prediction := contract.Prediction{InstanceID: "case-a", ModelPatch: "patch"}
+			if _, err := loadExistingCaseBundle(output, "case-a", prediction); err == nil ||
+				!strings.Contains(err.Error(), field) {
+				t.Fatalf("missing %s error = %v", field, err)
+			}
+		})
+	}
+	for _, field := range []string{"tool_loop_warning_count", "tool_loop_warning_llm_calls"} {
+		t.Run("null "+field, func(t *testing.T) {
+			output := t.TempDir()
+			result := executor.CaseResult{
+				InstanceID: "case-a", ModelPatch: "patch",
+				Info:                    executor.CaseInfo{ExitStatus: "Submitted", ToolLoopWarning: true},
+				ToolLoopWarningLLMCalls: []int{},
+			}
+			if err := writeCaseBundle(output, &result, artifact.WriteJSON); err != nil {
+				t.Fatal(err)
+			}
+			resultPath := filepath.Join(output, "case-a", "case-a.native.json")
+			var fields map[string]json.RawMessage
+			if err := artifact.ReadJSONFile(resultPath, &fields); err != nil {
+				t.Fatal(err)
+			}
+			fields[field] = json.RawMessage("null")
+			if err := artifact.WriteJSON(resultPath, fields); err != nil {
+				t.Fatal(err)
+			}
+			prediction := contract.Prediction{InstanceID: "case-a", ModelPatch: "patch"}
+			if _, err := loadExistingCaseBundle(output, "case-a", prediction); err == nil ||
+				!strings.Contains(err.Error(), field) {
+				t.Fatalf("null %s error = %v", field, err)
+			}
+		})
+	}
+}
+
+func TestLoadExistingCaseBundleAcceptsLegacyWarningOffTelemetryOmission(t *testing.T) {
+	output := t.TempDir()
+	result := executor.CaseResult{
+		InstanceID: "case-a", ModelPatch: "patch",
+		Info: executor.CaseInfo{ExitStatus: "Submitted"},
+	}
+	if err := writeCaseBundle(output, &result, artifact.WriteJSON); err != nil {
+		t.Fatal(err)
+	}
+	resultPath := filepath.Join(output, "case-a", "case-a.native.json")
+	var fields map[string]json.RawMessage
+	if err := artifact.ReadJSONFile(resultPath, &fields); err != nil {
+		t.Fatal(err)
+	}
+	delete(fields, "tool_loop_warning_count")
+	delete(fields, "first_tool_loop_warning_llm_call")
+	delete(fields, "tool_loop_warning_llm_calls")
+	if err := artifact.WriteJSON(resultPath, fields); err != nil {
+		t.Fatal(err)
+	}
+	prediction := contract.Prediction{InstanceID: "case-a", ModelPatch: "patch"}
+	if _, err := loadExistingCaseBundle(output, "case-a", prediction); err != nil {
+		t.Fatal(err)
 	}
 }
 

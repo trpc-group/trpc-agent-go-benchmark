@@ -256,19 +256,26 @@ func TestRunConfigSupportsGenericNativeRunnerManifest(t *testing.T) {
 
 func TestRunConfigSupportsFilteredNativeImportWithFullCasesManifest(t *testing.T) {
 	for _, tt := range []struct {
-		name      string
-		cleanRoom bool
+		name            string
+		cleanRoom       bool
+		toolLoopWarning bool
 	}{
 		{name: "default-off"},
+		{name: "tool-loop-warning", toolLoopWarning: true},
 		{name: "clean-room", cleanRoom: true},
+		{name: "clean-room-tool-loop-warning", cleanRoom: true, toolLoopWarning: true},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			testRunConfigSupportsFilteredNativeImportWithFullCasesManifest(t, tt.cleanRoom)
+			testRunConfigSupportsFilteredNativeImportWithFullCasesManifest(t, tt.cleanRoom, tt.toolLoopWarning)
 		})
 	}
 }
 
-func testRunConfigSupportsFilteredNativeImportWithFullCasesManifest(t *testing.T, cleanRoom bool) {
+func testRunConfigSupportsFilteredNativeImportWithFullCasesManifest(
+	t *testing.T,
+	cleanRoom bool,
+	toolLoopWarning bool,
+) {
 	t.Helper()
 	dir := t.TempDir()
 	instanceID := "psf__requests-2317"
@@ -307,37 +314,48 @@ func testRunConfigSupportsFilteredNativeImportWithFullCasesManifest(t *testing.T
 			t.Fatal(err)
 		}
 	}
+	if toolLoopWarning {
+		agentProtocol += "+tool-loop-warning-v1"
+		nativeArtifact["llm_calls"] = 2
+		nativeArtifact["tool_loop_warning_count"] = 1
+		nativeArtifact["first_tool_loop_warning_llm_call"] = 2
+		nativeArtifact["tool_loop_warning_llm_calls"] = []int{2}
+		nativeInfo["tool_loop_warning"] = true
+	}
 
 	runnerDir := filepath.Join(dir, "native")
 	predictionsPath := fixture.predictionsPath
 	runnerManifestPath := filepath.Join(runnerDir, "native-runner-manifest.json")
 	nativeManifest := runnerManifest{
-		RunID:                   "native-filtered",
-		RunnerType:              "trpc-agent-go-native",
-		AgentProtocol:           agentProtocol,
-		UpstreamCommit:          strings.Repeat("f", 40),
-		ObservationCodec:        "xml",
-		FrameworkModule:         "trpc.group/trpc-go/trpc-agent-go",
-		FrameworkVersion:        "v1.10.1-0.20260728070417-4237accb70cb",
-		SourceRevision:          strings.Repeat("a", 40),
-		BinarySHA256:            strings.Repeat("b", 64),
-		CasesSHA256:             fixture.cases.CasesJSONLSHA256,
-		ModelConfigSHA256:       strings.Repeat("d", 64),
-		EnvironmentConfigSHA256: strings.Repeat("e", 64),
-		SelectedInstancesSHA256: selectedHash,
-		CommandTimeout:          "1m",
-		CaseTimeout:             "2h",
-		CleanRoom:               cleanRoom,
-		CleanRoomPolicySHA256:   cleanRoomPolicySHA256,
-		OfflineAssets:           offlineAssets,
-		ImageSetSHA256:          imageSetSHA256,
-		DockerImages:            dockerImages,
-		OutputDir:               runnerDir,
-		CaseCount:               1,
-		Workers:                 1,
-		Predictions:             predictionsPath,
-		Status:                  "completed",
-		ModelConfig:             map[string]string{"MODEL_NAME": "test-model"},
+		RunID:                    "native-filtered",
+		RunnerType:               "trpc-agent-go-native",
+		AgentProtocol:            agentProtocol,
+		UpstreamCommit:           strings.Repeat("f", 40),
+		ObservationCodec:         "xml",
+		FrameworkModule:          "trpc.group/trpc-go/trpc-agent-go",
+		FrameworkVersion:         "v1.10.1-0.20260728070417-4237accb70cb",
+		SourceRevision:           strings.Repeat("a", 40),
+		BinarySHA256:             strings.Repeat("b", 64),
+		CasesSHA256:              fixture.cases.CasesJSONLSHA256,
+		ModelConfigSHA256:        strings.Repeat("d", 64),
+		EnvironmentConfigSHA256:  strings.Repeat("e", 64),
+		SelectedInstancesSHA256:  selectedHash,
+		CommandTimeout:           "1m",
+		CaseTimeout:              "2h",
+		CleanRoom:                cleanRoom,
+		ToolLoopWarning:          toolLoopWarning,
+		ToolLoopWarningCount:     boolInt(toolLoopWarning),
+		ToolLoopWarningCaseCount: boolInt(toolLoopWarning),
+		CleanRoomPolicySHA256:    cleanRoomPolicySHA256,
+		OfflineAssets:            offlineAssets,
+		ImageSetSHA256:           imageSetSHA256,
+		DockerImages:             dockerImages,
+		OutputDir:                runnerDir,
+		CaseCount:                1,
+		Workers:                  1,
+		Predictions:              predictionsPath,
+		Status:                   "completed",
+		ModelConfig:              map[string]string{"MODEL_NAME": "test-model"},
 	}
 	if err := writeJSON(runnerManifestPath, nativeManifest); err != nil {
 		t.Fatal(err)
@@ -465,8 +483,171 @@ func testRunConfigSupportsFilteredNativeImportWithFullCasesManifest(t *testing.T
 	if doc.Selection.CaseCount != 1 || doc.Selection.CaseListHash != selectedHash {
 		t.Fatalf("Selection = %+v, want filtered case identity %q", doc.Selection, selectedHash)
 	}
-	if doc.Runner.CleanRoom != cleanRoom || doc.Runner.CleanRoomPolicySHA256 != nativeManifest.CleanRoomPolicySHA256 {
-		t.Fatalf("Runner = %+v, want clean_room=%t with matching provenance", doc.Runner, cleanRoom)
+	if doc.Runner.CleanRoom != cleanRoom || doc.Runner.CleanRoomPolicySHA256 != nativeManifest.CleanRoomPolicySHA256 ||
+		doc.Runner.ToolLoopWarning != toolLoopWarning ||
+		doc.Runner.ToolLoopWarningCount != boolInt(toolLoopWarning) ||
+		doc.Runner.ToolLoopWarningCaseCount != boolInt(toolLoopWarning) {
+		t.Fatalf("Runner = %+v, want clean_room=%t tool_loop_warning=%t with matching telemetry/provenance",
+			doc.Runner,
+			cleanRoom,
+			toolLoopWarning,
+		)
+	}
+}
+
+func boolInt(value bool) int {
+	if value {
+		return 1
+	}
+	return 0
+}
+
+func TestValidateNativeTraceIdentityRejectsToolLoopWarningMismatch(t *testing.T) {
+	err := validateNativeTraceIdentity(
+		importedCase{InstanceID: "case-a"},
+		nativeTraceEnvelope{Info: nativeInfoEnvelope{ToolLoopWarning: true}},
+		runnerManifest{ToolLoopWarning: false},
+		runConfigSelection{},
+	)
+	if err == nil || !strings.Contains(err.Error(), "info.tool_loop_warning=true") {
+		t.Fatalf("validateNativeTraceIdentity() error = %v, want warning identity mismatch", err)
+	}
+}
+
+func TestValidateNativeToolLoopWarningAggregate(t *testing.T) {
+	rows := []importedCase{
+		{Result: targetResult{ToolLoopWarningCount: 2}},
+		{Result: targetResult{}},
+		{Result: targetResult{ToolLoopWarningCount: 1}},
+	}
+	manifest := runnerManifest{ToolLoopWarning: true, ToolLoopWarningCount: 3, ToolLoopWarningCaseCount: 2}
+	if err := validateNativeToolLoopWarningAggregate("test", rows, manifest); err != nil {
+		t.Fatalf("validateNativeToolLoopWarningAggregate() error = %v", err)
+	}
+	manifest.ToolLoopWarningCount++
+	if err := validateNativeToolLoopWarningAggregate("test", rows, manifest); err == nil ||
+		!strings.Contains(err.Error(), "do not match imported case aggregate") {
+		t.Fatalf("validateNativeToolLoopWarningAggregate() error = %v, want aggregate mismatch", err)
+	}
+}
+
+func TestEnabledWarningManifestRequiresExplicitAggregateFields(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		delete string
+		want   string
+	}{
+		{name: "count", delete: "tool_loop_warning_count", want: "missing tool_loop_warning_count"},
+		{name: "case count", delete: "tool_loop_warning_case_count", want: "missing tool_loop_warning_case_count"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			payload := map[string]any{
+				"tool_loop_warning":            true,
+				"tool_loop_warning_count":      0,
+				"tool_loop_warning_case_count": 0,
+			}
+			delete(payload, tc.delete)
+			data, err := json.Marshal(payload)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var manifest runnerManifest
+			if err := json.Unmarshal(data, &manifest); err != nil {
+				t.Fatal(err)
+			}
+			err = validateRunnerWarningAggregatePresence("runner manifest", manifest)
+			if err == nil || !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("presence error = %v, want %q", err, tc.want)
+			}
+		})
+	}
+
+	var explicit runnerManifest
+	if err := json.Unmarshal([]byte(`{
+		"tool_loop_warning":true,
+		"tool_loop_warning_count":0,
+		"tool_loop_warning_case_count":0
+	}`), &explicit); err != nil {
+		t.Fatal(err)
+	}
+	if err := validateRunnerWarningAggregatePresence("runner manifest", explicit); err != nil {
+		t.Fatalf("explicit zero warning aggregates rejected: %v", err)
+	}
+	if err := validateRunnerWarningAggregatePresence("legacy", runnerManifest{}); err != nil {
+		t.Fatalf("warning-off legacy manifest rejected: %v", err)
+	}
+}
+
+func TestEnabledWarningShardsRequireExplicitAggregateFields(t *testing.T) {
+	payload := map[string]any{
+		"runner_identity":              map[string]any{"tool_loop_warning": true},
+		"tool_loop_warning_count":      0,
+		"tool_loop_warning_case_count": 0,
+		"shards": []any{map[string]any{
+			"run_id":                       "shard-a",
+			"runner_identity":              map[string]any{"tool_loop_warning": true},
+			"tool_loop_warning_count":      0,
+			"tool_loop_warning_case_count": 0,
+		}},
+	}
+	data, err := json.Marshal(payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var explicit shardsManifest
+	if err := json.Unmarshal(data, &explicit); err != nil {
+		t.Fatal(err)
+	}
+	if err := validateWarningAggregatePresence(
+		"shards manifest", true,
+		explicit.toolLoopWarningCountSet,
+		explicit.toolLoopWarningCasesSet,
+	); err != nil {
+		t.Fatal(err)
+	}
+	if len(explicit.Shards) != 1 {
+		t.Fatalf("shards = %d, want 1", len(explicit.Shards))
+	}
+	if err := validateWarningAggregatePresence(
+		"shard", true,
+		explicit.Shards[0].toolLoopWarningCountSet,
+		explicit.Shards[0].toolLoopWarningCasesSet,
+	); err != nil {
+		t.Fatal(err)
+	}
+
+	delete(payload, "tool_loop_warning_count")
+	data, err = json.Marshal(payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var missingTop shardsManifest
+	if err := json.Unmarshal(data, &missingTop); err != nil {
+		t.Fatal(err)
+	}
+	if err := validateWarningAggregatePresence(
+		"shards manifest", true,
+		missingTop.toolLoopWarningCountSet,
+		missingTop.toolLoopWarningCasesSet,
+	); err == nil || !strings.Contains(err.Error(), "missing tool_loop_warning_count") {
+		t.Fatalf("top-level presence error = %v", err)
+	}
+
+	delete(payload["shards"].([]any)[0].(map[string]any), "tool_loop_warning_case_count")
+	data, err = json.Marshal(payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var missingShard shardsManifest
+	if err := json.Unmarshal(data, &missingShard); err != nil {
+		t.Fatal(err)
+	}
+	if err := validateWarningAggregatePresence(
+		"shard", true,
+		missingShard.Shards[0].toolLoopWarningCountSet,
+		missingShard.Shards[0].toolLoopWarningCasesSet,
+	); err == nil || !strings.Contains(err.Error(), "missing tool_loop_warning_case_count") {
+		t.Fatalf("shard presence error = %v", err)
 	}
 }
 
@@ -750,6 +931,94 @@ func TestValidateRunConfigSelectionRejectsUnboundImportedRows(t *testing.T) {
 			)
 			if err == nil || !strings.Contains(err.Error(), tt.want) {
 				t.Fatalf("validateRunConfigSelection() error = %v, want error containing %q", err, tt.want)
+			}
+		})
+	}
+}
+
+func TestReadAndValidateImportedCasesRequiresEnabledWarningTelemetryFields(t *testing.T) {
+	tests := []struct {
+		name   string
+		mutate func(map[string]any)
+		want   string
+	}{
+		{name: "valid zero warnings"},
+		{
+			name: "missing count",
+			mutate: func(result map[string]any) {
+				delete(result, "tool_loop_warning_count")
+			},
+			want: "missing result.tool_loop_warning_count",
+		},
+		{
+			name: "null count",
+			mutate: func(result map[string]any) {
+				result["tool_loop_warning_count"] = nil
+			},
+			want: "missing result.tool_loop_warning_count",
+		},
+		{
+			name: "missing first call",
+			mutate: func(result map[string]any) {
+				delete(result, "first_tool_loop_warning_llm_call")
+			},
+			want: "missing result.first_tool_loop_warning_llm_call",
+		},
+		{
+			name: "missing calls",
+			mutate: func(result map[string]any) {
+				delete(result, "tool_loop_warning_llm_calls")
+			},
+			want: "missing result.tool_loop_warning_llm_calls",
+		},
+		{
+			name: "null calls",
+			mutate: func(result map[string]any) {
+				result["tool_loop_warning_llm_calls"] = nil
+			},
+			want: "missing result.tool_loop_warning_llm_calls",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := map[string]any{
+				"main_status":                      "unresolved",
+				"tool_loop_warning_count":          0,
+				"first_tool_loop_warning_llm_call": nil,
+				"tool_loop_warning_llm_calls":      []int{},
+			}
+			if tt.mutate != nil {
+				tt.mutate(result)
+			}
+			row := map[string]any{
+				"schema_version":    importSchemaVersion,
+				"instance_id":       "case-a",
+				"tool_loop_warning": true,
+				"target":            "native",
+				"result":            result,
+			}
+			data, err := json.Marshal(row)
+			if err != nil {
+				t.Fatal(err)
+			}
+			path := filepath.Join(t.TempDir(), "cases.jsonl")
+			if err := os.WriteFile(path, append(data, '\n'), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			_, err = readAndValidateImportedCases(path, importSummary{
+				SchemaVersion: importSchemaVersion,
+				Target:        "native",
+				Total:         1,
+				Counts:        map[string]int{"unresolved": 1},
+			}, "native")
+			if tt.want == "" {
+				if err != nil {
+					t.Fatalf("readAndValidateImportedCases() error = %v", err)
+				}
+				return
+			}
+			if err == nil || !strings.Contains(err.Error(), tt.want) {
+				t.Fatalf("readAndValidateImportedCases() error = %v, want %q", err, tt.want)
 			}
 		})
 	}

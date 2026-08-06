@@ -13,7 +13,8 @@ tRPC-Agent-Go 的公开 model 与 tool 类型，但刻意保留 mini-SWE-agent �
 
 Native TAG 路径通过 tRPC-Agent-Go 的公开生命周期（`llmagent.New`、
 `runner.NewRunner` 和 `runner.Run`）执行同一组固定的模型侧协议。默认只向模型提供 `bash`
-工具；仓库检索与 loop-warning instrumentation 不属于这一层。
+工具，仓库检索不属于这一层。精确重复的 tool-use/result warning 只作为显式开启、
+默认关闭的 benchmark instrumentation 提供，不是 tRPC-Agent-Go 框架默认能力。
 
 ## 范围
 
@@ -28,6 +29,8 @@ Native TAG 路径通过 tRPC-Agent-Go 的公开生命周期（`llmagent.New`、
 - 只使用 upstream 公开 API 的 tRPC-Agent-Go 原生 runner；
 - 显式启用的 clean-room 协议：generation 断网、递归 Git 净化、closed-world 离线资产、
   不可变本地镜像身份与 model-free preflight；
+- 可选的精确 tool-loop warning telemetry，以及对当前 Native 与冻结 V12 TAG 的
+  warning-off 不可变轨迹复用同一 detector 的离线 shadow replay 工具；
 - 对未经修改的 upstream official local harness 的调用；
 - batch 规划、可恢复 shard 检查和确定性 predictions 合并。
 

@@ -22,6 +22,12 @@ import (
 // MaxLLMCalls is the pinned mini-SWE-agent v2.1 model-request limit.
 const MaxLLMCalls = 250
 
+// Config controls optional runner-local agent behavior.
+type Config struct {
+	CleanRoom       bool
+	ToolLoopWarning bool
+}
+
 // New creates a llmagent bound to one testbed and state holder.
 func New(
 	modelImpl model.Model,
@@ -29,13 +35,14 @@ func New(
 	codec observation.ObservationCodec,
 	generationConfig model.GenerationConfig,
 	state *State,
-	cleanRoom bool,
+	config Config,
 ) *llmagent.LLMAgent {
 	bash := &bashTool{environment: environment}
 	instruction := protocol.SystemPrompt
-	if cleanRoom {
+	if config.CleanRoom {
 		instruction = protocol.OfflineSystemPrompt
 	}
+	loopTracker := newToolLoopTracker(config.ToolLoopWarning)
 	return llmagent.New(
 		"swe-agent",
 		llmagent.WithModel(modelImpl),
@@ -47,7 +54,7 @@ func New(
 		llmagent.WithPreserveSameBranch(true),
 		llmagent.WithEnablePostToolPrompt(false),
 		llmagent.WithEnableCodeExecutionResponseProcessor(false),
-		llmagent.WithModelCallbacks(modelCallbacks(state)),
-		llmagent.WithToolCallbacks(toolCallbacks(state, codec)),
+		llmagent.WithModelCallbacks(modelCallbacks(state, loopTracker)),
+		llmagent.WithToolCallbacks(toolCallbacks(state, codec, loopTracker)),
 	)
 }

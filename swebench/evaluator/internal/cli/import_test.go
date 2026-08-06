@@ -14,6 +14,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -256,7 +257,11 @@ func TestRunImportReadsNativeTraceUsageAndRedactsSecrets(t *testing.T) {
 	nativeInfo := nativeArtifact["info"].(map[string]any)
 	nativeInfo["repo"] = "owner/repo"
 	nativeInfo["base_commit"] = strings.Repeat("a", 40)
+	nativeInfo["tool_loop_warning"] = true
 	nativeArtifact["llm_calls"] = 3
+	nativeArtifact["tool_loop_warning_count"] = 2
+	nativeArtifact["first_tool_loop_warning_llm_call"] = 2
+	nativeArtifact["tool_loop_warning_llm_calls"] = []int{2, 3}
 	usage := nativeArtifact["usage"].(map[string]any)
 	usage["prompt_tokens"] = 100
 	usage["completion_tokens"] = 40
@@ -302,6 +307,12 @@ func TestRunImportReadsNativeTraceUsageAndRedactsSecrets(t *testing.T) {
 	}
 	if row.Result.Usage != wantUsage {
 		t.Fatalf("usage = %+v, want %+v", row.Result.Usage, wantUsage)
+	}
+	if !row.ToolLoopWarning || row.Result.ToolLoopWarningCount != 2 ||
+		row.Result.FirstToolLoopWarningLLMCall == nil ||
+		*row.Result.FirstToolLoopWarningLLMCall != 2 ||
+		!reflect.DeepEqual(row.Result.ToolLoopWarningLLMCalls, []int{2, 3}) {
+		t.Fatalf("tool-loop warning projection = %+v", row)
 	}
 	if row.Result.TracePath == "" {
 		t.Fatal("native trace path is empty")
@@ -741,12 +752,77 @@ func TestExtractNativeUsageRequiresSerializedCaseResultStructure(t *testing.T) {
 	if trace.InstanceID != "case-a" || trace.Info.ExitStatus != "Submitted" || trace.ResponsesSHA256 != emptyResponsesSHA256 {
 		t.Fatalf("parseNativeTraceEnvelope() = %+v", trace)
 	}
+	if trace.Info.ToolLoopWarning || trace.ToolLoopWarningCount != 0 ||
+		trace.FirstToolLoopWarningLLMCall != nil || len(trace.ToolLoopWarningLLMCalls) != 0 {
+		t.Fatalf("legacy missing warning fields were not interpreted as disabled zero telemetry: %+v", trace)
+	}
 	usage, err := extractNativeUsage(data, "case-a")
 	if err != nil {
 		t.Fatalf("extractNativeUsage() explicit zero artifact error = %v", err)
 	}
 	if usage != (usageStats{}) {
 		t.Fatalf("extractNativeUsage() explicit zero usage = %+v, want zero", usage)
+	}
+}
+
+func TestParseNativeTraceValidatesToolLoopWarningTelemetry(t *testing.T) {
+	valid := func() map[string]any {
+		artifact := cloneJSONObject(t, validNativeArtifact())
+		artifact["llm_calls"] = 4
+		artifact["tool_loop_warning_count"] = 2
+		artifact["first_tool_loop_warning_llm_call"] = 2
+		artifact["tool_loop_warning_llm_calls"] = []int{2, 4}
+		artifact["info"].(map[string]any)["tool_loop_warning"] = true
+		return artifact
+	}
+	trace, err := parseNativeTraceEnvelope(marshalJSONObject(t, valid()), "case-a")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if trace.ToolLoopWarningCount != 2 || trace.FirstToolLoopWarningLLMCall == nil ||
+		*trace.FirstToolLoopWarningLLMCall != 2 ||
+		!reflect.DeepEqual(trace.ToolLoopWarningLLMCalls, []int{2, 4}) {
+		t.Fatalf("trace warning telemetry = %+v", trace)
+	}
+
+	for _, tc := range []struct {
+		name   string
+		change func(map[string]any)
+		want   string
+	}{
+		{name: "missing count", change: func(artifact map[string]any) {
+			delete(artifact, "tool_loop_warning_count")
+		}, want: "missing required field tool_loop_warning_count"},
+		{name: "missing first call", change: func(artifact map[string]any) {
+			delete(artifact, "first_tool_loop_warning_llm_call")
+		}, want: "missing required field first_tool_loop_warning_llm_call"},
+		{name: "missing call list", change: func(artifact map[string]any) {
+			delete(artifact, "tool_loop_warning_llm_calls")
+		}, want: "missing required field tool_loop_warning_llm_calls"},
+		{name: "disabled with telemetry", change: func(artifact map[string]any) {
+			artifact["info"].(map[string]any)["tool_loop_warning"] = false
+		}, want: "tool_loop_warning=false"},
+		{name: "count mismatch", change: func(artifact map[string]any) {
+			artifact["tool_loop_warning_count"] = 1
+		}, want: "want count"},
+		{name: "first mismatch", change: func(artifact map[string]any) {
+			artifact["first_tool_loop_warning_llm_call"] = 3
+		}, want: "inconsistent first"},
+		{name: "unsorted", change: func(artifact map[string]any) {
+			artifact["tool_loop_warning_llm_calls"] = []int{2, 2}
+		}, want: "strictly increasing"},
+		{name: "beyond calls", change: func(artifact map[string]any) {
+			artifact["tool_loop_warning_llm_calls"] = []int{2, 5}
+		}, want: "beyond llm_calls"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			artifact := valid()
+			tc.change(artifact)
+			_, err := parseNativeTraceEnvelope(marshalJSONObject(t, artifact), "case-a")
+			if err == nil || !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("error = %v, want %q", err, tc.want)
+			}
+		})
 	}
 }
 

@@ -24,6 +24,7 @@ import (
 	"trpc.group/trpc-go/trpc-agent-go-benchmark/swebench/internal/observation"
 	"trpc.group/trpc-go/trpc-agent-go-benchmark/swebench/internal/sweenv"
 	"trpc.group/trpc-go/trpc-agent-go-benchmark/swebench/trpc-agent-go-impl/internal/protocol"
+	"trpc.group/trpc-go/trpc-agent-go-benchmark/swebench/trpc-agent-go-impl/internal/tagagent"
 	"trpc.group/trpc-go/trpc-agent-go/event"
 	"trpc.group/trpc-go/trpc-agent-go/model"
 )
@@ -493,7 +494,8 @@ func TestEnvironmentFailureDoesNotConstructModel(t *testing.T) {
 			modelFactoryCalls++
 			return &scriptedModel{}
 		},
-		CleanRoom: true,
+		CleanRoom:       true,
+		ToolLoopWarning: true,
 	}.Execute(context.Background(), contract.Case{InstanceID: "case-a"})
 
 	if modelFactoryCalls != 0 {
@@ -508,6 +510,9 @@ func TestEnvironmentFailureDoesNotConstructModel(t *testing.T) {
 	}
 	if result.Info.VerifiedBaseCommit != "" || result.Info.EnvironmentProvenance != nil {
 		t.Fatalf("pre-start failure contains success-only attestations: %+v", result.Info)
+	}
+	if result.ToolLoopWarningLLMCalls == nil || len(result.ToolLoopWarningLLMCalls) != 0 {
+		t.Fatalf("pre-start warning calls = %#v, want explicit empty array", result.ToolLoopWarningLLMCalls)
 	}
 }
 
@@ -536,6 +541,12 @@ func TestRetryableCleanRoomPreStartFailureRequiresExactShape(t *testing.T) {
 		{name: "provenance", change: func(result *CaseResult) { result.Info.EnvironmentProvenance = &sweenv.Provenance{} }},
 		{name: "model call", change: func(result *CaseResult) { result.LLMCalls = 1 }},
 		{name: "tool call", change: func(result *CaseResult) { result.ToolCalls = 1 }},
+		{name: "warning count", change: func(result *CaseResult) { result.ToolLoopWarningCount = 1 }},
+		{name: "warning first call", change: func(result *CaseResult) {
+			first := 1
+			result.FirstToolLoopWarningLLMCall = &first
+		}},
+		{name: "warning calls", change: func(result *CaseResult) { result.ToolLoopWarningLLMCalls = []int{1} }},
 		{name: "response", change: func(result *CaseResult) { result.Responses = []*model.Response{{Done: true}} }},
 		{name: "event", change: func(result *CaseResult) { result.Events = []*event.Event{{}} }},
 		{name: "patch", change: func(result *CaseResult) { result.ModelPatch = "patch" }},
@@ -554,6 +565,32 @@ func TestRetryableCleanRoomPreStartFailureRequiresExactShape(t *testing.T) {
 				t.Fatalf("non-pre-start result was accepted: %+v", result)
 			}
 		})
+	}
+}
+
+func TestApplySnapshotProjectsToolLoopWarningTelemetry(t *testing.T) {
+	result := CaseResult{}
+	applySnapshot(&result, tagagent.Snapshot{
+		LLMCalls:                    7,
+		ToolLoopWarningCount:        2,
+		FirstToolLoopWarningLLMCall: 3,
+		ToolLoopWarningLLMCalls:     []int{3, 7},
+	})
+	if result.ToolLoopWarningCount != 2 || result.FirstToolLoopWarningLLMCall == nil ||
+		*result.FirstToolLoopWarningLLMCall != 3 ||
+		!reflect.DeepEqual(result.ToolLoopWarningLLMCalls, []int{3, 7}) {
+		t.Fatalf("warning telemetry = count %d first %v calls %#v",
+			result.ToolLoopWarningCount,
+			result.FirstToolLoopWarningLLMCall,
+			result.ToolLoopWarningLLMCalls,
+		)
+	}
+
+	result = CaseResult{FirstToolLoopWarningLLMCall: new(int), ToolLoopWarningLLMCalls: []int{1}}
+	applySnapshot(&result, tagagent.Snapshot{})
+	if result.ToolLoopWarningCount != 0 || result.FirstToolLoopWarningLLMCall != nil ||
+		result.ToolLoopWarningLLMCalls == nil || len(result.ToolLoopWarningLLMCalls) != 0 {
+		t.Fatalf("zero warning telemetry = %+v", result)
 	}
 }
 
