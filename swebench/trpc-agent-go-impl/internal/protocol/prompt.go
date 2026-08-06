@@ -27,6 +27,25 @@ const offlineGuidance = "The shell has no public internet access; only declared 
 // clean-room generation container.
 const OfflineSystemPrompt = SystemPrompt + " " + offlineGuidance
 
+// SystemPromptWithCodeSearch and OfflineSystemPromptWithCodeSearch describe
+// the opt-in static retrieval capability without changing the native prompt.
+const SystemPromptWithCodeSearch = SystemPrompt + " You can also use code_search to search a static task-start snapshot of the workspace."
+const OfflineSystemPromptWithCodeSearch = OfflineSystemPrompt + " You can also use code_search to search a static task-start snapshot of the workspace."
+
+const codeSearchRouting = `Use code_search to locate relevant code when the implementation location is unclear. Query with identifiers, error text, paths, or expected behavior.
+Use Bash to inspect current files, edit, test, and submit.
+code_search uses a static snapshot captured at task start and is not updated after edits.
+If the results are weak, refine the query or continue with targeted Bash exploration.`
+
+const codeSearchExample = `Example of a CORRECT code_search response:
+<example_response>
+I need to locate the Builder validation implementation.
+
+[Makes a code_search tool call: {"query": "Builder validation and construction flow"}]
+</example_response>
+
+`
+
 const instancePrompt = `<pr_description>
 Consider the following PR description:
 {{task}}
@@ -145,6 +164,33 @@ var offlinePromptReplacer = strings.NewReplacer(
 	"\n",
 )
 
+var codeSearchPromptReplacer = strings.NewReplacer(
+	"You're a software engineer interacting continuously with a computer by submitting commands.",
+	"You're a software engineer interacting continuously with a computer by using tools.",
+	"<IMPORTANT>This is an interactive process where you will think and issue AT LEAST ONE command, see the result, then think and issue your next command(s).</important>",
+	"<IMPORTANT>This is an interactive process where you will think and issue AT LEAST ONE tool call, see the result, then think and issue your next tool call(s).</important>",
+	"2. Provide one or more bash tool calls to execute",
+	"2. Provide one or more tool calls to execute",
+	"## Recommended Workflow\n\n",
+	"## Recommended Workflow\n\n"+codeSearchRouting+"\n\n",
+	"## Command Execution Rules",
+	"## Tool Execution Rules",
+	"1. You issue at least one command",
+	"1. You issue at least one tool call",
+	"3. The system executes the command(s) in a subshell",
+	"3. The system executes the tool call(s); Bash commands run in a subshell",
+	"2. At least one tool call with your command",
+	"2. At least one tool call",
+	"- Your response MUST include AT LEAST ONE bash tool call. You can make MULTIPLE tool calls in a single response when the commands are independent (e.g., searching multiple files, reading different parts of the codebase).",
+	"- Your response MUST include AT LEAST ONE tool call. You can make MULTIPLE tool calls in a single response when the calls are independent (e.g., searching multiple files, reading different parts of the codebase).",
+	"- Directory or environment variable changes are not persistent. Every action is executed in a new subshell.",
+	"- Directory or environment variable changes are not persistent. Every Bash action is executed in a new subshell.",
+	"- However, you can prefix any action with [[BACKTICK]]MY_ENV_VAR=MY_VALUE cd /path/to/working/dir && ...[[BACKTICK]] or write/load environment variables from files",
+	"- However, you can prefix any Bash action with [[BACKTICK]]MY_ENV_VAR=MY_VALUE cd /path/to/working/dir && ...[[BACKTICK]] or write/load environment variables from files",
+	"Example of a CORRECT response:\n",
+	codeSearchExample+"Example of a CORRECT response:\n",
+)
+
 // PromptForTaskOffline removes the upstream installation suggestion that is
 // impossible inside a network-none generation container.
 func PromptForTaskOffline(task string) string {
@@ -157,6 +203,27 @@ func PromptForTaskForMode(task string, cleanRoom bool) string {
 		return PromptForTaskOffline(task)
 	}
 	return PromptForTask(task)
+}
+
+// PromptForTaskWithCodeSearch renders the source-aligned instance prompt with
+// the minimum protocol changes needed to make code_search first class.
+func PromptForTaskWithCodeSearch(task string) string {
+	return renderPrompt(codeSearchPromptReplacer.Replace(instancePrompt), task)
+}
+
+// PromptForTaskWithCodeSearchOffline combines code-search routing with the
+// network-none guidance.
+func PromptForTaskWithCodeSearchOffline(task string) string {
+	prompt := codeSearchPromptReplacer.Replace(instancePrompt)
+	return renderPrompt(offlinePromptReplacer.Replace(prompt), task)
+}
+
+// PromptForTaskWithCodeSearchForMode selects the online or clean-room form.
+func PromptForTaskWithCodeSearchForMode(task string, cleanRoom bool) string {
+	if cleanRoom {
+		return PromptForTaskWithCodeSearchOffline(task)
+	}
+	return PromptForTaskWithCodeSearch(task)
 }
 
 func renderPrompt(prompt, task string) string {

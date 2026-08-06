@@ -26,29 +26,31 @@ import (
 )
 
 type shardsManifest struct {
-	GeneratedAt              time.Time           `json:"generated_at"`
-	PlanPath                 string              `json:"plan_path"`
-	RunsRoot                 string              `json:"runs_root"`
-	RawSubdir                string              `json:"raw_subdir"`
-	ExpectedCases            int                 `json:"expected_cases"`
-	AcceptedCases            int                 `json:"accepted_cases"`
-	MissingCases             int                 `json:"missing_cases"`
-	InvalidCases             int                 `json:"invalid_cases"`
-	DuplicateCases           int                 `json:"duplicate_cases"`
-	MissingIDs               []string            `json:"missing_ids"`
-	InvalidIDs               []string            `json:"invalid_ids"`
-	DuplicateIDs             []string            `json:"duplicate_ids"`
-	StartedAt                string              `json:"started_at,omitempty"`
-	FinishedAt               string              `json:"finished_at,omitempty"`
-	WallDurationMS           int64               `json:"wall_duration_ms,omitempty"`
-	CumulativeDurationMS     int64               `json:"cumulative_duration_ms"`
-	ExitStatusCounts         map[string]int      `json:"exit_status_counts"`
-	ToolLoopWarningCount     int                 `json:"tool_loop_warning_count"`
-	ToolLoopWarningCaseCount int                 `json:"tool_loop_warning_case_count"`
-	RunnerIdentity           shardRunnerIdentity `json:"runner_identity"`
-	Shards                   []shardSummary      `json:"shards"`
-	toolLoopWarningCountSet  bool                `json:"-"`
-	toolLoopWarningCasesSet  bool                `json:"-"`
+	GeneratedAt              time.Time                    `json:"generated_at"`
+	PlanPath                 string                       `json:"plan_path"`
+	RunsRoot                 string                       `json:"runs_root"`
+	RawSubdir                string                       `json:"raw_subdir"`
+	ExpectedCases            int                          `json:"expected_cases"`
+	AcceptedCases            int                          `json:"accepted_cases"`
+	MissingCases             int                          `json:"missing_cases"`
+	InvalidCases             int                          `json:"invalid_cases"`
+	DuplicateCases           int                          `json:"duplicate_cases"`
+	MissingIDs               []string                     `json:"missing_ids"`
+	InvalidIDs               []string                     `json:"invalid_ids"`
+	DuplicateIDs             []string                     `json:"duplicate_ids"`
+	StartedAt                string                       `json:"started_at,omitempty"`
+	FinishedAt               string                       `json:"finished_at,omitempty"`
+	WallDurationMS           int64                        `json:"wall_duration_ms,omitempty"`
+	CumulativeDurationMS     int64                        `json:"cumulative_duration_ms"`
+	ExitStatusCounts         map[string]int               `json:"exit_status_counts"`
+	ToolLoopWarningCount     int                          `json:"tool_loop_warning_count"`
+	ToolLoopWarningCaseCount int                          `json:"tool_loop_warning_case_count"`
+	Embedding                *nativeEmbeddingMetrics      `json:"embedding,omitempty"`
+	EmbeddingCache           *nativeEmbeddingCacheMetrics `json:"embedding_cache,omitempty"`
+	RunnerIdentity           shardRunnerIdentity          `json:"runner_identity"`
+	Shards                   []shardSummary               `json:"shards"`
+	toolLoopWarningCountSet  bool                         `json:"-"`
+	toolLoopWarningCasesSet  bool                         `json:"-"`
 }
 
 func (m *shardsManifest) UnmarshalJSON(data []byte) error {
@@ -68,58 +70,69 @@ func (m *shardsManifest) UnmarshalJSON(data []byte) error {
 }
 
 type shardRunnerIdentity struct {
-	ManifestKind            string                          `json:"manifest_kind"`
-	RunnerType              string                          `json:"runner_type"`
-	AgentProtocol           string                          `json:"agent_protocol,omitempty"`
-	UpstreamCommit          string                          `json:"upstream_commit,omitempty"`
-	ModelName               string                          `json:"model_name,omitempty"`
-	ObservationCodec        string                          `json:"observation_codec,omitempty"`
-	FrameworkModule         string                          `json:"framework_module,omitempty"`
-	FrameworkVersion        string                          `json:"framework_version,omitempty"`
-	SourceRevision          string                          `json:"source_revision,omitempty"`
-	SourceModified          bool                            `json:"source_modified"`
-	BinarySHA256            string                          `json:"binary_sha256,omitempty"`
-	CasesSHA256             string                          `json:"cases_sha256,omitempty"`
-	ModelConfigSHA256       string                          `json:"model_config_sha256,omitempty"`
-	EnvironmentConfigSHA256 string                          `json:"environment_config_sha256,omitempty"`
-	CommandTimeout          string                          `json:"command_timeout,omitempty"`
-	CaseTimeout             string                          `json:"case_timeout,omitempty"`
-	CleanRoom               bool                            `json:"clean_room"`
-	ToolLoopWarning         bool                            `json:"tool_loop_warning"`
-	CleanRoomPolicySHA256   string                          `json:"clean_room_policy_sha256,omitempty"`
-	OfflineAssets           *sweenv.OfflineAssetIdentity    `json:"offline_assets,omitempty"`
-	ImageSetSHA256          string                          `json:"image_set_sha256,omitempty"`
-	DockerImages            map[string]sweenv.ImageIdentity `json:"docker_images,omitempty"`
+	ManifestKind              string                          `json:"manifest_kind"`
+	RunnerType                string                          `json:"runner_type"`
+	AgentProtocol             string                          `json:"agent_protocol,omitempty"`
+	UpstreamCommit            string                          `json:"upstream_commit,omitempty"`
+	ModelName                 string                          `json:"model_name,omitempty"`
+	ObservationCodec          string                          `json:"observation_codec,omitempty"`
+	FrameworkModule           string                          `json:"framework_module,omitempty"`
+	FrameworkVersion          string                          `json:"framework_version,omitempty"`
+	SourceRevision            string                          `json:"source_revision,omitempty"`
+	SourceModified            bool                            `json:"source_modified"`
+	BinarySHA256              string                          `json:"binary_sha256,omitempty"`
+	CasesSHA256               string                          `json:"cases_sha256,omitempty"`
+	ModelConfigSHA256         string                          `json:"model_config_sha256,omitempty"`
+	EnvironmentConfigSHA256   string                          `json:"environment_config_sha256,omitempty"`
+	EmbeddingConfigSHA256     string                          `json:"embedding_config_sha256,omitempty"`
+	CommandTimeout            string                          `json:"command_timeout,omitempty"`
+	CaseTimeout               string                          `json:"case_timeout,omitempty"`
+	CleanRoom                 bool                            `json:"clean_room"`
+	ToolLoopWarning           bool                            `json:"tool_loop_warning"`
+	CodeSearch                bool                            `json:"code_search,omitempty"`
+	CodeSearchToolOrder       string                          `json:"code_search_tool_order,omitempty"`
+	CodeSearchInvocationDedup string                          `json:"code_search_invocation_dedup,omitempty"`
+	WorkspacePreload          *bool                           `json:"workspace_preload,omitempty"`
+	WorkspaceRepresentation   string                          `json:"workspace_representation,omitempty"`
+	RepresentationSchema      string                          `json:"workspace_representation_schema,omitempty"`
+	RepresentationSHA256      string                          `json:"workspace_representation_sha256,omitempty"`
+	EmbeddingConfig           map[string]any                  `json:"embedding_config,omitempty"`
+	CleanRoomPolicySHA256     string                          `json:"clean_room_policy_sha256,omitempty"`
+	OfflineAssets             *sweenv.OfflineAssetIdentity    `json:"offline_assets,omitempty"`
+	ImageSetSHA256            string                          `json:"image_set_sha256,omitempty"`
+	DockerImages              map[string]sweenv.ImageIdentity `json:"docker_images,omitempty"`
 }
 
 type shardSummary struct {
-	Index                    int                 `json:"index"`
-	Name                     string              `json:"name"`
-	RunID                    string              `json:"run_id"`
-	RawDir                   string              `json:"raw_dir"`
-	Status                   string              `json:"status"`
-	FailureReason            string              `json:"failure_reason,omitempty"`
-	ExpectedCount            int                 `json:"expected_count"`
-	PredictionsCount         int                 `json:"predictions_count"`
-	PredictionsSHA256        string              `json:"predictions_sha256,omitempty"`
-	SelectedInstancesSHA256  string              `json:"selected_instances_sha256,omitempty"`
-	AcceptedCount            int                 `json:"accepted_count"`
-	MissingCount             int                 `json:"missing_count"`
-	InvalidCount             int                 `json:"invalid_count"`
-	EmptyPatchCount          int                 `json:"empty_patch_count"`
-	Workers                  int                 `json:"workers,omitempty"`
-	StartedAt                string              `json:"started_at,omitempty"`
-	FinishedAt               string              `json:"finished_at,omitempty"`
-	DurationMS               int64               `json:"duration_ms,omitempty"`
-	ExitStatusCounts         map[string]int      `json:"exit_status_counts"`
-	ToolLoopWarningCount     int                 `json:"tool_loop_warning_count"`
-	ToolLoopWarningCaseCount int                 `json:"tool_loop_warning_case_count"`
-	RunnerIdentity           shardRunnerIdentity `json:"runner_identity"`
-	ExpectedIDs              []string            `json:"expected_ids"`
-	Cases                    []shardCaseSummary  `json:"cases"`
-	identityValidated        bool                `json:"-"`
-	toolLoopWarningCountSet  bool                `json:"-"`
-	toolLoopWarningCasesSet  bool                `json:"-"`
+	Index                    int                          `json:"index"`
+	Name                     string                       `json:"name"`
+	RunID                    string                       `json:"run_id"`
+	RawDir                   string                       `json:"raw_dir"`
+	Status                   string                       `json:"status"`
+	FailureReason            string                       `json:"failure_reason,omitempty"`
+	ExpectedCount            int                          `json:"expected_count"`
+	PredictionsCount         int                          `json:"predictions_count"`
+	PredictionsSHA256        string                       `json:"predictions_sha256,omitempty"`
+	SelectedInstancesSHA256  string                       `json:"selected_instances_sha256,omitempty"`
+	AcceptedCount            int                          `json:"accepted_count"`
+	MissingCount             int                          `json:"missing_count"`
+	InvalidCount             int                          `json:"invalid_count"`
+	EmptyPatchCount          int                          `json:"empty_patch_count"`
+	Workers                  int                          `json:"workers,omitempty"`
+	StartedAt                string                       `json:"started_at,omitempty"`
+	FinishedAt               string                       `json:"finished_at,omitempty"`
+	DurationMS               int64                        `json:"duration_ms,omitempty"`
+	ExitStatusCounts         map[string]int               `json:"exit_status_counts"`
+	ToolLoopWarningCount     int                          `json:"tool_loop_warning_count"`
+	ToolLoopWarningCaseCount int                          `json:"tool_loop_warning_case_count"`
+	Embedding                *nativeEmbeddingMetrics      `json:"embedding,omitempty"`
+	EmbeddingCache           *nativeEmbeddingCacheMetrics `json:"embedding_cache,omitempty"`
+	RunnerIdentity           shardRunnerIdentity          `json:"runner_identity"`
+	ExpectedIDs              []string                     `json:"expected_ids"`
+	Cases                    []shardCaseSummary           `json:"cases"`
+	identityValidated        bool                         `json:"-"`
+	toolLoopWarningCountSet  bool                         `json:"-"`
+	toolLoopWarningCasesSet  bool                         `json:"-"`
 }
 
 func (s *shardSummary) UnmarshalJSON(data []byte) error {
@@ -226,6 +239,18 @@ func summarizeShardPlan(plan batchPlan, planPath, runsRoot, rawSubdir string) (s
 		manifest.CumulativeDurationMS += shard.DurationMS
 		manifest.ToolLoopWarningCount += shard.ToolLoopWarningCount
 		manifest.ToolLoopWarningCaseCount += shard.ToolLoopWarningCaseCount
+		if shard.Embedding != nil {
+			if manifest.Embedding == nil {
+				manifest.Embedding = &nativeEmbeddingMetrics{}
+			}
+			manifest.Embedding.add(*shard.Embedding)
+		}
+		if shard.EmbeddingCache != nil {
+			if manifest.EmbeddingCache == nil {
+				manifest.EmbeddingCache = &nativeEmbeddingCacheMetrics{}
+			}
+			manifest.EmbeddingCache.add(*shard.EmbeddingCache)
+		}
 		for status, count := range shard.ExitStatusCounts {
 			manifest.ExitStatusCounts[status] += count
 		}
@@ -286,6 +311,8 @@ func summarizeShardPlan(plan batchPlan, planPath, runsRoot, rawSubdir string) (s
 }
 
 func cloneShardRunnerIdentity(identity shardRunnerIdentity) shardRunnerIdentity {
+	identity.WorkspacePreload = cloneBool(identity.WorkspacePreload)
+	identity.EmbeddingConfig = cloneJSONMap(identity.EmbeddingConfig)
 	identity.OfflineAssets = cloneOfflineAssetIdentity(identity.OfflineAssets)
 	identity.DockerImages = cloneDockerImages(identity.DockerImages)
 	return identity
@@ -551,6 +578,8 @@ func loadNativeShardManifest(batch batchPlanItem, rawDir, manifestPath string, s
 	shard.DurationMS = manifest.DurationMS
 	shard.ToolLoopWarningCount = manifest.ToolLoopWarningCount
 	shard.ToolLoopWarningCaseCount = manifest.ToolLoopWarningCaseCount
+	shard.Embedding = cloneNativeEmbeddingMetrics(manifest.Embedding)
+	shard.EmbeddingCache = cloneNativeEmbeddingCacheMetrics(manifest.EmbeddingCache)
 	shard.SelectedInstancesSHA256 = manifest.SelectedInstancesSHA256
 	identity, identityErr := normalizeShardRunnerIdentity(nativeRunnerIdentity(manifest))
 	shard.RunnerIdentity = identity
@@ -626,6 +655,9 @@ func validateNativeShardManifest(batch batchPlanItem, rawDir string, manifest ru
 		return fmt.Errorf("native runner_type %q is not %q", manifest.RunnerType, "trpc-agent-go-native")
 	}
 	if err := validateRunnerWarningAggregatePresence("native runner manifest", manifest); err != nil {
+		return err
+	}
+	if err := validateNativeRAGManifest("native runner manifest", manifest); err != nil {
 		return err
 	}
 	if _, err := normalizeShardRunnerIdentity(nativeRunnerIdentity(manifest)); err != nil {
@@ -710,6 +742,15 @@ func nativeRunnerIdentity(manifest runnerManifest) shardRunnerIdentity {
 	identity.AgentProtocol = manifest.AgentProtocol
 	identity.UpstreamCommit = manifest.UpstreamCommit
 	identity.ModelName = manifest.ModelConfig["MODEL_NAME"]
+	identity.CodeSearch = manifest.CodeSearch
+	identity.CodeSearchToolOrder = manifest.CodeSearchToolOrder
+	identity.CodeSearchInvocationDedup = manifest.CodeSearchInvocationDedup
+	identity.WorkspacePreload = cloneBool(manifest.WorkspacePreload)
+	identity.WorkspaceRepresentation = manifest.WorkspaceRepresentation
+	identity.RepresentationSchema = manifest.RepresentationSchema
+	identity.RepresentationSHA256 = manifest.RepresentationSHA256
+	identity.EmbeddingConfigSHA256 = manifest.EmbeddingConfigSHA256
+	identity.EmbeddingConfig = cloneJSONMap(manifest.EmbeddingConfig)
 	return identity
 }
 
@@ -777,6 +818,28 @@ func normalizeShardRunnerIdentity(identity shardRunnerIdentity) (shardRunnerIden
 				)
 			}
 		}
+		if err := validateNativeRAGIdentity("native shard runner identity", nativeRAGIdentity{
+			CodeSearch:                identity.CodeSearch,
+			CodeSearchToolOrder:       identity.CodeSearchToolOrder,
+			CodeSearchInvocationDedup: identity.CodeSearchInvocationDedup,
+			WorkspacePreload:          identity.WorkspacePreload,
+			WorkspaceRepresentation:   identity.WorkspaceRepresentation,
+			RepresentationSchema:      identity.RepresentationSchema,
+			RepresentationSHA256:      identity.RepresentationSHA256,
+			EmbeddingConfigSHA256:     identity.EmbeddingConfigSHA256,
+			EmbeddingConfig:           identity.EmbeddingConfig,
+		}); err != nil {
+			return shardRunnerIdentity{}, err
+		}
+	} else if identity.CodeSearch || identity.CodeSearchToolOrder != "" ||
+		identity.CodeSearchInvocationDedup != "" || identity.WorkspacePreload != nil ||
+		identity.WorkspaceRepresentation != "" || identity.RepresentationSchema != "" ||
+		identity.RepresentationSHA256 != "" || identity.EmbeddingConfigSHA256 != "" ||
+		identity.EmbeddingConfig != nil {
+		return shardRunnerIdentity{}, fmt.Errorf(
+			"manifest_kind %q does not support workspace retrieval fields",
+			identity.ManifestKind,
+		)
 	}
 	if identity.CleanRoom && identity.ManifestKind != "native" {
 		return shardRunnerIdentity{}, fmt.Errorf("manifest_kind %q does not support clean_room=true", identity.ManifestKind)
@@ -968,9 +1031,15 @@ func shardRunnerIdentityMismatch(canonical, candidate shardRunnerIdentity) strin
 		{"cases_sha256", canonical.CasesSHA256, candidate.CasesSHA256},
 		{"model_config_sha256", canonical.ModelConfigSHA256, candidate.ModelConfigSHA256},
 		{"environment_config_sha256", canonical.EnvironmentConfigSHA256, candidate.EnvironmentConfigSHA256},
+		{"embedding_config_sha256", canonical.EmbeddingConfigSHA256, candidate.EmbeddingConfigSHA256},
+		{"code_search_tool_order", canonical.CodeSearchToolOrder, candidate.CodeSearchToolOrder},
+		{"code_search_invocation_dedup", canonical.CodeSearchInvocationDedup, candidate.CodeSearchInvocationDedup},
 		{"command_timeout", canonical.CommandTimeout, candidate.CommandTimeout},
 		{"case_timeout", canonical.CaseTimeout, candidate.CaseTimeout},
 		{"clean_room_policy_sha256", canonical.CleanRoomPolicySHA256, candidate.CleanRoomPolicySHA256},
+		{"workspace_representation", canonical.WorkspaceRepresentation, candidate.WorkspaceRepresentation},
+		{"workspace_representation_schema", canonical.RepresentationSchema, candidate.RepresentationSchema},
+		{"workspace_representation_sha256", canonical.RepresentationSHA256, candidate.RepresentationSHA256},
 	}
 	for _, field := range fields {
 		if field.canonical != field.candidate {
@@ -989,6 +1058,19 @@ func shardRunnerIdentityMismatch(canonical, candidate shardRunnerIdentity) strin
 			candidate.ToolLoopWarning,
 			canonical.ToolLoopWarning,
 		)
+	}
+	if canonical.CodeSearch != candidate.CodeSearch {
+		return fmt.Sprintf("code_search %t does not match canonical %t", candidate.CodeSearch, canonical.CodeSearch)
+	}
+	if !equalOptionalBool(canonical.WorkspacePreload, candidate.WorkspacePreload) {
+		return fmt.Sprintf(
+			"workspace_preload %v does not match canonical %v",
+			candidate.WorkspacePreload,
+			canonical.WorkspacePreload,
+		)
+	}
+	if !equalJSONValue(canonical.EmbeddingConfig, candidate.EmbeddingConfig) {
+		return "embedding_config does not match canonical"
 	}
 	if !equalOfflineAssetIdentity(canonical.OfflineAssets, candidate.OfflineAssets) {
 		return fmt.Sprintf(

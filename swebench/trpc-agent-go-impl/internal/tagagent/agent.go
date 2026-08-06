@@ -36,11 +36,20 @@ func New(
 	generationConfig model.GenerationConfig,
 	state *State,
 	config Config,
+	extraTools ...tool.Tool,
 ) *llmagent.LLMAgent {
 	bash := &bashTool{environment: environment}
+	tools := append([]tool.Tool(nil), extraTools...)
+	tools = append(tools, bash)
 	instruction := protocol.SystemPrompt
 	if config.CleanRoom {
 		instruction = protocol.OfflineSystemPrompt
+	}
+	if len(extraTools) > 0 {
+		instruction = protocol.SystemPromptWithCodeSearch
+		if config.CleanRoom {
+			instruction = protocol.OfflineSystemPromptWithCodeSearch
+		}
 	}
 	loopTracker := newToolLoopTracker(config.ToolLoopWarning)
 	return llmagent.New(
@@ -48,13 +57,13 @@ func New(
 		llmagent.WithModel(modelImpl),
 		llmagent.WithGlobalInstruction(instruction),
 		llmagent.WithGenerationConfig(generationConfig),
-		llmagent.WithTools([]tool.Tool{bash}),
+		llmagent.WithTools(tools),
 		llmagent.WithMaxLLMCalls(MaxLLMCalls),
 		llmagent.WithEnableParallelTools(false),
 		llmagent.WithPreserveSameBranch(true),
 		llmagent.WithEnablePostToolPrompt(false),
 		llmagent.WithEnableCodeExecutionResponseProcessor(false),
-		llmagent.WithModelCallbacks(modelCallbacks(state, loopTracker)),
+		llmagent.WithModelCallbacks(modelCallbacks(state, loopTracker, len(extraTools) > 0)),
 		llmagent.WithToolCallbacks(toolCallbacks(state, codec, loopTracker)),
 	)
 }

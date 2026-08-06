@@ -12,10 +12,86 @@ package sweenv
 import (
 	"context"
 	"errors"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 )
+
+func TestDockerEnvironmentSnapshotWorkspace(t *testing.T) {
+	commander := &fakeCommander{}
+	destination := t.TempDir()
+	environment := &dockerEnvironment{
+		name:       "case-container",
+		dockerHost: "unix:///tmp/docker.sock",
+		commander:  commander,
+	}
+	if err := environment.SnapshotWorkspace(context.Background(), destination); err != nil {
+		t.Fatalf("SnapshotWorkspace() error = %v", err)
+	}
+	if len(commander.commands) != 1 {
+		t.Fatalf("commands = %d, want 1", len(commander.commands))
+	}
+	command := commander.commands[0]
+	if command.name != "docker" || strings.Join(command.args, " ") !=
+		"cp case-container:/testbed/. "+destination {
+		t.Fatalf("snapshot command = %s %v", command.name, command.args)
+	}
+	if len(command.env) != 1 || command.env[0] != "DOCKER_HOST=unix:///tmp/docker.sock" {
+		t.Fatalf("snapshot env = %#v", command.env)
+	}
+}
+
+func TestDockerEnvironmentSnapshotWorkspaceRejectsUnsafeDestinations(t *testing.T) {
+	commander := &fakeCommander{}
+	environment := &dockerEnvironment{name: "case", commander: commander}
+
+	nonEmpty := t.TempDir()
+	if err := os.WriteFile(filepath.Join(nonEmpty, "existing"), []byte("x"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	realDirectory := t.TempDir()
+	symlink := filepath.Join(t.TempDir(), "snapshot-link")
+	if err := os.Symlink(realDirectory, symlink); err != nil {
+		t.Fatal(err)
+	}
+	file := filepath.Join(t.TempDir(), "snapshot-file")
+	if err := os.WriteFile(file, []byte("x"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	for name, destination := range map[string]string{
+		"relative":  "snapshot",
+		"non-empty": nonEmpty,
+		"symlink":   symlink,
+		"file":      file,
+		"missing":   filepath.Join(t.TempDir(), "missing"),
+	} {
+		t.Run(name, func(t *testing.T) {
+			if err := environment.SnapshotWorkspace(context.Background(), destination); err == nil {
+				t.Fatalf("SnapshotWorkspace(%q) succeeded", destination)
+			}
+		})
+	}
+	if len(commander.commands) != 0 {
+		t.Fatalf("unsafe destinations executed Docker: %#v", commander.commands)
+	}
+}
+
+func TestDockerEnvironmentSnapshotWorkspaceUsesCommandTimeout(t *testing.T) {
+	destination := t.TempDir()
+	environment := &dockerEnvironment{
+		name:           "case-container",
+		commandTimeout: 10 * time.Millisecond,
+		commander:      snapshotTimeoutCommander{},
+	}
+	err := environment.SnapshotWorkspace(context.Background(), destination)
+	if err == nil || !errors.Is(err, context.DeadlineExceeded) ||
+		!strings.Contains(err.Error(), "timed out after 10ms") {
+		t.Fatalf("SnapshotWorkspace() error = %v, want command timeout", err)
+	}
+}
 
 type recordedCommand struct {
 	env  []string
@@ -40,6 +116,16 @@ type timeoutCommander struct{}
 func (timeoutCommander) Run(ctx context.Context, _ []string, _ string, args ...string) ([]byte, error) {
 	if len(args) == 0 || args[0] != "exec" {
 		return []byte("container-id"), nil
+	}
+	<-ctx.Done()
+	return []byte("partial"), ctx.Err()
+}
+
+type snapshotTimeoutCommander struct{}
+
+func (snapshotTimeoutCommander) Run(ctx context.Context, _ []string, _ string, args ...string) ([]byte, error) {
+	if len(args) == 0 || args[0] != "cp" {
+		return nil, errors.New("unexpected command")
 	}
 	<-ctx.Done()
 	return []byte("partial"), ctx.Err()

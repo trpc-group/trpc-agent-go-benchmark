@@ -13,6 +13,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"os"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"sync"
@@ -23,6 +25,7 @@ import (
 	"trpc.group/trpc-go/trpc-agent-go-benchmark/swebench/internal/modelconfig"
 	"trpc.group/trpc-go/trpc-agent-go-benchmark/swebench/internal/observation"
 	"trpc.group/trpc-go/trpc-agent-go-benchmark/swebench/internal/sweenv"
+	"trpc.group/trpc-go/trpc-agent-go-benchmark/swebench/trpc-agent-go-impl/internal/embeddingconfig"
 	"trpc.group/trpc-go/trpc-agent-go-benchmark/swebench/trpc-agent-go-impl/internal/protocol"
 	"trpc.group/trpc-go/trpc-agent-go-benchmark/swebench/trpc-agent-go-impl/internal/tagagent"
 	"trpc.group/trpc-go/trpc-agent-go/event"
@@ -34,6 +37,62 @@ type scriptedModel struct {
 	responses []*model.Response
 	requests  []*model.Request
 	err       error
+}
+
+func TestScrubCaseResultSensitiveRemovesEmbeddingSecrets(t *testing.T) {
+	config := &embeddingconfig.Config{}
+	config.Embedding.APIBase = "https://private.example.invalid/v1"
+	config.Embedding.APIKey = "secret-key"
+	config.Embedding.ExtraHeaders = map[string]string{"X-Tenant": "private-tenant"}
+	config.Cache.Directory = "/private/cache"
+	message := "POST https://private.example.invalid/v1/embeddings secret-key private-tenant /private/cache"
+	raw, err := json.Marshal(map[string]string{"error": message})
+	if err != nil {
+		t.Fatal(err)
+	}
+	response := &model.Response{
+		Done:    true,
+		Error:   &model.ResponseError{Message: message},
+		Choices: []model.Choice{{Message: model.Message{Content: message}}},
+	}
+	result := CaseResult{
+		Info:                  CaseInfo{Error: message},
+		CodeSearchResultBytes: len(raw),
+		CodeSearchRawResults:  []json.RawMessage{raw},
+		RetrievalTrace: []tagagent.RetrievalTraceEntry{{
+			Status:       "error",
+			Error:        message,
+			ErrorSHA256:  tagagent.DigestBytes([]byte(message)),
+			ResultBytes:  len(raw),
+			ResultSHA256: tagagent.DigestBytes(raw),
+		}},
+		Responses: []*model.Response{response.Clone()},
+		Events:    []*event.Event{{Response: response.Clone()}},
+	}
+	scrubCaseResultSensitive(&result, config)
+	serialized, err := json.Marshal(struct {
+		Result    CaseResult        `json:"result"`
+		Responses []*model.Response `json:"responses"`
+	}{Result: result, Responses: result.Responses})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, forbidden := range []string{
+		config.Embedding.APIBase,
+		config.Embedding.APIKey,
+		config.Embedding.ExtraHeaders["X-Tenant"],
+		config.Cache.Directory,
+	} {
+		if strings.Contains(string(serialized), forbidden) {
+			t.Fatalf("portable case artifact contains %q: %s", forbidden, serialized)
+		}
+	}
+	if result.CodeSearchResultBytes != len(result.CodeSearchRawResults[0]) ||
+		result.RetrievalTrace[0].ResultBytes != len(result.CodeSearchRawResults[0]) ||
+		result.RetrievalTrace[0].ResultSHA256 != tagagent.DigestBytes(result.CodeSearchRawResults[0]) ||
+		result.RetrievalTrace[0].ErrorSHA256 != tagagent.DigestBytes([]byte(result.RetrievalTrace[0].Error)) {
+		t.Fatalf("scrubbed retrieval evidence is inconsistent: %#v", result)
+	}
 }
 
 func (*scriptedModel) Info() model.Info { return model.Info{Name: "scripted"} }
@@ -84,6 +143,16 @@ type provenanceEnvironment struct {
 
 func (e provenanceEnvironment) Provenance() sweenv.Provenance { return e.provenance }
 
+type snapshotEnvironment struct{ *fakeEnvironment }
+
+func (e snapshotEnvironment) SnapshotWorkspace(_ context.Context, destination string) error {
+	return os.WriteFile(
+		filepath.Join(destination, "users.py"),
+		[]byte("def find_user_by_email(email):\n    return email\n"),
+		0o600,
+	)
+}
+
 func (e *fakeEnvironment) Execute(_ context.Context, command string) sweenv.CommandResult {
 	e.mu.Lock()
 	defer e.mu.Unlock()
@@ -118,6 +187,14 @@ func bashCall(id, command string) model.ToolCall {
 	return model.ToolCall{
 		ID: id, Type: "function",
 		Function: model.FunctionDefinitionParam{Name: "bash", Arguments: arguments},
+	}
+}
+
+func codeSearchCall(id, query string) model.ToolCall {
+	arguments, _ := json.Marshal(map[string]string{"query": query})
+	return model.ToolCall{
+		ID: id, Type: "function",
+		Function: model.FunctionDefinitionParam{Name: "code_search", Arguments: arguments},
 	}
 }
 
@@ -207,6 +284,57 @@ func TestToolResultsUseSelectedCodecAndExecuteSequentially(t *testing.T) {
 	}
 	if result.Usage.PromptTokens != 20 || result.Usage.CompletionTokens != 4 || result.Usage.TotalTokens != 24 {
 		t.Fatalf("usage = %+v", result.Usage)
+	}
+}
+
+func TestOptionalCodeSearchBuildsStaticIndexAndProjectsTelemetry(t *testing.T) {
+	modelImpl := &scriptedModel{responses: []*model.Response{
+		assistantResponse("search", codeSearchCall("search-1", "find_user_by_email")),
+		assistantResponse("done", bashCall("submit", "submit")),
+	}}
+	environment := snapshotEnvironment{fakeEnvironment: &fakeEnvironment{results: []sweenv.CommandResult{{
+		Output: protocol.SubmissionMarker + "\npatch\n",
+	}}}}
+	preload := false
+	exec := Executor{
+		Factory:                 fakeFactory{environment: environment},
+		ObservationCodec:        observation.ObservationCodecXML,
+		ModelFactory:            func(modelconfig.EnvConfig) model.Model { return modelImpl },
+		Workers:                 1,
+		EnableCodeSearch:        true,
+		EnableWorkspacePreload:  preload,
+		WorkspaceRepresentation: tagagent.WorkspaceRepresentationCurrentFixed,
+	}
+	result := exec.Execute(
+		context.Background(),
+		contract.Case{InstanceID: "case-a", Repo: "owner/project", ProblemStatement: "fix lookup"},
+	)
+
+	if result.Info.ExitStatus != "Submitted" || result.ModelPatch != "patch\n" ||
+		!result.Info.CodeSearch || result.Info.WorkspacePreload == nil ||
+		*result.Info.WorkspacePreload != preload {
+		t.Fatalf("result identity = %+v", result)
+	}
+	if result.LLMCalls != 2 || result.ToolCalls != 2 || result.CodeSearchCalls != 1 ||
+		result.CodeSearchResultBytes <= 0 || result.CodeSearchObservationBytes <= 0 {
+		t.Fatalf("retrieval telemetry = %+v", result)
+	}
+	if result.WorkspaceIndex == nil || result.WorkspaceIndex.Documents == 0 ||
+		result.WorkspaceIndex.RetrievalMode != "keyword" || result.WorkspaceIndex.PreloadInjected {
+		t.Fatalf("workspace index = %+v", result.WorkspaceIndex)
+	}
+	if len(result.CodeSearchRawResults) != 1 || len(result.RetrievalTrace) != 1 ||
+		result.RetrievalTrace[0].Query != "find_user_by_email" {
+		t.Fatalf("retrieval artifacts = raw=%d trace=%+v", len(result.CodeSearchRawResults), result.RetrievalTrace)
+	}
+	if got := environment.commands; !reflect.DeepEqual(got, []string{"submit"}) {
+		t.Fatalf("bash commands = %#v, want submit only", got)
+	}
+	if len(modelImpl.requests) != 2 || !strings.Contains(
+		modelImpl.requests[1].Messages[len(modelImpl.requests[1].Messages)-1].Content,
+		"find_user_by_email",
+	) {
+		t.Fatalf("second model request did not receive code_search result: %#v", modelImpl.requests)
 	}
 }
 

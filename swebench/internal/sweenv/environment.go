@@ -30,6 +30,14 @@ type Environment interface {
 	Close(ctx context.Context) error
 }
 
+// WorkspaceSnapshotter is implemented by environments that can materialize
+// the immutable task-start workspace into an empty host directory. Callers
+// must treat the snapshot as read-only: it is a retrieval input, not a second
+// execution workspace.
+type WorkspaceSnapshotter interface {
+	SnapshotWorkspace(ctx context.Context, destination string) error
+}
+
 // CaseSpec is the minimum case identity required to enforce a clean-room
 // boundary before an agent sees a testbed.
 type CaseSpec struct {

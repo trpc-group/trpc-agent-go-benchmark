@@ -23,7 +23,8 @@ import (
 	"trpc.group/trpc-go/trpc-agent-go/tool"
 )
 
-func modelCallbacks(state *State, loopTracker *toolLoopTracker) *model.Callbacks {
+func modelCallbacks(state *State, loopTracker *toolLoopTracker, codeSearch ...bool) *model.Callbacks {
+	allowCodeSearch := len(codeSearch) > 0 && codeSearch[0]
 	callbacks := model.NewCallbacks()
 	callbacks.RegisterBeforeModel(func(_ context.Context, args *model.BeforeModelArgs) (*model.BeforeModelResult, error) {
 		llmCall := state.recordModelCall()
@@ -57,9 +58,15 @@ func modelCallbacks(state *State, loopTracker *toolLoopTracker) *model.Callbacks
 			return nil, errors.New("model response contains no choices")
 		}
 		toolCalls := response.Choices[0].Message.ToolCalls
-		_, err := protocol.ParseActions(toolCalls)
+		bashCalls, err := parseToolActions(toolCalls, allowCodeSearch)
 		if err == nil {
-			loopTracker.start(toolCalls)
+			if len(bashCalls) > 0 {
+				// code_search is intentionally excluded: the exact-repeat warning
+				// remains a detector over executable bash batches.
+				loopTracker.start(bashCalls)
+			} else {
+				loopTracker.reset()
+			}
 			return nil, nil
 		}
 		loopTracker.reset()
@@ -76,6 +83,34 @@ func modelCallbacks(state *State, loopTracker *toolLoopTracker) *model.Callbacks
 	return callbacks
 }
 
+func parseToolActions(toolCalls []model.ToolCall, allowCodeSearch bool) ([]model.ToolCall, error) {
+	if len(toolCalls) == 0 {
+		_, err := protocol.ParseActions(nil)
+		return nil, err
+	}
+	bashCalls := make([]model.ToolCall, 0, len(toolCalls))
+	for _, call := range toolCalls {
+		switch call.Function.Name {
+		case "bash":
+			bashCalls = append(bashCalls, call)
+		case "code_search":
+			if !allowCodeSearch {
+				_, err := protocol.ParseActions([]model.ToolCall{call})
+				return nil, err
+			}
+		default:
+			_, err := protocol.ParseActions([]model.ToolCall{call})
+			return nil, err
+		}
+	}
+	if len(bashCalls) > 0 {
+		if _, err := protocol.ParseActions(bashCalls); err != nil {
+			return nil, err
+		}
+	}
+	return bashCalls, nil
+}
+
 func toolCallbacks(
 	state *State,
 	codec observation.ObservationCodec,
@@ -83,9 +118,26 @@ func toolCallbacks(
 ) *tool.Callbacks {
 	callbacks := tool.NewCallbacks()
 	callbacks.RegisterAfterTool(func(_ context.Context, args *tool.AfterToolArgs) (*tool.AfterToolResult, error) {
-		state.recordToolCall()
-		if args == nil || args.Error != nil {
+		if args != nil {
+			state.recordToolCall(args.ToolName)
+		}
+		if args == nil {
 			loopTracker.reset()
+			return nil, nil
+		}
+		if args.Error != nil {
+			if args.ToolName == "code_search" {
+				state.recordCodeSearchError(args.ToolCallID, args.Arguments, args.Error)
+			} else if args.ToolName == "bash" {
+				loopTracker.reset()
+			}
+			return nil, nil
+		}
+		if args.ToolName == "code_search" {
+			state.recordCodeSearchResult(args.ToolCallID, args.Arguments, args.Result)
+			return nil, nil
+		}
+		if args.ToolName != "bash" {
 			return nil, nil
 		}
 		result, ok := args.Result.(sweenv.CommandResult)
@@ -109,6 +161,17 @@ func toolCallbacks(
 		if input == nil {
 			loopTracker.reset()
 			return nil, errors.New("nil tool result input")
+		}
+		if input.ToolName == "code_search" {
+			formatted, err := formatCodeSearchXMLLike(input.Result)
+			if err != nil {
+				return nil, err
+			}
+			state.recordCodeSearchObservation(input.ToolCallID, formatted)
+			return model.NewToolMessage(input.ToolCallID, "code_search", formatted), nil
+		}
+		if input.ToolName != "bash" {
+			return nil, nil
 		}
 		result, ok := input.Result.(sweenv.CommandResult)
 		if !ok {

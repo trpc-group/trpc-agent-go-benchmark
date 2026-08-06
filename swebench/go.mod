@@ -3,9 +3,11 @@ module trpc.group/trpc-go/trpc-agent-go-benchmark/swebench
 go 1.21
 
 require (
+	github.com/mattn/go-sqlite3 v1.14.32
 	github.com/openai/openai-go v1.12.0
 	gopkg.in/yaml.v3 v3.0.1
 	trpc.group/trpc-go/trpc-agent-go v1.10.1-0.20260728070417-4237accb70cb
+	trpc.group/trpc-go/trpc-agent-go/knowledge/document/reader/python v0.0.0-20260728070417-4237accb70cb
 )
 
 require (
@@ -21,6 +23,7 @@ require (
 	github.com/tidwall/match v1.1.1 // indirect
 	github.com/tidwall/pretty v1.2.1 // indirect
 	github.com/tidwall/sjson v1.2.5 // indirect
+	github.com/yuin/goldmark v1.4.13 // indirect
 	go.opentelemetry.io/otel v1.29.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.29.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.29.0 // indirect

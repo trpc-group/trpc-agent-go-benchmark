@@ -32,24 +32,31 @@ type buildMetadata struct {
 }
 
 type runIdentity struct {
-	RunID                   string
-	ObservationCodec        string
-	SourceRevision          string
-	SourceModified          bool
-	BinarySHA256            string
-	ModelConfigSHA256       string
-	EnvironmentConfigSHA256 string
-	CasesSHA256             string
-	CommandTimeout          string
-	CaseTimeout             string
-	SelectedInstancesSHA256 string
-	CleanRoom               bool
-	ToolLoopWarning         bool
-	CleanRoomPolicySHA256   string
-	OfflineAssetsSHA256     string
-	ImageSetSHA256          string
-	DockerImages            map[string]sweenv.ImageIdentity
-	Workers                 int
+	RunID                     string
+	ObservationCodec          string
+	SourceRevision            string
+	SourceModified            bool
+	BinarySHA256              string
+	ModelConfigSHA256         string
+	EnvironmentConfigSHA256   string
+	CasesSHA256               string
+	CommandTimeout            string
+	CaseTimeout               string
+	SelectedInstancesSHA256   string
+	CleanRoom                 bool
+	ToolLoopWarning           bool
+	CodeSearch                bool
+	CodeSearchToolOrder       string
+	CodeSearchInvocationDedup string
+	WorkspacePreload          bool
+	WorkspaceRepresentation   string
+	RepresentationSHA256      string
+	EmbeddingConfigSHA256     string
+	CleanRoomPolicySHA256     string
+	OfflineAssetsSHA256       string
+	ImageSetSHA256            string
+	DockerImages              map[string]sweenv.ImageIdentity
+	Workers                   int
 }
 
 func fileSHA256(path string) (string, error) {

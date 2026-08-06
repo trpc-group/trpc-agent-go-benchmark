@@ -25,8 +25,11 @@ import (
 	"trpc.group/trpc-go/trpc-agent-go-benchmark/swebench/internal/modelconfig"
 	"trpc.group/trpc-go/trpc-agent-go-benchmark/swebench/internal/observation"
 	"trpc.group/trpc-go/trpc-agent-go-benchmark/swebench/internal/sweenv"
+	"trpc.group/trpc-go/trpc-agent-go-benchmark/swebench/trpc-agent-go-impl/internal/embeddingcache"
+	"trpc.group/trpc-go/trpc-agent-go-benchmark/swebench/trpc-agent-go-impl/internal/embeddingconfig"
 	"trpc.group/trpc-go/trpc-agent-go-benchmark/swebench/trpc-agent-go-impl/internal/executor"
 	"trpc.group/trpc-go/trpc-agent-go-benchmark/swebench/trpc-agent-go-impl/internal/protocol"
+	"trpc.group/trpc-go/trpc-agent-go-benchmark/swebench/trpc-agent-go-impl/internal/tagagent"
 	"trpc.group/trpc-go/trpc-agent-go/model"
 )
 
@@ -74,6 +77,173 @@ func TestToolLoopWarningFlagDefaultsOffAndAcceptsExplicitValues(t *testing.T) {
 				t.Fatalf("error = %v, want flag parsing to reach cases hashing", err)
 			}
 		})
+	}
+}
+
+func TestWorkspaceRetrievalFlagsAreOptInAndFailClosed(t *testing.T) {
+	baseArgs := func(t *testing.T) []string {
+		t.Helper()
+		return []string{
+			"trpc-agent-go-impl",
+			"-run-id=test",
+			"-model-config=unused",
+			"-cases=" + filepath.Join(t.TempDir(), "missing.jsonl"),
+		}
+	}
+	for _, tc := range []struct {
+		name      string
+		arguments []string
+		want      string
+	}{
+		{
+			name:      "embedding config without retrieval",
+			arguments: []string{"-embedding-config=unused"},
+			want:      "-embedding-config requires -code-search=true",
+		},
+		{
+			name:      "representation without retrieval",
+			arguments: []string{"-workspace-representation=ast-structured"},
+			want:      "-workspace-representation=ast-structured requires -code-search=true",
+		},
+		{
+			name:      "invalid representation",
+			arguments: []string{"-code-search=true", "-workspace-representation=unknown"},
+			want:      "unsupported workspace representation",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			err := Run(append(baseArgs(t), tc.arguments...))
+			if err == nil || !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("error = %v, want substring %q", err, tc.want)
+			}
+		})
+	}
+
+	for _, arguments := range [][]string{
+		{"-workspace-preload=false"},
+		{"-code-search=true"},
+		{"-code-search=true", "-workspace-preload=false"},
+		{"-code-search=true", "-workspace-representation=ast-code"},
+	} {
+		err := Run(append(baseArgs(t), arguments...))
+		if err == nil || !strings.Contains(err.Error(), "hash cases") {
+			t.Fatalf("arguments=%v error=%v, want flag parsing to reach cases hashing", arguments, err)
+		}
+	}
+}
+
+func TestManifestOmitsDisabledWorkspaceRetrievalIdentity(t *testing.T) {
+	payload, err := json.Marshal(manifest{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, field := range []string{
+		"code_search",
+		"code_search_tool_order",
+		"code_search_invocation_dedup",
+		"workspace_preload",
+		"workspace_representation",
+		"workspace_representation_schema",
+		"workspace_representation_sha256",
+		"embedding_config_sha256",
+		"embedding_config",
+		"embedding_cache",
+	} {
+		if strings.Contains(string(payload), `"`+field+`"`) {
+			t.Fatalf("disabled manifest unexpectedly contains %q: %s", field, payload)
+		}
+	}
+
+	preload := false
+	payload, err = json.Marshal(manifest{
+		CodeSearch:                true,
+		CodeSearchToolOrder:       tagagent.CodeSearchProviderToolOrder,
+		CodeSearchInvocationDedup: tagagent.CodeSearchInvocationDedup,
+		WorkspacePreload:          &preload,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(payload), `"workspace_preload":false`) {
+		t.Fatalf("enabled retrieval manifest lost explicit preload=false: %s", payload)
+	}
+	for _, identity := range []string{
+		`"code_search_tool_order":"bash,code_search"`,
+		`"code_search_invocation_dedup":"disabled"`,
+	} {
+		if !strings.Contains(string(payload), identity) {
+			t.Fatalf("enabled retrieval manifest lost %s: %s", identity, payload)
+		}
+	}
+}
+
+func TestCaseInfoOmitsDisabledWorkspacePreloadAndKeepsExplicitFalseWhenEnabled(t *testing.T) {
+	payload, err := json.Marshal(executor.CaseInfo{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(payload), `"workspace_preload"`) {
+		t.Fatalf("disabled case info unexpectedly contains workspace_preload: %s", payload)
+	}
+	preload := false
+	payload, err = json.Marshal(executor.CaseInfo{CodeSearch: true, WorkspacePreload: &preload})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(payload), `"workspace_preload":false`) {
+		t.Fatalf("enabled case info lost explicit preload=false: %s", payload)
+	}
+}
+
+func TestWorkspaceEmbeddingManifestIsRedactedAndHashed(t *testing.T) {
+	directory := filepath.Join(t.TempDir(), "private-cache")
+	path := filepath.Join(t.TempDir(), "embedding.yaml")
+	contents := strings.Join([]string{
+		"embedding:",
+		"  provider: openai",
+		"  api_base: https://internal.example.invalid/v1",
+		"  api_key: private-key",
+		"  model: embed-model",
+		"  dimensions: 4",
+		"retrieval:",
+		"  mode: hybrid",
+		"cache:",
+		"  enabled: true",
+		"  directory: " + directory,
+		"  model_fingerprint: public-model-revision",
+	}, "\n") + "\n"
+	if err := os.WriteFile(path, []byte(contents), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	hash, err := fileSHA256(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !isHexIdentifier(hash, 64) {
+		t.Fatalf("embedding config hash = %q", hash)
+	}
+	cfg, err := embeddingconfig.Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	payload, err := json.Marshal(manifest{
+		EmbeddingConfigSHA256: hash,
+		EmbeddingConfig:       cfg.Redacted(),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, secret := range []string{
+		"https://internal.example.invalid/v1",
+		"private-key",
+		directory,
+	} {
+		if strings.Contains(string(payload), secret) {
+			t.Fatalf("embedding manifest leaked %q: %s", secret, payload)
+		}
+	}
+	if !strings.Contains(string(payload), `"embedding_config_sha256":"`+hash+`"`) {
+		t.Fatalf("embedding manifest omitted config hash: %s", payload)
 	}
 }
 
@@ -481,6 +651,183 @@ func TestValidateRunIdentityCleanRoomRequirements(t *testing.T) {
 	})
 }
 
+func TestValidateRunIdentityWorkspaceRetrievalRequirements(t *testing.T) {
+	identity := testWorkspaceIdentity(t, "case-a")
+	if err := validateRunIdentity(identity); err != nil {
+		t.Fatal(err)
+	}
+
+	t.Run("representation hash", func(t *testing.T) {
+		changed := identity
+		changed.RepresentationSHA256 = strings.Repeat("1", 64)
+		if err := validateRunIdentity(changed); err == nil ||
+			!strings.Contains(err.Error(), "workspace representation hash") {
+			t.Fatalf("error = %v", err)
+		}
+	})
+	t.Run("embedding hash", func(t *testing.T) {
+		changed := identity
+		changed.EmbeddingConfigSHA256 = "not-a-hash"
+		if err := validateRunIdentity(changed); err == nil ||
+			!strings.Contains(err.Error(), "embedding config hash") {
+			t.Fatalf("error = %v", err)
+		}
+	})
+	t.Run("disabled retrieval rejects residue", func(t *testing.T) {
+		changed := identity
+		changed.CodeSearch = false
+		if err := validateRunIdentity(changed); err == nil ||
+			!strings.Contains(err.Error(), "code_search=false") {
+			t.Fatalf("error = %v", err)
+		}
+	})
+}
+
+func TestValidateResumeResultRequiresExactWorkspaceRetrievalIdentity(t *testing.T) {
+	selectedCase := contract.Case{InstanceID: "case-a"}
+	identity := testWorkspaceIdentity(t, selectedCase.InstanceID)
+	valid := resumeCaseResult(t, selectedCase, "patch", identity)
+	if err := validateResumeResult(selectedCase, valid, identity); err != nil {
+		t.Fatal(err)
+	}
+
+	for _, tc := range []struct {
+		name      string
+		change    func(*executor.CaseResult)
+		wantError string
+	}{
+		{
+			name:      "code search",
+			change:    func(result *executor.CaseResult) { result.Info.CodeSearch = false },
+			wantError: "code_search=false, want true",
+		},
+		{
+			name: "preload",
+			change: func(result *executor.CaseResult) {
+				preload := false
+				result.Info.WorkspacePreload = &preload
+			},
+			wantError: "workspace_preload=false, want true",
+		},
+		{
+			name:      "representation",
+			change:    func(result *executor.CaseResult) { result.Info.WorkspaceRepresentation = "fixed-raw" },
+			wantError: "workspace representation",
+		},
+		{
+			name:      "representation hash",
+			change:    func(result *executor.CaseResult) { result.Info.RepresentationSHA256 = strings.Repeat("1", 64) },
+			wantError: "workspace representation hash",
+		},
+		{
+			name:      "embedding config hash",
+			change:    func(result *executor.CaseResult) { result.Info.EmbeddingConfigSHA256 = strings.Repeat("2", 64) },
+			wantError: "embedding config hash",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			result := valid
+			tc.change(&result)
+			if err := validateResumeResult(selectedCase, result, identity); err == nil ||
+				!strings.Contains(err.Error(), tc.wantError) {
+				t.Fatalf("error = %v, want substring %q", err, tc.wantError)
+			}
+		})
+	}
+}
+
+func TestValidateResumeResultRequiresCompleteWorkspaceRetrievalEvidence(t *testing.T) {
+	selectedCase := contract.Case{InstanceID: "case-a"}
+	identity := testWorkspaceIdentity(t, selectedCase.InstanceID)
+	newResult := func() executor.CaseResult {
+		result := resumeCaseResult(t, selectedCase, "patch", identity)
+		raw := json.RawMessage("{\n  \"documents\": []\n}")
+		compact := []byte(`{"documents":[]}`)
+		observation := "<code_search_result></code_search_result>"
+		result.CodeSearchCalls = 1
+		result.CodeSearchResultBytes = len(compact)
+		result.CodeSearchObservationBytes = len(observation)
+		result.CodeSearchRawResults = []json.RawMessage{raw}
+		result.RetrievalTrace = []tagagent.RetrievalTraceEntry{{
+			Call:              1,
+			ToolCallID:        "call-1",
+			Query:             "needle",
+			Status:            "success",
+			ArgumentsSHA256:   strings.Repeat("a", 64),
+			ResultSHA256:      tagagent.DigestBytes(compact),
+			ObservationSHA256: tagagent.DigestBytes([]byte(observation)),
+			ResultBytes:       len(compact),
+			ObservationBytes:  len(observation),
+			Documents:         []tagagent.RetrievalTraceDocument{},
+		}}
+		return result
+	}
+
+	if err := validateResumeResult(selectedCase, newResult(), identity); err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct {
+		name      string
+		change    func(*executor.CaseResult)
+		wantError string
+	}{
+		{
+			name:      "missing workspace index",
+			change:    func(result *executor.CaseResult) { result.WorkspaceIndex = nil },
+			wantError: "missing workspace_index",
+		},
+		{
+			name:      "trace count",
+			change:    func(result *executor.CaseResult) { result.RetrievalTrace = nil },
+			wantError: "evidence counts",
+		},
+		{
+			name: "raw result digest",
+			change: func(result *executor.CaseResult) {
+				result.CodeSearchRawResults[0] = json.RawMessage(`{"documents":[{"id":"changed"}]}`)
+			},
+			wantError: "does not match raw result",
+		},
+		{
+			name:      "error count",
+			change:    func(result *executor.CaseResult) { result.CodeSearchErrors = 1 },
+			wantError: "retrieval errors",
+		},
+		{
+			name: "workspace identity",
+			change: func(result *executor.CaseResult) {
+				result.WorkspaceIndex.RepresentationSHA256 = strings.Repeat("f", 64)
+			},
+			wantError: "representation identity",
+		},
+		{
+			name:      "embedding telemetry",
+			change:    func(result *executor.CaseResult) { result.Embedding = nil },
+			wantError: "embedding telemetry",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			result := newResult()
+			tc.change(&result)
+			if err := validateResumeResult(selectedCase, result, identity); err == nil ||
+				!strings.Contains(err.Error(), tc.wantError) {
+				t.Fatalf("error = %v, want substring %q", err, tc.wantError)
+			}
+		})
+	}
+}
+
+func TestValidateResumeResultRejectsDisabledWorkspaceRetrievalResidue(t *testing.T) {
+	selectedCase := contract.Case{InstanceID: "case-a"}
+	identity := testRunIdentity(t, selectedCase.InstanceID)
+	result := resumeCaseResult(t, selectedCase, "patch", identity)
+	result.CodeSearchCalls = 1
+	if err := validateResumeResult(selectedCase, result, identity); err == nil ||
+		!strings.Contains(err.Error(), "code_search=false") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
 func TestValidateToolLoopWarningTelemetry(t *testing.T) {
 	first := 2
 	base := executor.CaseResult{
@@ -556,6 +903,42 @@ func TestProgressAndAggregateIncludeSkippedWarningTelemetry(t *testing.T) {
 	}
 }
 
+func TestAggregateResultsIncludesEmbeddingAndCacheMetrics(t *testing.T) {
+	results := map[string]executor.CaseResult{
+		"case-a": {
+			Info: executor.CaseInfo{ExitStatus: "Submitted"},
+			Embedding: &embeddingconfig.Metrics{
+				Requests: 1, BatchRequests: 1, Inputs: 3,
+				PromptTokens: 10, TotalTokens: 10, DurationMS: 20,
+			},
+			EmbeddingCache: &embeddingcache.Metrics{
+				Requests: 3, Hits: 2, Misses: 1, BytesRead: 40,
+			},
+		},
+		"case-b": {
+			Info: executor.CaseInfo{ExitStatus: "Submitted"},
+			Embedding: &embeddingconfig.Metrics{
+				Requests: 2, Inputs: 2, Errors: 1,
+				PromptTokens: 7, TotalTokens: 7, DurationMS: 9,
+			},
+			EmbeddingCache: &embeddingcache.Metrics{
+				Requests: 2, Hits: 1, Misses: 1, BytesWritten: 64,
+			},
+		},
+	}
+	aggregate := aggregateResults(results)
+	if !aggregate.HasEmbedding || aggregate.Embedding.Requests != 3 ||
+		aggregate.Embedding.Inputs != 5 || aggregate.Embedding.Errors != 1 ||
+		aggregate.Embedding.PromptTokens != 17 || aggregate.Embedding.DurationMS != 29 {
+		t.Fatalf("embedding aggregate = %#v", aggregate.Embedding)
+	}
+	if !aggregate.HasEmbeddingCache || aggregate.EmbeddingCache.Requests != 5 ||
+		aggregate.EmbeddingCache.Hits != 3 || aggregate.EmbeddingCache.Misses != 2 ||
+		aggregate.EmbeddingCache.BytesRead != 40 || aggregate.EmbeddingCache.BytesWritten != 64 {
+		t.Fatalf("embedding cache aggregate = %#v", aggregate.EmbeddingCache)
+	}
+}
+
 func TestValidateResumeResultRequiresExactAuxiliaryImageRoles(t *testing.T) {
 	selectedCase := contract.Case{
 		InstanceID: "psf__requests-2317",
@@ -611,6 +994,20 @@ func testRunIdentity(t *testing.T, instanceIDs ...string) runIdentity {
 		CommandTimeout: "1m0s", CaseTimeout: "2h0m0s",
 		SelectedInstancesSHA256: selectedHash, Workers: 1,
 	}
+}
+
+func testWorkspaceIdentity(t *testing.T, instanceIDs ...string) runIdentity {
+	t.Helper()
+	identity := testRunIdentity(t, instanceIDs...)
+	representation := tagagent.WorkspaceRepresentationASTStructured
+	identity.CodeSearch = true
+	identity.CodeSearchToolOrder = tagagent.CodeSearchProviderToolOrder
+	identity.CodeSearchInvocationDedup = tagagent.CodeSearchInvocationDedup
+	identity.WorkspacePreload = true
+	identity.WorkspaceRepresentation = string(representation)
+	identity.RepresentationSHA256 = tagagent.WorkspaceRepresentationSHA256(representation)
+	identity.EmbeddingConfigSHA256 = strings.Repeat("0", 64)
+	return identity
 }
 
 func testCleanRoomIdentity(t *testing.T, withAssets bool, instanceIDs ...string) runIdentity {
@@ -698,6 +1095,11 @@ func resumeCaseResult(
 	identity runIdentity,
 ) executor.CaseResult {
 	t.Helper()
+	var workspacePreload *bool
+	if identity.CodeSearch {
+		preload := identity.WorkspacePreload
+		workspacePreload = &preload
+	}
 	result := executor.CaseResult{
 		InstanceID: selectedCase.InstanceID,
 		ModelPatch: patch,
@@ -707,17 +1109,24 @@ func resumeCaseResult(
 			BinarySHA256: identity.BinarySHA256, ModelConfigSHA256: identity.ModelConfigSHA256,
 			EnvironmentConfigSHA256: identity.EnvironmentConfigSHA256,
 			CasesSHA256:             identity.CasesSHA256, CommandTimeout: identity.CommandTimeout,
-			CaseTimeout:             identity.CaseTimeout,
-			SelectedInstancesSHA256: identity.SelectedInstancesSHA256,
-			CleanRoom:               identity.CleanRoom,
-			ToolLoopWarning:         identity.ToolLoopWarning,
-			CleanRoomPolicySHA256:   identity.CleanRoomPolicySHA256,
-			OfflineAssetsSHA256:     identity.OfflineAssetsSHA256,
-			ImageSetSHA256:          identity.ImageSetSHA256,
-			Repo:                    selectedCase.Repo,
-			BaseCommit:              selectedCase.BaseCommit,
-			Workers:                 identity.Workers,
-			ExitStatus:              "Submitted",
+			CaseTimeout:               identity.CaseTimeout,
+			SelectedInstancesSHA256:   identity.SelectedInstancesSHA256,
+			CleanRoom:                 identity.CleanRoom,
+			ToolLoopWarning:           identity.ToolLoopWarning,
+			CodeSearch:                identity.CodeSearch,
+			CodeSearchToolOrder:       identity.CodeSearchToolOrder,
+			CodeSearchInvocationDedup: identity.CodeSearchInvocationDedup,
+			WorkspacePreload:          workspacePreload,
+			WorkspaceRepresentation:   identity.WorkspaceRepresentation,
+			RepresentationSHA256:      identity.RepresentationSHA256,
+			EmbeddingConfigSHA256:     identity.EmbeddingConfigSHA256,
+			CleanRoomPolicySHA256:     identity.CleanRoomPolicySHA256,
+			OfflineAssetsSHA256:       identity.OfflineAssetsSHA256,
+			ImageSetSHA256:            identity.ImageSetSHA256,
+			Repo:                      selectedCase.Repo,
+			BaseCommit:                selectedCase.BaseCommit,
+			Workers:                   identity.Workers,
+			ExitStatus:                "Submitted",
 		},
 	}
 	if identity.CleanRoom {
@@ -730,6 +1139,24 @@ func resumeCaseResult(
 		result.Info.EnvironmentProvenance = &sweenv.Provenance{
 			Testbed:         testbed,
 			AuxiliaryImages: auxiliary,
+		}
+	}
+	if identity.CodeSearch {
+		representation := tagagent.WorkspaceRepresentation(identity.WorkspaceRepresentation)
+		result.WorkspaceIndex = &tagagent.WorkspaceIndexStats{
+			Representation:        identity.WorkspaceRepresentation,
+			RepresentationSchema:  tagagent.WorkspaceRepresentationSchema(representation),
+			RepresentationSHA256:  identity.RepresentationSHA256,
+			EligibleFileSetSHA256: strings.Repeat("1", 64),
+			EligibleContentSHA256: strings.Repeat("2", 64),
+			IndexedFileSetSHA256:  strings.Repeat("3", 64),
+			DocumentSetSHA256:     strings.Repeat("4", 64),
+			PreloadInjected:       identity.WorkspacePreload,
+			RetrievalMode:         "hybrid",
+			InvocationDedup:       identity.CodeSearchInvocationDedup,
+		}
+		if identity.EmbeddingConfigSHA256 != "" {
+			result.Embedding = &embeddingconfig.Metrics{}
 		}
 	}
 	return result
@@ -899,6 +1326,36 @@ func TestLoadExistingCaseBundleAcceptsLegacyWarningOffTelemetryOmission(t *testi
 	prediction := contract.Prediction{InstanceID: "case-a", ModelPatch: "patch"}
 	if _, err := loadExistingCaseBundle(output, "case-a", prediction); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestReadExistingCaseResultRequiresExplicitWorkspaceIdentityFields(t *testing.T) {
+	identity := testWorkspaceIdentity(t, "case-a")
+	result := resumeCaseResult(t, contract.Case{InstanceID: "case-a"}, "patch", identity)
+	payload, err := json.Marshal(result)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var envelope map[string]any
+	if err := json.Unmarshal(payload, &envelope); err != nil {
+		t.Fatal(err)
+	}
+	info, ok := envelope["info"].(map[string]any)
+	if !ok {
+		t.Fatalf("info = %#v", envelope["info"])
+	}
+	delete(info, "workspace_preload")
+	payload, err = json.Marshal(envelope)
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(t.TempDir(), "case-a.native.json")
+	if err := os.WriteFile(path, payload, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := readExistingCaseResult(path, "case-a"); err == nil ||
+		!strings.Contains(err.Error(), `missing required info field "workspace_preload"`) {
+		t.Fatalf("error = %v", err)
 	}
 }
 

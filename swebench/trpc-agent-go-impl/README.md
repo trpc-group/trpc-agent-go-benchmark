@@ -57,6 +57,94 @@ The optional tool-loop warning setting is also part of the immutable run
 identity. Resume rejects a case bundle whose recorded setting differs from the
 current command, even when every other fingerprint matches.
 
+## Optional benchmark-local workspace retrieval
+
+Workspace retrieval is a benchmark protocol option, not a tRPC-Agent-Go
+framework default. It is disabled unless `--code-search=true` is supplied, so
+the default Native lane still exposes only `bash` and does not emit retrieval
+fields. When enabled, the runner copies the task-start `/testbed` bytes into a
+temporary host snapshot after environment setup and before the agent runs. The
+index is therefore static for the case: later edits are visible to `bash`, but
+not to `code_search`.
+
+The model receives a `code_search` tool alongside `bash`. Its query-only result is
+rendered with source paths and excerpts through the same observation boundary
+as other tool output. The exact tool result, a content-free ranked-document
+trace, index coverage and representation fingerprints are retained in the
+per-case artifact. `code_search` calls are deliberately excluded from the
+exact `bash` loop-warning detector.
+
+Keyword retrieval needs no embedding service:
+
+```bash
+go run ./trpc-agent-go-impl \
+  --run-id native-keyword-smoke \
+  --cases data/generated/cases.jsonl \
+  --model-config config/models/openai-compatible.yaml.example \
+  --environment-config config/environments/swebench-testbed.yaml \
+  --output results/runs/native-keyword-smoke/raw/native \
+  --filter '^(astropy__astropy-12907)$' \
+  --agent-workers 1 \
+  --code-search=true \
+  --workspace-preload=false \
+  --workspace-representation=current-fixed
+```
+
+`--workspace-representation` accepts:
+
+- `current-fixed`: line-normalized fixed-size chunks used by the current
+  baseline;
+- `fixed-raw`: fixed-size chunks that preserve Python whitespace;
+- `ast-code`: public Python-reader AST nodes embedded as source code; and
+- `ast-structured`: stable JSON embedding text containing node identity,
+  signature, comment and code, while returning source code to the model.
+
+The two AST modes fall back per file to `fixed-raw` when Python parsing fails
+or yields no usable nodes. The artifact records fallback reasons, file and
+document-set hashes, coverage, duplicate rate, node counts, parser dependency
+and Python runtime identity, and index duration.
+The representation schema hash is part of resume identity, so a run cannot
+silently mix index contracts.
+
+AST construction aborts the index build when the case context expires. The
+pinned public reader exposes only a synchronous API and its Python subprocess
+cannot be killed through that API, so a parser already in flight may finish in
+the background after the case has failed closed. Hard child-process
+cancellation requires an upstream context-aware reader API; this adapter does
+not copy parser internals to simulate one.
+
+The pinned public OpenAI adapter sorts tool names before sending a request, so
+the optional lane records provider order `bash,code_search`. The public generic
+knowledge tool also has invocation deduplication disabled: a later search may
+return a chunk seen by an earlier search. Both values are explicit in run,
+case, index and replay identity. The frozen historical RAG lane used
+`code_search,bash` plus invocation-scoped deduplication, so this public rebuild
+does not claim trajectory equivalence with that implementation.
+
+To use vector or hybrid retrieval, copy
+`config/embeddings/workspace-rag.yaml.example` to the ignored private file
+`config/embeddings/workspace-rag.local.yaml`, set the OpenAI-compatible
+embedding endpoint and model identity, then add:
+
+```text
+--embedding-config config/embeddings/workspace-rag.local.yaml
+```
+
+Only a SHA-256 and redacted configuration summary enter the manifest; endpoint,
+credential and cache paths do not. Persisted embedding and retrieval errors are
+scrubbed using the same local configuration before case bundles are written.
+The optional SQLite cache is exact-input,
+model-fingerprint scoped, and read-through/write-through. Embedding requests,
+tokens, latency and cache hits/misses are reported separately
+from agent-model usage. A configured `batch_size` is retained as experiment
+metadata; the current public framework loader invokes the embedder per
+document, with `concurrency` controlling those calls.
+
+This implementation was rebuilt against the public framework API from the
+frozen experiment contract. Historical result bundles remain historical
+evidence: this tree does not claim bit-for-bit equivalence to those binaries,
+and it does not reuse their results as validation of the rebuilt code.
+
 Each output directory contains:
 
 ```text
@@ -69,6 +157,42 @@ native-runner-progress.json
 
 The manifest reads the linked tRPC-Agent-Go module version from Go build
 information. It does not hardcode a development revision.
+
+### Offline retrieval replay
+
+The Native run directory intentionally does not retain task workspace bytes,
+so replay first freezes a content-addressed portable bundle from separately
+preserved task-start checkouts. The corpus root must contain exactly one real
+directory per selected instance; the case-list file contains those instance
+IDs in strictly sorted order. Symlinks, special files, path traversal and
+missing or extra cases fail closed:
+
+```bash
+go run ./trpc-agent-go-impl/cmd/retrieval-replay prepare \
+  --run-dir ./native-run \
+  --corpus-root ./frozen-task-start-corpora \
+  --case-list ./sorted-cases.txt \
+  --output-dir ./new-portable-bundle
+
+go run ./trpc-agent-go-impl/cmd/retrieval-replay replay \
+  --run-dir ./native-run \
+  --bundle ./new-portable-bundle/replay-bundle.json \
+  --output ./replay-report.json
+```
+
+`prepare` cross-checks the rebuilt corpus and index identity against the Native
+artifacts, runs a complete self-replay, then atomically publishes the bundle.
+`replay` verifies every input digest, reconstructs the recorded index using the
+concrete benchmark-local engine and compares each executed call's outcome,
+error fingerprint, ranked document identity and exact score bits. Neither step
+calls an LLM or embedding endpoint or consumes a SWE-Bench gold patch. The
+report output must be outside both the immutable bundle and Native run
+directories.
+
+The public offline engine currently supports keyword/BM25 retrieval with
+invocation deduplication disabled. Vector, hybrid and historical private-tool
+identities fail closed until their complete portable dependencies are
+available; stored trace summaries are never substituted for an actual replay.
 
 ## Optional exact tool-loop warning
 

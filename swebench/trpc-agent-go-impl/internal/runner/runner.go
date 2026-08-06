@@ -11,11 +11,13 @@
 package runner
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -30,8 +32,11 @@ import (
 	"trpc.group/trpc-go/trpc-agent-go-benchmark/swebench/internal/modelconfig"
 	"trpc.group/trpc-go/trpc-agent-go-benchmark/swebench/internal/observation"
 	"trpc.group/trpc-go/trpc-agent-go-benchmark/swebench/internal/sweenv"
+	"trpc.group/trpc-go/trpc-agent-go-benchmark/swebench/trpc-agent-go-impl/internal/embeddingcache"
+	"trpc.group/trpc-go/trpc-agent-go-benchmark/swebench/trpc-agent-go-impl/internal/embeddingconfig"
 	"trpc.group/trpc-go/trpc-agent-go-benchmark/swebench/trpc-agent-go-impl/internal/executor"
 	"trpc.group/trpc-go/trpc-agent-go-benchmark/swebench/trpc-agent-go-impl/internal/protocol"
+	"trpc.group/trpc-go/trpc-agent-go-benchmark/swebench/trpc-agent-go-impl/internal/tagagent"
 	"trpc.group/trpc-go/trpc-agent-go/model"
 )
 
@@ -40,53 +45,64 @@ var artifactNamePattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]*$`)
 const offlineHTTPBinImageReference = "docker.io/kennethreitz/httpbin:latest"
 
 type manifest struct {
-	RunID                    string                          `json:"run_id"`
-	RunnerType               string                          `json:"runner_type"`
-	FrameworkModule          string                          `json:"framework_module"`
-	FrameworkVersion         string                          `json:"framework_version"`
-	AgentProtocol            string                          `json:"agent_protocol"`
-	UpstreamCommit           string                          `json:"upstream_commit"`
-	ObservationCodec         string                          `json:"observation_codec"`
-	SourceRevision           string                          `json:"source_revision,omitempty"`
-	SourceModified           bool                            `json:"source_modified"`
-	BinarySHA256             string                          `json:"binary_sha256,omitempty"`
-	CasesSHA256              string                          `json:"cases_sha256"`
-	ModelConfigSHA256        string                          `json:"model_config_sha256"`
-	EnvironmentConfigSHA256  string                          `json:"environment_config_sha256"`
-	SelectedInstancesSHA256  string                          `json:"selected_instances_sha256"`
-	CleanRoom                bool                            `json:"clean_room"`
-	ToolLoopWarning          bool                            `json:"tool_loop_warning"`
-	CleanRoomPolicySHA256    string                          `json:"clean_room_policy_sha256,omitempty"`
-	OfflineAssets            *sweenv.OfflineAssetIdentity    `json:"offline_assets,omitempty"`
-	ImageSetSHA256           string                          `json:"image_set_sha256,omitempty"`
-	DockerImages             map[string]sweenv.ImageIdentity `json:"docker_images,omitempty"`
-	StartedAt                time.Time                       `json:"started_at"`
-	FinishedAt               time.Time                       `json:"finished_at"`
-	DurationMS               int64                           `json:"duration_ms"`
-	Cases                    string                          `json:"cases"`
-	OutputDir                string                          `json:"output_dir"`
-	Filter                   string                          `json:"filter,omitempty"`
-	CaseCount                int                             `json:"case_count"`
-	AttemptedCount           int                             `json:"attempted_count"`
-	SkippedExisting          int                             `json:"skipped_existing"`
-	CompletedCount           int                             `json:"completed_count"`
-	PredictionCount          int                             `json:"prediction_count"`
-	Workers                  int                             `json:"workers"`
-	RedoExisting             bool                            `json:"redo_existing"`
-	Predictions              string                          `json:"predictions"`
-	Progress                 string                          `json:"progress"`
-	ModelConfig              map[string]string               `json:"model_config,omitempty"`
-	Environment              string                          `json:"environment_config"`
-	CommandTimeout           string                          `json:"command_timeout"`
-	CaseTimeout              string                          `json:"case_timeout"`
-	ExitStatusCounts         map[string]int                  `json:"exit_status_counts"`
-	LLMCalls                 int                             `json:"llm_calls"`
-	ToolCalls                int                             `json:"tool_calls"`
-	ToolLoopWarningCount     int                             `json:"tool_loop_warning_count"`
-	ToolLoopWarningCaseCount int                             `json:"tool_loop_warning_case_count"`
-	Usage                    usageSummary                    `json:"usage"`
-	Status                   string                          `json:"status"`
-	Notes                    []string                        `json:"notes,omitempty"`
+	RunID                     string                          `json:"run_id"`
+	RunnerType                string                          `json:"runner_type"`
+	FrameworkModule           string                          `json:"framework_module"`
+	FrameworkVersion          string                          `json:"framework_version"`
+	AgentProtocol             string                          `json:"agent_protocol"`
+	UpstreamCommit            string                          `json:"upstream_commit"`
+	ObservationCodec          string                          `json:"observation_codec"`
+	SourceRevision            string                          `json:"source_revision,omitempty"`
+	SourceModified            bool                            `json:"source_modified"`
+	BinarySHA256              string                          `json:"binary_sha256,omitempty"`
+	CasesSHA256               string                          `json:"cases_sha256"`
+	ModelConfigSHA256         string                          `json:"model_config_sha256"`
+	EnvironmentConfigSHA256   string                          `json:"environment_config_sha256"`
+	SelectedInstancesSHA256   string                          `json:"selected_instances_sha256"`
+	EmbeddingConfigSHA256     string                          `json:"embedding_config_sha256,omitempty"`
+	CleanRoom                 bool                            `json:"clean_room"`
+	ToolLoopWarning           bool                            `json:"tool_loop_warning"`
+	CodeSearch                bool                            `json:"code_search,omitempty"`
+	CodeSearchToolOrder       string                          `json:"code_search_tool_order,omitempty"`
+	CodeSearchInvocationDedup string                          `json:"code_search_invocation_dedup,omitempty"`
+	WorkspacePreload          *bool                           `json:"workspace_preload,omitempty"`
+	WorkspaceRepresentation   string                          `json:"workspace_representation,omitempty"`
+	RepresentationSchema      string                          `json:"workspace_representation_schema,omitempty"`
+	RepresentationSHA256      string                          `json:"workspace_representation_sha256,omitempty"`
+	CleanRoomPolicySHA256     string                          `json:"clean_room_policy_sha256,omitempty"`
+	OfflineAssets             *sweenv.OfflineAssetIdentity    `json:"offline_assets,omitempty"`
+	ImageSetSHA256            string                          `json:"image_set_sha256,omitempty"`
+	DockerImages              map[string]sweenv.ImageIdentity `json:"docker_images,omitempty"`
+	StartedAt                 time.Time                       `json:"started_at"`
+	FinishedAt                time.Time                       `json:"finished_at"`
+	DurationMS                int64                           `json:"duration_ms"`
+	Cases                     string                          `json:"cases"`
+	OutputDir                 string                          `json:"output_dir"`
+	Filter                    string                          `json:"filter,omitempty"`
+	CaseCount                 int                             `json:"case_count"`
+	AttemptedCount            int                             `json:"attempted_count"`
+	SkippedExisting           int                             `json:"skipped_existing"`
+	CompletedCount            int                             `json:"completed_count"`
+	PredictionCount           int                             `json:"prediction_count"`
+	Workers                   int                             `json:"workers"`
+	RedoExisting              bool                            `json:"redo_existing"`
+	Predictions               string                          `json:"predictions"`
+	Progress                  string                          `json:"progress"`
+	ModelConfig               map[string]string               `json:"model_config,omitempty"`
+	EmbeddingConfig           map[string]any                  `json:"embedding_config,omitempty"`
+	Environment               string                          `json:"environment_config"`
+	CommandTimeout            string                          `json:"command_timeout"`
+	CaseTimeout               string                          `json:"case_timeout"`
+	ExitStatusCounts          map[string]int                  `json:"exit_status_counts"`
+	LLMCalls                  int                             `json:"llm_calls"`
+	ToolCalls                 int                             `json:"tool_calls"`
+	ToolLoopWarningCount      int                             `json:"tool_loop_warning_count"`
+	ToolLoopWarningCaseCount  int                             `json:"tool_loop_warning_case_count"`
+	Embedding                 *embeddingconfig.Metrics        `json:"embedding,omitempty"`
+	EmbeddingCache            *embeddingcache.Metrics         `json:"embedding_cache,omitempty"`
+	Usage                     usageSummary                    `json:"usage"`
+	Status                    string                          `json:"status"`
+	Notes                     []string                        `json:"notes,omitempty"`
 }
 
 type usageSummary struct {
@@ -119,16 +135,21 @@ type resultAggregate struct {
 	ToolCalls                int
 	ToolLoopWarningCount     int
 	ToolLoopWarningCaseCount int
+	Embedding                embeddingconfig.Metrics
+	EmbeddingCache           embeddingcache.Metrics
+	HasEmbedding             bool
+	HasEmbeddingCache        bool
 	Usage                    usageSummary
 	HasErrors                bool
 }
 
 // Run executes the tRPC-Agent-Go SWE-Bench runner CLI.
-func Run(args []string) error {
+func Run(args []string) (runErr error) {
 	fs := flag.NewFlagSet("trpc-agent-go-impl", flag.ContinueOnError)
 	runID := fs.String("run-id", "", "run id")
 	casesPath := fs.String("cases", "data/generated/cases.jsonl", "safe SWE-Bench cases.jsonl")
 	modelConfigPath := fs.String("model-config", "", "model config YAML/env path")
+	embeddingConfigPath := fs.String("embedding-config", "", "optional workspace embedding YAML path")
 	environmentConfigPath := fs.String("environment-config", "config/environments/swebench-testbed.yaml", "environment YAML path")
 	output := fs.String("output", "", "output directory; defaults to results/runs/<run-id>/raw/native")
 	filter := fs.String("filter", "", "optional instance id regexp")
@@ -138,6 +159,13 @@ func Run(args []string) error {
 	dockerHost := fs.String("docker-host", "", "optional Docker daemon endpoint")
 	cleanRoom := fs.Bool("clean-room", false, "enable network-none generation and recursive Git sanitation")
 	toolLoopWarning := fs.Bool("tool-loop-warning", false, "warn on the next model call after an exact repeated tool-use/result batch")
+	codeSearch := fs.Bool("code-search", false, "enable benchmark-local static workspace code retrieval")
+	workspacePreload := fs.Bool("workspace-preload", true, "inject retrieved workspace context into the initial prompt")
+	workspaceRepresentationValue := fs.String(
+		"workspace-representation",
+		string(tagagent.WorkspaceRepresentationCurrentFixed),
+		"workspace representation: current-fixed, fixed-raw, ast-code, or ast-structured",
+	)
 	offlineAssetsDir := fs.String(
 		"offline-assets-dir",
 		"",
@@ -163,6 +191,16 @@ func Run(args []string) error {
 	if !*cleanRoom && strings.TrimSpace(*offlineAssetsDir) != "" {
 		return fmt.Errorf("-offline-assets-dir requires -clean-room=true")
 	}
+	if strings.TrimSpace(*embeddingConfigPath) != "" && !*codeSearch {
+		return fmt.Errorf("-embedding-config requires -code-search=true")
+	}
+	workspaceRepresentation, err := tagagent.ParseWorkspaceRepresentation(*workspaceRepresentationValue)
+	if err != nil {
+		return err
+	}
+	if !*codeSearch && workspaceRepresentation != tagagent.WorkspaceRepresentationCurrentFixed {
+		return fmt.Errorf("-workspace-representation=%s requires -code-search=true", workspaceRepresentation)
+	}
 	codec, err := observation.ParseObservationCodec(*codecValue)
 	if err != nil {
 		return err
@@ -186,6 +224,18 @@ func Run(args []string) error {
 	modelHash, err := fileSHA256(*modelConfigPath)
 	if err != nil {
 		return fmt.Errorf("hash model config: %w", err)
+	}
+	var embeddingHash string
+	var embeddingCfg *embeddingconfig.Config
+	if strings.TrimSpace(*embeddingConfigPath) != "" {
+		embeddingHash, err = fileSHA256(*embeddingConfigPath)
+		if err != nil {
+			return fmt.Errorf("hash embedding config: %w", err)
+		}
+		embeddingCfg, err = embeddingconfig.Load(*embeddingConfigPath)
+		if err != nil {
+			return fmt.Errorf("load embedding config: %w", err)
+		}
 	}
 	environmentHash, err := fileSHA256(*environmentConfigPath)
 	if err != nil {
@@ -229,6 +279,22 @@ func Run(args []string) error {
 	if err != nil {
 		return err
 	}
+	var embeddingCache *embeddingcache.Store
+	if embeddingCfg != nil && embeddingCfg.Cache.Enabled {
+		embeddingCache, err = embeddingcache.Open(
+			context.Background(),
+			embeddingCfg.Cache.Directory,
+			embeddingCfg.CacheIdentity(),
+		)
+		if err != nil {
+			return fmt.Errorf("open embedding cache: %w", err)
+		}
+		defer func() {
+			if closeErr := embeddingCache.Close(); closeErr != nil {
+				runErr = errors.Join(runErr, fmt.Errorf("close embedding cache: %w", closeErr))
+			}
+		}()
+	}
 	var offlineAssetsIdentity sweenv.OfflineAssetIdentity
 	var cleanRoomPolicySHA256 string
 	if *cleanRoom {
@@ -257,6 +323,16 @@ func Run(args []string) error {
 		return err
 	}
 	factory.ResolvedImages = resolvedImages
+	effectiveWorkspacePreload := *codeSearch && *workspacePreload
+	var workspaceRepresentationName, representationSchema, representationSHA256 string
+	var codeSearchToolOrder, codeSearchInvocationDedup string
+	if *codeSearch {
+		codeSearchToolOrder = tagagent.CodeSearchProviderToolOrder
+		codeSearchInvocationDedup = tagagent.CodeSearchInvocationDedup
+		workspaceRepresentationName = string(workspaceRepresentation)
+		representationSchema = tagagent.WorkspaceRepresentationSchema(workspaceRepresentation)
+		representationSHA256 = tagagent.WorkspaceRepresentationSHA256(workspaceRepresentation)
+	}
 	exec := executor.Executor{
 		Factory: factory, ModelConfig: modelCfg, ObservationCodec: codec,
 		RunID: *runID, SourceRevision: build.SourceRevision, SourceModified: build.SourceModified,
@@ -265,8 +341,14 @@ func Run(args []string) error {
 		CommandTimeout: *commandTimeout, CaseTimeout: *caseTimeout,
 		SelectedInstancesSHA256: selectedHash,
 		CleanRoom:               *cleanRoom, ToolLoopWarning: *toolLoopWarning,
-		CleanRoomPolicySHA256: cleanRoomPolicySHA256,
-		OfflineAssetsSHA256:   offlineAssetsIdentity.SHA256, ImageSetSHA256: imageSetSHA256,
+		EnableCodeSearch:        *codeSearch,
+		EnableWorkspacePreload:  effectiveWorkspacePreload,
+		WorkspaceRepresentation: workspaceRepresentation,
+		EmbeddingConfig:         embeddingCfg,
+		EmbeddingConfigSHA256:   embeddingHash,
+		EmbeddingCache:          embeddingCache,
+		CleanRoomPolicySHA256:   cleanRoomPolicySHA256,
+		OfflineAssetsSHA256:     offlineAssetsIdentity.SHA256, ImageSetSHA256: imageSetSHA256,
 		DockerImages: resolvedImages,
 		Workers:      *workers,
 	}
@@ -282,8 +364,15 @@ func Run(args []string) error {
 		CasesSHA256: casesHash, CommandTimeout: commandTimeout.String(),
 		CaseTimeout: caseTimeout.String(), SelectedInstancesSHA256: selectedHash,
 		CleanRoom: *cleanRoom, ToolLoopWarning: *toolLoopWarning,
-		CleanRoomPolicySHA256: cleanRoomPolicySHA256,
-		OfflineAssetsSHA256:   offlineAssetsIdentity.SHA256, ImageSetSHA256: imageSetSHA256,
+		CodeSearch:                *codeSearch,
+		CodeSearchToolOrder:       codeSearchToolOrder,
+		CodeSearchInvocationDedup: codeSearchInvocationDedup,
+		WorkspacePreload:          effectiveWorkspacePreload,
+		WorkspaceRepresentation:   workspaceRepresentationName,
+		RepresentationSHA256:      representationSHA256,
+		EmbeddingConfigSHA256:     embeddingHash,
+		CleanRoomPolicySHA256:     cleanRoomPolicySHA256,
+		OfflineAssetsSHA256:       offlineAssetsIdentity.SHA256, ImageSetSHA256: imageSetSHA256,
 		DockerImages: resolvedImages,
 		Workers:      *workers,
 	}
@@ -382,6 +471,11 @@ func Run(args []string) error {
 	if aggregate.HasErrors {
 		status = "completed_with_errors"
 	}
+	var workspacePreloadManifest *bool
+	if *codeSearch {
+		workspacePreloadManifest = new(bool)
+		*workspacePreloadManifest = effectiveWorkspacePreload
+	}
 	doc := manifest{
 		RunID: *runID, RunnerType: "trpc-agent-go-native", FrameworkModule: build.FrameworkModule,
 		FrameworkVersion: build.FrameworkVersion,
@@ -390,9 +484,17 @@ func Run(args []string) error {
 		SourceModified: build.SourceModified, BinarySHA256: build.BinarySHA256,
 		CasesSHA256: casesHash, ModelConfigSHA256: modelHash,
 		EnvironmentConfigSHA256: environmentHash, SelectedInstancesSHA256: selectedHash,
-		CleanRoom: *cleanRoom, ToolLoopWarning: *toolLoopWarning,
-		CleanRoomPolicySHA256: cleanRoomPolicySHA256,
-		ImageSetSHA256:        imageSetSHA256, DockerImages: resolvedImages,
+		EmbeddingConfigSHA256: embeddingHash,
+		CleanRoom:             *cleanRoom, ToolLoopWarning: *toolLoopWarning,
+		CodeSearch:                *codeSearch,
+		CodeSearchToolOrder:       codeSearchToolOrder,
+		CodeSearchInvocationDedup: codeSearchInvocationDedup,
+		WorkspacePreload:          workspacePreloadManifest,
+		WorkspaceRepresentation:   workspaceRepresentationName,
+		RepresentationSchema:      representationSchema,
+		RepresentationSHA256:      representationSHA256,
+		CleanRoomPolicySHA256:     cleanRoomPolicySHA256,
+		ImageSetSHA256:            imageSetSHA256, DockerImages: resolvedImages,
 		StartedAt:  started.UTC(),
 		FinishedAt: finished.UTC(), DurationMS: finished.Sub(started).Milliseconds(),
 		Cases: artifact.AbsPath(*casesPath), OutputDir: artifact.AbsPath(*output), Filter: *filter,
@@ -411,6 +513,15 @@ func Run(args []string) error {
 			"OpenAI SDK retry is configured with nine retries after the initial request; preds.json is the resume boundary.",
 		},
 	}
+	if embeddingCfg != nil {
+		doc.EmbeddingConfig = embeddingCfg.Redacted()
+		embedding := aggregate.Embedding
+		doc.Embedding = &embedding
+	}
+	if embeddingCache != nil {
+		cache := aggregate.EmbeddingCache
+		doc.EmbeddingCache = &cache
+	}
 	if offlineAssetsIdentity.SHA256 != "" {
 		doc.OfflineAssets = &offlineAssetsIdentity
 	}
@@ -422,6 +533,11 @@ func Run(args []string) error {
 	if *toolLoopWarning {
 		doc.Notes = append(doc.Notes,
 			"Exact repeated complete tool-use/result batches inject one warning immediately before the next real model call; telemetry records those injection call numbers.",
+		)
+	}
+	if *codeSearch {
+		doc.Notes = append(doc.Notes,
+			"Workspace retrieval uses a task-start benchmark-local snapshot; the selected representation and embedding configuration hash are frozen in every case artifact.",
 		)
 	}
 	manifestPath := filepath.Join(*output, "native-runner-manifest.json")
@@ -454,6 +570,20 @@ func aggregateResults(results map[string]executor.CaseResult) resultAggregate {
 		aggregate.ToolLoopWarningCount += result.ToolLoopWarningCount
 		if result.ToolLoopWarningCount > 0 {
 			aggregate.ToolLoopWarningCaseCount++
+		}
+		if result.Embedding != nil {
+			aggregate.HasEmbedding = true
+			aggregate.Embedding.Requests += result.Embedding.Requests
+			aggregate.Embedding.BatchRequests += result.Embedding.BatchRequests
+			aggregate.Embedding.Inputs += result.Embedding.Inputs
+			aggregate.Embedding.Errors += result.Embedding.Errors
+			aggregate.Embedding.PromptTokens += result.Embedding.PromptTokens
+			aggregate.Embedding.TotalTokens += result.Embedding.TotalTokens
+			aggregate.Embedding.DurationMS += result.Embedding.DurationMS
+		}
+		if result.EmbeddingCache != nil {
+			aggregate.HasEmbeddingCache = true
+			aggregate.EmbeddingCache.Add(*result.EmbeddingCache)
 		}
 		aggregate.Usage.PromptTokens += result.Usage.PromptTokens
 		aggregate.Usage.CachedTokens += result.Usage.PromptTokensDetails.CachedTokens
@@ -595,6 +725,47 @@ func validateRunIdentity(identity runIdentity) error {
 	if identity.Workers <= 0 {
 		return fmt.Errorf("run identity has non-positive workers %d", identity.Workers)
 	}
+	if identity.CodeSearch {
+		if identity.CodeSearchToolOrder != tagagent.CodeSearchProviderToolOrder {
+			return fmt.Errorf(
+				"run identity code_search tool order %q, want %q",
+				identity.CodeSearchToolOrder,
+				tagagent.CodeSearchProviderToolOrder,
+			)
+		}
+		if identity.CodeSearchInvocationDedup != tagagent.CodeSearchInvocationDedup {
+			return fmt.Errorf(
+				"run identity code_search invocation dedup %q, want %q",
+				identity.CodeSearchInvocationDedup,
+				tagagent.CodeSearchInvocationDedup,
+			)
+		}
+		representation, err := tagagent.ParseWorkspaceRepresentation(identity.WorkspaceRepresentation)
+		if err != nil {
+			return fmt.Errorf("run identity workspace representation: %w", err)
+		}
+		if string(representation) != identity.WorkspaceRepresentation {
+			return fmt.Errorf("run identity workspace representation is not canonical")
+		}
+		wantRepresentationSHA256 := tagagent.WorkspaceRepresentationSHA256(representation)
+		if identity.RepresentationSHA256 != wantRepresentationSHA256 {
+			return fmt.Errorf(
+				"run identity workspace representation hash %q, want %q",
+				identity.RepresentationSHA256,
+				wantRepresentationSHA256,
+			)
+		}
+		if identity.EmbeddingConfigSHA256 != "" && !isHexIdentifier(identity.EmbeddingConfigSHA256, 64) {
+			return fmt.Errorf(
+				"run identity embedding config hash %q is not a SHA-256 digest",
+				identity.EmbeddingConfigSHA256,
+			)
+		}
+	} else if identity.CodeSearchToolOrder != "" || identity.CodeSearchInvocationDedup != "" ||
+		identity.WorkspacePreload || identity.WorkspaceRepresentation != "" ||
+		identity.RepresentationSHA256 != "" || identity.EmbeddingConfigSHA256 != "" {
+		return fmt.Errorf("run identity contains workspace retrieval provenance with code_search=false")
+	}
 	if identity.CleanRoom {
 		for _, hash := range []struct {
 			name  string
@@ -656,6 +827,7 @@ func validateResumeResultForMode(
 	redo bool,
 ) error {
 	instanceID := c.InstanceID
+	allowPreStartRetry := redo && result.IsRetryableCleanRoomPreStartFailure()
 	if result.InstanceID != instanceID {
 		return fmt.Errorf("existing prediction %s has result instance_id %q", instanceID, result.InstanceID)
 	}
@@ -671,7 +843,52 @@ func validateResumeResultForMode(
 			expected.ToolLoopWarning,
 		)
 	}
+	if info.CodeSearch != expected.CodeSearch {
+		return fmt.Errorf(
+			"existing prediction %s has code_search=%t, want %t",
+			instanceID,
+			info.CodeSearch,
+			expected.CodeSearch,
+		)
+	}
+	if info.CodeSearchToolOrder != expected.CodeSearchToolOrder {
+		return fmt.Errorf(
+			"existing prediction %s has code_search_tool_order=%q, want %q",
+			instanceID,
+			info.CodeSearchToolOrder,
+			expected.CodeSearchToolOrder,
+		)
+	}
+	if info.CodeSearchInvocationDedup != expected.CodeSearchInvocationDedup {
+		return fmt.Errorf(
+			"existing prediction %s has code_search_invocation_dedup=%q, want %q",
+			instanceID,
+			info.CodeSearchInvocationDedup,
+			expected.CodeSearchInvocationDedup,
+		)
+	}
+	if expected.CodeSearch && (info.WorkspacePreload == nil || *info.WorkspacePreload != expected.WorkspacePreload) {
+		actual := "missing"
+		if info.WorkspacePreload != nil {
+			actual = strconv.FormatBool(*info.WorkspacePreload)
+		}
+		return fmt.Errorf(
+			"existing prediction %s has workspace_preload=%s, want %t",
+			instanceID,
+			actual,
+			expected.WorkspacePreload,
+		)
+	}
+	if !expected.CodeSearch && info.WorkspacePreload != nil {
+		return fmt.Errorf(
+			"existing prediction %s has workspace_preload set for code_search=false",
+			instanceID,
+		)
+	}
 	if err := validateToolLoopWarningTelemetry(instanceID, result); err != nil {
+		return err
+	}
+	if err := validateWorkspaceRetrievalTelemetry(instanceID, result, expected, allowPreStartRetry); err != nil {
 		return err
 	}
 	checks := []struct {
@@ -692,6 +909,19 @@ func validateResumeResultForMode(
 	}
 	for _, check := range checks {
 		if check.expected != "" && check.actual != check.expected {
+			return fmt.Errorf("existing prediction %s has %s %q, want %q", instanceID, check.name, check.actual, check.expected)
+		}
+	}
+	for _, check := range []struct {
+		name     string
+		actual   string
+		expected string
+	}{
+		{"workspace representation", info.WorkspaceRepresentation, expected.WorkspaceRepresentation},
+		{"workspace representation hash", info.RepresentationSHA256, expected.RepresentationSHA256},
+		{"embedding config hash", info.EmbeddingConfigSHA256, expected.EmbeddingConfigSHA256},
+	} {
+		if check.actual != check.expected {
 			return fmt.Errorf("existing prediction %s has %s %q, want %q", instanceID, check.name, check.actual, check.expected)
 		}
 	}
@@ -729,7 +959,6 @@ func validateResumeResultForMode(
 				return fmt.Errorf("existing prediction %s has %s %q, want %q", instanceID, check.name, check.actual, check.expected)
 			}
 		}
-		allowPreStartRetry := redo && result.IsRetryableCleanRoomPreStartFailure()
 		if !allowPreStartRetry {
 			if info.VerifiedBaseCommit != c.BaseCommit {
 				return fmt.Errorf(
@@ -764,6 +993,249 @@ func validateResumeResultForMode(
 	}
 	if info.Workers != expected.Workers {
 		return fmt.Errorf("existing prediction %s has workers %d, want %d", instanceID, info.Workers, expected.Workers)
+	}
+	return nil
+}
+
+func validateWorkspaceRetrievalTelemetry(
+	instanceID string,
+	result executor.CaseResult,
+	expected runIdentity,
+	allowPreStartRetry bool,
+) error {
+	hasTelemetry := result.CodeSearchCalls != 0 || result.CodeSearchErrors != 0 ||
+		result.CodeSearchResultBytes != 0 || result.CodeSearchObservationBytes != 0 ||
+		len(result.CodeSearchRawResults) != 0 || len(result.RetrievalTrace) != 0 ||
+		result.WorkspaceIndex != nil || result.Embedding != nil || result.EmbeddingCache != nil
+	if !expected.CodeSearch {
+		if hasTelemetry {
+			return fmt.Errorf(
+				"existing prediction %s has workspace retrieval telemetry with code_search=false",
+				instanceID,
+			)
+		}
+		return nil
+	}
+	for _, value := range []struct {
+		name  string
+		value int
+	}{
+		{"code_search_calls", result.CodeSearchCalls},
+		{"code_search_errors", result.CodeSearchErrors},
+		{"code_search_result_bytes", result.CodeSearchResultBytes},
+		{"code_search_observation_bytes", result.CodeSearchObservationBytes},
+	} {
+		if value.value < 0 {
+			return fmt.Errorf("existing prediction %s has negative %s %d", instanceID, value.name, value.value)
+		}
+	}
+	if len(result.CodeSearchRawResults) != len(result.RetrievalTrace) ||
+		len(result.RetrievalTrace) != result.CodeSearchCalls {
+		return fmt.Errorf(
+			"existing prediction %s has code_search evidence counts raw=%d trace=%d calls=%d",
+			instanceID,
+			len(result.CodeSearchRawResults),
+			len(result.RetrievalTrace),
+			result.CodeSearchCalls,
+		)
+	}
+	resultBytes := 0
+	observationBytes := 0
+	errorCount := 0
+	for index, entry := range result.RetrievalTrace {
+		if entry.Call != index+1 {
+			return fmt.Errorf("existing prediction %s retrieval call %d is not sequential", instanceID, entry.Call)
+		}
+		if strings.TrimSpace(entry.ToolCallID) == "" {
+			return fmt.Errorf("existing prediction %s retrieval call %d has empty tool_call_id", instanceID, entry.Call)
+		}
+		switch entry.Status {
+		case "success":
+			if entry.Error != "" || entry.ErrorSHA256 != "" {
+				return fmt.Errorf("existing prediction %s retrieval call %d has error fields with status=success", instanceID, entry.Call)
+			}
+			if entry.ObservationBytes <= 0 || !isHexIdentifier(entry.ObservationSHA256, 64) {
+				return fmt.Errorf("existing prediction %s retrieval call %d has incomplete success observation", instanceID, entry.Call)
+			}
+		case "error":
+			errorCount++
+			if strings.TrimSpace(entry.Error) == "" ||
+				entry.ErrorSHA256 != tagagent.DigestBytes([]byte(entry.Error)) {
+				return fmt.Errorf("existing prediction %s retrieval call %d has invalid error identity", instanceID, entry.Call)
+			}
+			if len(entry.Documents) != 0 {
+				return fmt.Errorf("existing prediction %s retrieval call %d has documents with status=error", instanceID, entry.Call)
+			}
+		default:
+			return fmt.Errorf("existing prediction %s retrieval call %d has invalid status %q", instanceID, entry.Call, entry.Status)
+		}
+		if !isHexIdentifier(entry.ArgumentsSHA256, 64) || !isHexIdentifier(entry.ResultSHA256, 64) {
+			return fmt.Errorf("existing prediction %s retrieval call %d has invalid digest", instanceID, entry.Call)
+		}
+		if entry.ResultBytes < 0 || entry.ObservationBytes < 0 ||
+			(entry.ObservationBytes == 0 && entry.ObservationSHA256 != "") ||
+			(entry.ObservationBytes > 0 && !isHexIdentifier(entry.ObservationSHA256, 64)) {
+			return fmt.Errorf("existing prediction %s retrieval call %d has invalid byte or observation identity", instanceID, entry.Call)
+		}
+		var compact bytes.Buffer
+		if err := json.Compact(&compact, result.CodeSearchRawResults[index]); err != nil {
+			return fmt.Errorf("existing prediction %s retrieval call %d has invalid raw result: %w", instanceID, entry.Call, err)
+		}
+		raw := compact.Bytes()
+		if len(raw) != entry.ResultBytes || tagagent.DigestBytes(raw) != entry.ResultSHA256 {
+			return fmt.Errorf("existing prediction %s retrieval call %d does not match raw result", instanceID, entry.Call)
+		}
+		if entry.Status == "error" {
+			var payload struct {
+				Error string `json:"error"`
+			}
+			if err := json.Unmarshal(raw, &payload); err != nil || payload.Error != entry.Error {
+				return fmt.Errorf("existing prediction %s retrieval call %d error does not match raw result", instanceID, entry.Call)
+			}
+		}
+		for _, document := range entry.Documents {
+			if math.IsNaN(document.Score) || math.IsInf(document.Score, 0) ||
+				!isHexIdentifier(document.ContentSHA256, 64) {
+				return fmt.Errorf("existing prediction %s retrieval call %d has invalid document identity", instanceID, entry.Call)
+			}
+		}
+		resultBytes += entry.ResultBytes
+		observationBytes += entry.ObservationBytes
+	}
+	if errorCount != result.CodeSearchErrors {
+		return fmt.Errorf(
+			"existing prediction %s has %d retrieval errors, want code_search_errors=%d",
+			instanceID,
+			errorCount,
+			result.CodeSearchErrors,
+		)
+	}
+	if resultBytes != result.CodeSearchResultBytes || observationBytes != result.CodeSearchObservationBytes {
+		return fmt.Errorf(
+			"existing prediction %s retrieval byte totals %d/%d do not match declared %d/%d",
+			instanceID,
+			resultBytes,
+			observationBytes,
+			result.CodeSearchResultBytes,
+			result.CodeSearchObservationBytes,
+		)
+	}
+	if result.WorkspaceIndex == nil {
+		if allowPreStartRetry && !hasTelemetry {
+			return nil
+		}
+		return fmt.Errorf("existing prediction %s is missing workspace_index for code_search=true", instanceID)
+	}
+	stats := result.WorkspaceIndex
+	wantRepresentation := tagagent.WorkspaceRepresentation(expected.WorkspaceRepresentation)
+	wantSchema := tagagent.WorkspaceRepresentationSchema(wantRepresentation)
+	if stats.Representation != expected.WorkspaceRepresentation ||
+		stats.RepresentationSchema != wantSchema ||
+		stats.RepresentationSHA256 != expected.RepresentationSHA256 {
+		return fmt.Errorf("existing prediction %s workspace_index representation identity does not match run", instanceID)
+	}
+	if stats.InvocationDedup != expected.CodeSearchInvocationDedup {
+		return fmt.Errorf("existing prediction %s workspace_index invocation_dedup does not match run", instanceID)
+	}
+	if stats.PreloadInjected != expected.WorkspacePreload {
+		return fmt.Errorf("existing prediction %s workspace_index preload identity does not match run", instanceID)
+	}
+	if !stats.PreloadInjected && (stats.PreloadedDocuments != 0 || stats.PreloadedChars != 0) {
+		return fmt.Errorf("existing prediction %s workspace_index has preload totals without preload", instanceID)
+	}
+	for _, digest := range []string{
+		stats.EligibleFileSetSHA256,
+		stats.EligibleContentSHA256,
+		stats.IndexedFileSetSHA256,
+		stats.DocumentSetSHA256,
+	} {
+		if !isHexIdentifier(digest, 64) {
+			return fmt.Errorf("existing prediction %s workspace_index has invalid corpus digest", instanceID)
+		}
+	}
+	if stats.DurationMS < 0 || math.IsNaN(stats.FileCoverage) || math.IsInf(stats.FileCoverage, 0) ||
+		stats.FileCoverage < 0 || stats.FileCoverage > 1 ||
+		math.IsNaN(stats.DuplicateDocumentRate) || math.IsInf(stats.DuplicateDocumentRate, 0) ||
+		stats.DuplicateDocumentRate < 0 || stats.DuplicateDocumentRate > 1 ||
+		strings.TrimSpace(stats.RetrievalMode) == "" {
+		return fmt.Errorf("existing prediction %s workspace_index has invalid duration, rate, or retrieval mode", instanceID)
+	}
+	for _, value := range []int{
+		stats.Documents,
+		stats.EligibleFiles,
+		stats.IndexedFiles,
+		stats.FallbackDocuments,
+		stats.ContentChars,
+		stats.EmbeddingTextChars,
+		stats.DuplicateDocuments,
+		stats.PreloadedDocuments,
+		stats.PreloadedChars,
+	} {
+		if value < 0 {
+			return fmt.Errorf("existing prediction %s workspace_index has negative metric", instanceID)
+		}
+	}
+	if expected.EmbeddingConfigSHA256 == "" {
+		if result.Embedding != nil || result.EmbeddingCache != nil {
+			return fmt.Errorf("existing prediction %s has embedding telemetry without embedding config", instanceID)
+		}
+		return nil
+	}
+	if result.Embedding == nil {
+		return fmt.Errorf("existing prediction %s is missing configured embedding telemetry", instanceID)
+	}
+	if err := validateEmbeddingMetrics(instanceID, *result.Embedding); err != nil {
+		return err
+	}
+	if result.EmbeddingCache != nil {
+		return validateEmbeddingCacheMetrics(instanceID, *result.EmbeddingCache)
+	}
+	return nil
+}
+
+func validateEmbeddingMetrics(instanceID string, metrics embeddingconfig.Metrics) error {
+	values := []int64{
+		metrics.Requests,
+		metrics.BatchRequests,
+		metrics.Inputs,
+		metrics.Errors,
+		metrics.PromptTokens,
+		metrics.TotalTokens,
+		metrics.DurationMS,
+	}
+	for _, value := range values {
+		if value < 0 {
+			return fmt.Errorf("existing prediction %s has negative embedding metric", instanceID)
+		}
+	}
+	if metrics.BatchRequests > metrics.Requests || metrics.Errors > metrics.Requests {
+		return fmt.Errorf("existing prediction %s has inconsistent embedding request totals", instanceID)
+	}
+	return nil
+}
+
+func validateEmbeddingCacheMetrics(instanceID string, metrics embeddingcache.Metrics) error {
+	values := []int64{
+		metrics.Requests,
+		metrics.BatchRequests,
+		metrics.Inputs,
+		metrics.Hits,
+		metrics.Misses,
+		metrics.Writes,
+		metrics.Corruptions,
+		metrics.Errors,
+		metrics.BytesRead,
+		metrics.BytesWritten,
+		metrics.ReadDurationMS,
+		metrics.WriteDurationMS,
+	}
+	for _, value := range values {
+		if value < 0 {
+			return fmt.Errorf("existing prediction %s has negative embedding cache metric", instanceID)
+		}
+	}
+	if metrics.BatchRequests > metrics.Requests {
+		return fmt.Errorf("existing prediction %s has inconsistent embedding cache request totals", instanceID)
 	}
 	return nil
 }
@@ -920,6 +1392,29 @@ func readExistingCaseResult(path, instanceID string) (executor.CaseResult, error
 	}
 	if err := json.Unmarshal(payload, &result); err != nil {
 		return result, err
+	}
+	if result.Info.CodeSearch {
+		var envelope struct {
+			Info map[string]json.RawMessage `json:"info"`
+		}
+		if err := json.Unmarshal(payload, &envelope); err != nil {
+			return result, err
+		}
+		for _, field := range []string{
+			"code_search",
+			"workspace_preload",
+			"workspace_representation",
+			"workspace_representation_sha256",
+		} {
+			value, ok := envelope.Info[field]
+			if !ok || strings.TrimSpace(string(value)) == "null" {
+				return result, fmt.Errorf(
+					"workspace retrieval result %s is missing required info field %q",
+					instanceID,
+					field,
+				)
+			}
+		}
 	}
 	if !result.Info.ToolLoopWarning {
 		return result, nil

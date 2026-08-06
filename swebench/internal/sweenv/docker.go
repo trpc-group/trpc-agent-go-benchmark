@@ -15,6 +15,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"regexp"
 	"sort"
 	"strconv"
@@ -269,6 +270,52 @@ func (e *dockerEnvironment) Execute(ctx context.Context, command string) Command
 	result.ReturnCode = 1
 	result.ExceptionInfo = err.Error()
 	return result
+}
+
+// SnapshotWorkspace copies /testbed from the live case container into an
+// existing empty directory. Requiring an empty, non-symlink destination keeps
+// the environment boundary explicit and prevents docker cp from merging a
+// snapshot with unrelated host data.
+func (e *dockerEnvironment) SnapshotWorkspace(ctx context.Context, destination string) error {
+	destination = filepath.Clean(strings.TrimSpace(destination))
+	if destination == "." || !filepath.IsAbs(destination) {
+		return fmt.Errorf("workspace snapshot destination must be an absolute directory")
+	}
+	info, err := os.Lstat(destination)
+	if err != nil {
+		return fmt.Errorf("inspect workspace snapshot destination: %w", err)
+	}
+	if info.Mode()&os.ModeSymlink != 0 || !info.IsDir() {
+		return fmt.Errorf("workspace snapshot destination must be a real directory")
+	}
+	entries, err := os.ReadDir(destination)
+	if err != nil {
+		return fmt.Errorf("read workspace snapshot destination: %w", err)
+	}
+	if len(entries) != 0 {
+		return fmt.Errorf("workspace snapshot destination must be empty")
+	}
+	timeout := e.commandTimeout
+	if timeout <= 0 {
+		timeout = time.Minute
+	}
+	commandCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	out, err := e.commander.Run(
+		commandCtx,
+		dockerEnv(e.dockerHost),
+		"docker",
+		"cp",
+		e.name+":/testbed/.",
+		destination,
+	)
+	if err != nil {
+		if errors.Is(commandCtx.Err(), context.DeadlineExceeded) {
+			return fmt.Errorf("snapshot Docker workspace timed out after %s: %w", timeout, commandCtx.Err())
+		}
+		return fmt.Errorf("snapshot Docker workspace: %w: %s", err, strings.TrimSpace(string(out)))
+	}
+	return nil
 }
 
 func (e *dockerEnvironment) Close(ctx context.Context) error {

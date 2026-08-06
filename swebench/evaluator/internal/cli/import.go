@@ -28,36 +28,52 @@ import (
 const importSchemaVersion = 1
 
 type importedCase struct {
-	SchemaVersion         int                `json:"schema_version"`
-	InstanceID            string             `json:"instance_id"`
-	Repo                  string             `json:"repo,omitempty"`
-	BaseCommit            string             `json:"base_commit,omitempty"`
-	VerifiedBaseCommit    string             `json:"verified_base_commit,omitempty"`
-	CleanRoom             bool               `json:"clean_room,omitempty"`
-	CleanRoomPolicySHA256 string             `json:"clean_room_policy_sha256,omitempty"`
-	OfflineAssetsSHA256   string             `json:"offline_assets_sha256,omitempty"`
-	ImageSetSHA256        string             `json:"image_set_sha256,omitempty"`
-	EnvironmentProvenance *sweenv.Provenance `json:"environment_provenance,omitempty"`
-	ToolLoopWarning       bool               `json:"tool_loop_warning"`
-	Target                string             `json:"target"`
-	Result                targetResult       `json:"result"`
+	SchemaVersion             int                `json:"schema_version"`
+	InstanceID                string             `json:"instance_id"`
+	Repo                      string             `json:"repo,omitempty"`
+	BaseCommit                string             `json:"base_commit,omitempty"`
+	VerifiedBaseCommit        string             `json:"verified_base_commit,omitempty"`
+	CleanRoom                 bool               `json:"clean_room,omitempty"`
+	CleanRoomPolicySHA256     string             `json:"clean_room_policy_sha256,omitempty"`
+	OfflineAssetsSHA256       string             `json:"offline_assets_sha256,omitempty"`
+	ImageSetSHA256            string             `json:"image_set_sha256,omitempty"`
+	EnvironmentProvenance     *sweenv.Provenance `json:"environment_provenance,omitempty"`
+	ToolLoopWarning           bool               `json:"tool_loop_warning"`
+	CodeSearch                bool               `json:"code_search,omitempty"`
+	CodeSearchToolOrder       string             `json:"code_search_tool_order,omitempty"`
+	CodeSearchInvocationDedup string             `json:"code_search_invocation_dedup,omitempty"`
+	WorkspacePreload          *bool              `json:"workspace_preload,omitempty"`
+	WorkspaceRepresentation   string             `json:"workspace_representation,omitempty"`
+	RepresentationSchema      string             `json:"workspace_representation_schema,omitempty"`
+	RepresentationSHA256      string             `json:"workspace_representation_sha256,omitempty"`
+	EmbeddingConfigSHA256     string             `json:"embedding_config_sha256,omitempty"`
+	Target                    string             `json:"target"`
+	Result                    targetResult       `json:"result"`
 }
 
 type targetResult struct {
-	MainStatus                  string              `json:"main_status"`
-	FailureReason               string              `json:"failure_reason,omitempty"`
-	ModelNameOrPath             string              `json:"model_name_or_path,omitempty"`
-	PatchPath                   string              `json:"patch_path,omitempty"`
-	TracePath                   string              `json:"trace_path,omitempty"`
-	VerifierResultRef           string              `json:"verifier_result_ref,omitempty"`
-	PatchStats                  artifact.PatchStats `json:"patch_stats"`
-	Usage                       usageStats          `json:"usage"`
-	ToolLoopWarningCount        int                 `json:"tool_loop_warning_count"`
-	FirstToolLoopWarningLLMCall *int                `json:"first_tool_loop_warning_llm_call"`
-	ToolLoopWarningLLMCalls     []int               `json:"tool_loop_warning_llm_calls"`
-	toolLoopWarningCountSet     bool                `json:"-"`
-	firstToolLoopWarningCallSet bool                `json:"-"`
-	toolLoopWarningCallsSet     bool                `json:"-"`
+	MainStatus                  string                       `json:"main_status"`
+	FailureReason               string                       `json:"failure_reason,omitempty"`
+	ModelNameOrPath             string                       `json:"model_name_or_path,omitempty"`
+	PatchPath                   string                       `json:"patch_path,omitempty"`
+	TracePath                   string                       `json:"trace_path,omitempty"`
+	VerifierResultRef           string                       `json:"verifier_result_ref,omitempty"`
+	PatchStats                  artifact.PatchStats          `json:"patch_stats"`
+	Usage                       usageStats                   `json:"usage"`
+	ToolLoopWarningCount        int                          `json:"tool_loop_warning_count"`
+	FirstToolLoopWarningLLMCall *int                         `json:"first_tool_loop_warning_llm_call"`
+	ToolLoopWarningLLMCalls     []int                        `json:"tool_loop_warning_llm_calls"`
+	CodeSearchCalls             int                          `json:"code_search_calls,omitempty"`
+	CodeSearchErrors            int                          `json:"code_search_errors,omitempty"`
+	CodeSearchResultBytes       int                          `json:"code_search_result_bytes,omitempty"`
+	CodeSearchObservationBytes  int                          `json:"code_search_observation_bytes,omitempty"`
+	RetrievalTrace              []nativeRetrievalTraceEntry  `json:"retrieval_trace,omitempty"`
+	WorkspaceIndex              *nativeWorkspaceIndexStats   `json:"workspace_index,omitempty"`
+	Embedding                   *nativeEmbeddingMetrics      `json:"embedding,omitempty"`
+	EmbeddingCache              *nativeEmbeddingCacheMetrics `json:"embedding_cache,omitempty"`
+	toolLoopWarningCountSet     bool                         `json:"-"`
+	firstToolLoopWarningCallSet bool                         `json:"-"`
+	toolLoopWarningCallsSet     bool                         `json:"-"`
 }
 
 func (r *targetResult) UnmarshalJSON(data []byte) error {
@@ -207,6 +223,14 @@ func runImport(args []string) error {
 					result.ToolLoopWarningCount = nativeTrace.ToolLoopWarningCount
 					result.FirstToolLoopWarningLLMCall = cloneInt(nativeTrace.FirstToolLoopWarningLLMCall)
 					result.ToolLoopWarningLLMCalls = append([]int{}, nativeTrace.ToolLoopWarningLLMCalls...)
+					result.CodeSearchCalls = nativeTrace.CodeSearchCalls
+					result.CodeSearchErrors = nativeTrace.CodeSearchErrors
+					result.CodeSearchResultBytes = nativeTrace.CodeSearchResultBytes
+					result.CodeSearchObservationBytes = nativeTrace.CodeSearchObservationBytes
+					result.RetrievalTrace = cloneNativeRetrievalTrace(nativeTrace.RetrievalTrace)
+					result.WorkspaceIndex = cloneNativeWorkspaceIndex(nativeTrace.WorkspaceIndex)
+					result.Embedding = cloneNativeEmbeddingMetrics(nativeTrace.Embedding)
+					result.EmbeddingCache = cloneNativeEmbeddingCacheMetrics(nativeTrace.EmbeddingCache)
 				}
 			}
 		}
@@ -229,6 +253,17 @@ func runImport(args []string) error {
 		if nativeTrace != nil {
 			nativeInfo := &nativeTrace.Info
 			row.ToolLoopWarning = nativeInfo.ToolLoopWarning
+			row.CodeSearch = nativeInfo.CodeSearch
+			if nativeInfo.CodeSearch {
+				row.CodeSearchToolOrder = nativeInfo.CodeSearchToolOrder
+				row.CodeSearchInvocationDedup = nativeInfo.CodeSearchInvocationDedup
+				row.WorkspacePreload = new(bool)
+				*row.WorkspacePreload = nativeInfo.WorkspacePreload
+				row.WorkspaceRepresentation = nativeInfo.WorkspaceRepresentation
+				row.RepresentationSchema = nativeInfo.WorkspaceRepresentationSchema
+				row.RepresentationSHA256 = nativeInfo.RepresentationSHA256
+				row.EmbeddingConfigSHA256 = nativeInfo.EmbeddingConfigSHA256
+			}
 			if selectionFromPredictions {
 				row.Repo = nativeInfo.Repo
 				row.BaseCommit = nativeInfo.BaseCommit
@@ -522,38 +557,56 @@ type nativeTraceEnvelope struct {
 	ToolLoopWarningCount        int
 	FirstToolLoopWarningLLMCall *int
 	ToolLoopWarningLLMCalls     []int
+	CodeSearchCalls             int
+	CodeSearchErrors            int
+	CodeSearchResultBytes       int
+	CodeSearchObservationBytes  int
+	CodeSearchRawResults        []json.RawMessage
+	RetrievalTrace              []nativeRetrievalTraceEntry
+	WorkspaceIndex              *nativeWorkspaceIndexStats
+	Embedding                   *nativeEmbeddingMetrics
+	EmbeddingCache              *nativeEmbeddingCacheMetrics
 	Usage                       nativeUsageEnvelope
 	ResponseCount               int
 	ResponsesSHA256             string
 }
 
 type nativeInfoEnvelope struct {
-	RunID                   string
-	ObservationCodec        string
-	SourceRevision          string
-	SourceModified          bool
-	BinarySHA256            string
-	ModelConfigSHA256       string
-	EnvironmentConfigSHA256 string
-	CasesSHA256             string
-	CommandTimeout          string
-	CaseTimeout             string
-	SelectedInstancesSHA256 string
-	CleanRoom               bool
-	CleanRoomDeclared       bool
-	ToolLoopWarning         bool
-	CleanRoomPolicySHA256   string
-	OfflineAssetsSHA256     string
-	ImageSetSHA256          string
-	Repo                    string
-	BaseCommit              string
-	VerifiedBaseCommit      string
-	EnvironmentProvenance   *sweenv.Provenance
-	Workers                 int
-	ExitStatus              string
-	Error                   string
-	ErrorCategory           string
-	Retryable               bool
+	RunID                         string
+	ObservationCodec              string
+	SourceRevision                string
+	SourceModified                bool
+	BinarySHA256                  string
+	ModelConfigSHA256             string
+	EnvironmentConfigSHA256       string
+	CasesSHA256                   string
+	CommandTimeout                string
+	CaseTimeout                   string
+	SelectedInstancesSHA256       string
+	CleanRoom                     bool
+	CleanRoomDeclared             bool
+	ToolLoopWarning               bool
+	CodeSearch                    bool
+	CodeSearchToolOrder           string
+	CodeSearchInvocationDedup     string
+	WorkspacePreload              bool
+	WorkspacePreloadDeclared      bool
+	WorkspaceRepresentation       string
+	WorkspaceRepresentationSchema string
+	RepresentationSHA256          string
+	EmbeddingConfigSHA256         string
+	CleanRoomPolicySHA256         string
+	OfflineAssetsSHA256           string
+	ImageSetSHA256                string
+	Repo                          string
+	BaseCommit                    string
+	VerifiedBaseCommit            string
+	EnvironmentProvenance         *sweenv.Provenance
+	Workers                       int
+	ExitStatus                    string
+	Error                         string
+	ErrorCategory                 string
+	Retryable                     bool
 }
 
 type nativeUsageEnvelope struct {
@@ -581,46 +634,62 @@ type nativeTimingEnvelope struct {
 }
 
 type nativeTraceJSON struct {
-	InstanceID                  *string         `json:"instance_id"`
-	Info                        json.RawMessage `json:"info"`
-	ModelPatch                  *string         `json:"model_patch"`
-	DurationMS                  *int64          `json:"duration_ms"`
-	LLMCalls                    *int            `json:"llm_calls"`
-	ToolCalls                   *int            `json:"tool_calls"`
-	ToolLoopWarningCount        *int            `json:"tool_loop_warning_count"`
-	FirstToolLoopWarningLLMCall *int            `json:"first_tool_loop_warning_llm_call"`
-	ToolLoopWarningLLMCalls     []int           `json:"tool_loop_warning_llm_calls"`
-	Usage                       json.RawMessage `json:"usage"`
-	ResponseCount               *int            `json:"response_count"`
-	ResponsesSHA256             *string         `json:"responses_sha256"`
+	InstanceID                  *string                      `json:"instance_id"`
+	Info                        json.RawMessage              `json:"info"`
+	ModelPatch                  *string                      `json:"model_patch"`
+	DurationMS                  *int64                       `json:"duration_ms"`
+	LLMCalls                    *int                         `json:"llm_calls"`
+	ToolCalls                   *int                         `json:"tool_calls"`
+	ToolLoopWarningCount        *int                         `json:"tool_loop_warning_count"`
+	FirstToolLoopWarningLLMCall *int                         `json:"first_tool_loop_warning_llm_call"`
+	ToolLoopWarningLLMCalls     []int                        `json:"tool_loop_warning_llm_calls"`
+	CodeSearchCalls             *int                         `json:"code_search_calls,omitempty"`
+	CodeSearchErrors            *int                         `json:"code_search_errors,omitempty"`
+	CodeSearchResultBytes       *int                         `json:"code_search_result_bytes,omitempty"`
+	CodeSearchObservationBytes  *int                         `json:"code_search_observation_bytes,omitempty"`
+	CodeSearchRawResults        []json.RawMessage            `json:"code_search_raw_results,omitempty"`
+	RetrievalTrace              []nativeRetrievalTraceEntry  `json:"retrieval_trace,omitempty"`
+	WorkspaceIndex              *nativeWorkspaceIndexStats   `json:"workspace_index,omitempty"`
+	Embedding                   *nativeEmbeddingMetrics      `json:"embedding,omitempty"`
+	EmbeddingCache              *nativeEmbeddingCacheMetrics `json:"embedding_cache,omitempty"`
+	Usage                       json.RawMessage              `json:"usage"`
+	ResponseCount               *int                         `json:"response_count"`
+	ResponsesSHA256             *string                      `json:"responses_sha256"`
 }
 
 type nativeInfoJSON struct {
-	RunID                   string             `json:"run_id,omitempty"`
-	ObservationCodec        string             `json:"observation_codec,omitempty"`
-	SourceRevision          string             `json:"source_revision,omitempty"`
-	SourceModified          bool               `json:"source_modified,omitempty"`
-	BinarySHA256            string             `json:"binary_sha256,omitempty"`
-	ModelConfigSHA256       string             `json:"model_config_sha256,omitempty"`
-	EnvironmentConfigSHA256 string             `json:"environment_config_sha256,omitempty"`
-	CasesSHA256             string             `json:"cases_sha256,omitempty"`
-	CommandTimeout          string             `json:"command_timeout,omitempty"`
-	CaseTimeout             string             `json:"case_timeout,omitempty"`
-	SelectedInstancesSHA256 string             `json:"selected_instances_sha256,omitempty"`
-	CleanRoom               *bool              `json:"clean_room,omitempty"`
-	ToolLoopWarning         bool               `json:"tool_loop_warning"`
-	CleanRoomPolicySHA256   string             `json:"clean_room_policy_sha256,omitempty"`
-	OfflineAssetsSHA256     string             `json:"offline_assets_sha256,omitempty"`
-	ImageSetSHA256          string             `json:"image_set_sha256,omitempty"`
-	Repo                    string             `json:"repo,omitempty"`
-	BaseCommit              string             `json:"base_commit,omitempty"`
-	VerifiedBaseCommit      string             `json:"verified_base_commit,omitempty"`
-	EnvironmentProvenance   *sweenv.Provenance `json:"environment_provenance,omitempty"`
-	Workers                 *int               `json:"workers"`
-	ExitStatus              *string            `json:"exit_status"`
-	Error                   string             `json:"error,omitempty"`
-	ErrorCategory           string             `json:"error_category,omitempty"`
-	Retryable               bool               `json:"retryable,omitempty"`
+	RunID                     string             `json:"run_id,omitempty"`
+	ObservationCodec          string             `json:"observation_codec,omitempty"`
+	SourceRevision            string             `json:"source_revision,omitempty"`
+	SourceModified            bool               `json:"source_modified,omitempty"`
+	BinarySHA256              string             `json:"binary_sha256,omitempty"`
+	ModelConfigSHA256         string             `json:"model_config_sha256,omitempty"`
+	EnvironmentConfigSHA256   string             `json:"environment_config_sha256,omitempty"`
+	CasesSHA256               string             `json:"cases_sha256,omitempty"`
+	CommandTimeout            string             `json:"command_timeout,omitempty"`
+	CaseTimeout               string             `json:"case_timeout,omitempty"`
+	SelectedInstancesSHA256   string             `json:"selected_instances_sha256,omitempty"`
+	CleanRoom                 *bool              `json:"clean_room,omitempty"`
+	ToolLoopWarning           bool               `json:"tool_loop_warning"`
+	CodeSearch                *bool              `json:"code_search,omitempty"`
+	CodeSearchToolOrder       string             `json:"code_search_tool_order,omitempty"`
+	CodeSearchInvocationDedup string             `json:"code_search_invocation_dedup,omitempty"`
+	WorkspacePreload          *bool              `json:"workspace_preload,omitempty"`
+	WorkspaceRepresentation   string             `json:"workspace_representation,omitempty"`
+	RepresentationSHA256      string             `json:"workspace_representation_sha256,omitempty"`
+	EmbeddingConfigSHA256     string             `json:"embedding_config_sha256,omitempty"`
+	CleanRoomPolicySHA256     string             `json:"clean_room_policy_sha256,omitempty"`
+	OfflineAssetsSHA256       string             `json:"offline_assets_sha256,omitempty"`
+	ImageSetSHA256            string             `json:"image_set_sha256,omitempty"`
+	Repo                      string             `json:"repo,omitempty"`
+	BaseCommit                string             `json:"base_commit,omitempty"`
+	VerifiedBaseCommit        string             `json:"verified_base_commit,omitempty"`
+	EnvironmentProvenance     *sweenv.Provenance `json:"environment_provenance,omitempty"`
+	Workers                   *int               `json:"workers"`
+	ExitStatus                *string            `json:"exit_status"`
+	Error                     string             `json:"error,omitempty"`
+	ErrorCategory             string             `json:"error_category,omitempty"`
+	Retryable                 bool               `json:"retryable,omitempty"`
 }
 
 type nativeUsageJSON struct {
@@ -769,7 +838,11 @@ func parseNativeTraceEnvelope(data []byte, instanceID string) (nativeTraceEnvelo
 			*raw.ResponsesSHA256,
 		)
 	}
-	return nativeTraceEnvelope{
+	codeSearchCalls := optionalIntValue(raw.CodeSearchCalls)
+	codeSearchErrors := optionalIntValue(raw.CodeSearchErrors)
+	codeSearchResultBytes := optionalIntValue(raw.CodeSearchResultBytes)
+	codeSearchObservationBytes := optionalIntValue(raw.CodeSearchObservationBytes)
+	trace := nativeTraceEnvelope{
 		InstanceID:                  *raw.InstanceID,
 		Info:                        info,
 		ModelPatch:                  *raw.ModelPatch,
@@ -779,10 +852,30 @@ func parseNativeTraceEnvelope(data []byte, instanceID string) (nativeTraceEnvelo
 		ToolLoopWarningCount:        toolLoopWarningCount,
 		FirstToolLoopWarningLLMCall: cloneInt(raw.FirstToolLoopWarningLLMCall),
 		ToolLoopWarningLLMCalls:     append([]int{}, raw.ToolLoopWarningLLMCalls...),
+		CodeSearchCalls:             codeSearchCalls,
+		CodeSearchErrors:            codeSearchErrors,
+		CodeSearchResultBytes:       codeSearchResultBytes,
+		CodeSearchObservationBytes:  codeSearchObservationBytes,
+		CodeSearchRawResults:        cloneRawMessages(raw.CodeSearchRawResults),
+		RetrievalTrace:              cloneNativeRetrievalTrace(raw.RetrievalTrace),
+		WorkspaceIndex:              cloneNativeWorkspaceIndex(raw.WorkspaceIndex),
+		Embedding:                   cloneNativeEmbeddingMetrics(raw.Embedding),
+		EmbeddingCache:              cloneNativeEmbeddingCacheMetrics(raw.EmbeddingCache),
 		Usage:                       usage,
 		ResponseCount:               *raw.ResponseCount,
 		ResponsesSHA256:             *raw.ResponsesSHA256,
-	}, nil
+	}
+	if err := validateNativeRetrievalTelemetry(instanceID, trace); err != nil {
+		return nativeTraceEnvelope{}, err
+	}
+	return trace, nil
+}
+
+func optionalIntValue(value *int) int {
+	if value == nil {
+		return 0
+	}
+	return *value
 }
 
 func parseNativeInfo(data json.RawMessage, instanceID string) (nativeInfoEnvelope, error) {
@@ -812,34 +905,49 @@ func parseNativeInfo(data json.RawMessage, instanceID string) (nativeInfoEnvelop
 	if err := validateNativeCleanRoomInfo(raw, instanceID); err != nil {
 		return nativeInfoEnvelope{}, err
 	}
+	representationSchema, err := validateNativeTraceRAGInfo(instanceID, raw)
+	if err != nil {
+		return nativeInfoEnvelope{}, err
+	}
 	cleanRoom := raw.CleanRoom != nil && *raw.CleanRoom
+	codeSearch := raw.CodeSearch != nil && *raw.CodeSearch
+	workspacePreload := raw.WorkspacePreload != nil && *raw.WorkspacePreload
 	return nativeInfoEnvelope{
-		RunID:                   raw.RunID,
-		ObservationCodec:        raw.ObservationCodec,
-		SourceRevision:          raw.SourceRevision,
-		SourceModified:          raw.SourceModified,
-		BinarySHA256:            raw.BinarySHA256,
-		ModelConfigSHA256:       raw.ModelConfigSHA256,
-		EnvironmentConfigSHA256: raw.EnvironmentConfigSHA256,
-		CasesSHA256:             raw.CasesSHA256,
-		CommandTimeout:          raw.CommandTimeout,
-		CaseTimeout:             raw.CaseTimeout,
-		SelectedInstancesSHA256: raw.SelectedInstancesSHA256,
-		CleanRoom:               cleanRoom,
-		CleanRoomDeclared:       raw.CleanRoom != nil,
-		ToolLoopWarning:         raw.ToolLoopWarning,
-		CleanRoomPolicySHA256:   raw.CleanRoomPolicySHA256,
-		OfflineAssetsSHA256:     raw.OfflineAssetsSHA256,
-		ImageSetSHA256:          raw.ImageSetSHA256,
-		Repo:                    raw.Repo,
-		BaseCommit:              raw.BaseCommit,
-		VerifiedBaseCommit:      raw.VerifiedBaseCommit,
-		EnvironmentProvenance:   cloneEnvironmentProvenance(raw.EnvironmentProvenance),
-		Workers:                 *raw.Workers,
-		ExitStatus:              *raw.ExitStatus,
-		Error:                   raw.Error,
-		ErrorCategory:           raw.ErrorCategory,
-		Retryable:               raw.Retryable,
+		RunID:                         raw.RunID,
+		ObservationCodec:              raw.ObservationCodec,
+		SourceRevision:                raw.SourceRevision,
+		SourceModified:                raw.SourceModified,
+		BinarySHA256:                  raw.BinarySHA256,
+		ModelConfigSHA256:             raw.ModelConfigSHA256,
+		EnvironmentConfigSHA256:       raw.EnvironmentConfigSHA256,
+		CasesSHA256:                   raw.CasesSHA256,
+		CommandTimeout:                raw.CommandTimeout,
+		CaseTimeout:                   raw.CaseTimeout,
+		SelectedInstancesSHA256:       raw.SelectedInstancesSHA256,
+		CleanRoom:                     cleanRoom,
+		CleanRoomDeclared:             raw.CleanRoom != nil,
+		ToolLoopWarning:               raw.ToolLoopWarning,
+		CodeSearch:                    codeSearch,
+		CodeSearchToolOrder:           raw.CodeSearchToolOrder,
+		CodeSearchInvocationDedup:     raw.CodeSearchInvocationDedup,
+		WorkspacePreload:              workspacePreload,
+		WorkspacePreloadDeclared:      raw.WorkspacePreload != nil,
+		WorkspaceRepresentation:       raw.WorkspaceRepresentation,
+		WorkspaceRepresentationSchema: representationSchema,
+		RepresentationSHA256:          raw.RepresentationSHA256,
+		EmbeddingConfigSHA256:         raw.EmbeddingConfigSHA256,
+		CleanRoomPolicySHA256:         raw.CleanRoomPolicySHA256,
+		OfflineAssetsSHA256:           raw.OfflineAssetsSHA256,
+		ImageSetSHA256:                raw.ImageSetSHA256,
+		Repo:                          raw.Repo,
+		BaseCommit:                    raw.BaseCommit,
+		VerifiedBaseCommit:            raw.VerifiedBaseCommit,
+		EnvironmentProvenance:         cloneEnvironmentProvenance(raw.EnvironmentProvenance),
+		Workers:                       *raw.Workers,
+		ExitStatus:                    *raw.ExitStatus,
+		Error:                         raw.Error,
+		ErrorCategory:                 raw.ErrorCategory,
+		Retryable:                     raw.Retryable,
 	}, nil
 }
 
