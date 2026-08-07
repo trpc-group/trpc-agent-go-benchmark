@@ -200,6 +200,8 @@ class ContextualRetrievalRescoreTest(unittest.TestCase):
             )
 
         self.assertTrue(result["case_manifest_changed"])
+        self.assertEqual("valid", result["evidence_status"])
+        self.assertTrue(result["formal_ab_eligible"])
         self.assertEqual(
             corrected["artifact_digest"],
             result["rescored_case_manifest_digest"],

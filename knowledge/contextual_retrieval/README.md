@@ -14,6 +14,15 @@ Contextual Retrieval design is ineffective.
 
 The benchmark implementation does not change the public tRPC-Agent-Go API.
 
+## Runtime contract
+
+This directory is a per-benchmark harness rather than a reusable Python
+package. Its supported reproduction environment is Python 3.11, which is also
+the version exercised by the pull-request workflow. The published I2 Judge
+additionally requires the exact frozen dependency versions enforced by the
+harness, including Python 3.11.6. Compatibility with other system Python
+versions is outside this benchmark's reproduction contract.
+
 ## Method boundary
 
 Both lanes read the same sealed chunk manifest. The only A/B method variable is
@@ -235,6 +244,12 @@ covered for the first time. Its ideal DCG is the best ordering attainable from
 the case's sealed chunk-to-evidence mapping, so an ideal ranking scores `1.0`
 even when one chunk covers several evidence items.
 
+The retrieval runner preserves request, response-validation, and scoring
+failures in the affected lane's attempts. A failed pair is excluded from the
+metric view and makes full formal evidence insufficient. The runner
+intentionally continues with the remaining cases so that an isolated failure
+does not discard the rest of the benchmark evidence.
+
 Scoring fixes do not require another retrieval run. Recompute metrics from a
 sealed manifest and its complete frozen rankings into a new artifact:
 
@@ -253,6 +268,14 @@ It never calls HTTP, PostgreSQL, an embedding service, or a model, and never
 overwrites the source artifacts. A corrected case manifest is rejected unless
 `--allow-case-manifest-change` is supplied for an explicitly audited mapping
 correction; both source and corrected case digests remain in the output.
+
+For rescore artifacts, `formal_ab_eligible` describes complete paired rankings
+and zero failed source attempts under the case manifest used for rescoring. It
+does not assert that the rescored case manifest is byte-identical to the source
+run. Consumers must inspect `case_manifest_changed` together with the source
+and rescored case digests for label provenance. An unacknowledged manifest
+change remains rejected; an explicitly audited correction may retain formal
+eligibility.
 
 ## 4. Freeze I2 Agent answers
 
