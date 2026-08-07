@@ -19,7 +19,7 @@
 | 问题 | 基线 | 候选 | Official-harness RR | Total tokens | 模型侧成本 | 证据边界 |
 | --- | --- | --- | --- | --- | --- | --- |
 | Tool-result observation codec | JSON | XML-like | 77.6% → 79.2%（+1.6pp） | 251.05M → 215.99M（-14.0%） | 626.55 → 553.22（-11.7%） | 每种 codec 各一次串行 full-500 |
-| Workspace representation | fixed-raw | AST-structured | 79.2% → 80.6%（+1.4pp） | 238.43M → 253.43M（+6.3%） | 598.48 → 638.58（+6.7%） | 每种表示各一次串行 full-500；配对区间包含 0 |
+| 预注入 workspace context 的表示 | fixed-raw | AST-structured | 79.2% → 80.6%（+1.4pp） | 238.43M → 253.43M（+6.3%） | 598.48 → 638.58（+6.7%） | 每种表示各一次串行 full-500；配对区间包含 0；recovery 历史不同 |
 | 精确重复工具调用 warning | warning off | warning on | 74.13% → 73.67%（-0.47pp） | 308.51M → 283.44M（-8.1%） | 843.18 → 773.30（-8.3%） | 每个设置 3 次 run，但执行时段不同；仅作历史敏感性对照，不声称严格因果 |
 
 成本单位是按冻结 rate card 复算的 billing unit，不代表货币支出。Machine-readable 结果同时
@@ -38,8 +38,10 @@ sample SD/range、配对一致性，以及 0%、90%、95%、98%、100% prompt ca
 
 1. 在该 Coding Agent 协议下，XML-like tool-result observation 是经过验证的可配置能力；
    结果不等于所有模型都应修改默认序列化格式。
-2. Full-panel 的 workspace-RAG 实测中，AST-structured 多解决 7 个 case（+1.4pp）。这足以
-   支持继续推进 AST 检索工程，但单次串行配对尚不能证明稳定因果收益。
+2. Full-panel 的 workspace-RAG 实测中，AST-structured 预注入 context 多解决 7 个
+   case（+1.4pp）。两臂的 500 个 case 都注入了 preload，显式 `code_search` 调用较少，
+   因此该结果主要验证 context 表示方向，而非“是否启用检索”。单次串行配对与
+   不同的 recovery 历史尚不能证明稳定因果收益。
 3. Warning-on 的三次 run 在平均 RR 基本持平时使用了更少 token 与成本。离线 replay 对
    “warning-off 轨迹中确实存在大量精确重复长尾”提供高置信证据，但不能推演注入 warning 后的
    反事实模型轨迹。

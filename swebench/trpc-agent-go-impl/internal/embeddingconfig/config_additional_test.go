@@ -184,8 +184,38 @@ func TestNewEmbedderUsesPublicTAGInterface(t *testing.T) {
 
 func TestCacheIdentityOnNilConfig(t *testing.T) {
 	if got := (*Config)(nil).CacheIdentity(); got.Provider != "" ||
-		got.Model != "" || got.ModelFingerprint != "" || got.Dimensions != 0 {
+		got.Model != "" || got.ModelFingerprint != "" ||
+		got.BackendFingerprint != "" || got.Dimensions != 0 {
 		t.Fatalf("nil CacheIdentity() = %+v", got)
+	}
+}
+
+func TestCacheIdentityBindsBackendWithoutBindingCredential(t *testing.T) {
+	config := validConfigForTest()
+	config.Embedding.ExtraHeaders = map[string]string{
+		"X-Tenant": "tenant-a",
+		"X-Route":  "route-a",
+	}
+	initial := config.CacheIdentity().BackendFingerprint
+	if len(initial) != 64 {
+		t.Fatalf("backend fingerprint = %q, want SHA-256 hex", initial)
+	}
+
+	config.Embedding.APIKey = "rotated-credential"
+	if got := config.CacheIdentity().BackendFingerprint; got != initial {
+		t.Fatalf("credential rotation changed backend fingerprint: %q != %q", got, initial)
+	}
+
+	config.Embedding.APIBase = "https://other.example.com/v1"
+	endpointChanged := config.CacheIdentity().BackendFingerprint
+	if endpointChanged == initial {
+		t.Fatal("endpoint change did not change backend fingerprint")
+	}
+
+	config.Embedding.APIBase = "https://api.example.com/v1"
+	config.Embedding.ExtraHeaders["X-Tenant"] = "tenant-b"
+	if got := config.CacheIdentity().BackendFingerprint; got == initial {
+		t.Fatal("routing-header change did not change backend fingerprint")
 	}
 }
 
@@ -248,6 +278,28 @@ func TestScrubSensitiveTextRemovesLocalEmbeddingConfiguration(t *testing.T) {
 		if !strings.Contains(got, marker) {
 			t.Fatalf("scrubbed error missing %q: %s", marker, got)
 		}
+	}
+}
+
+func TestScrubSensitiveTextPreservesOrdinaryShortLiterals(t *testing.T) {
+	config := validConfigForTest()
+	config.Cache.Directory = "cache"
+	config.Embedding.ExtraHeaders = map[string]string{
+		"X-Route": "1",
+	}
+	input := "cache lookup returned 1 result; django__django-11111 remains diagnostic"
+	if got := config.ScrubSensitiveText(input); got != input {
+		t.Fatalf("ScrubSensitiveText() = %q, want unchanged %q", got, input)
+	}
+	resolvedCache, err := filepath.Abs(config.Cache.Directory)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := config.ScrubSensitiveText("database at " + resolvedCache + " failed; cache lookup returned 1 result")
+	if strings.Contains(got, resolvedCache) ||
+		!strings.Contains(got, "<redacted-embedding-cache-path>") ||
+		!strings.Contains(got, "cache lookup returned 1 result") {
+		t.Fatalf("ScrubSensitiveText() relative-cache handling = %q", got)
 	}
 }
 

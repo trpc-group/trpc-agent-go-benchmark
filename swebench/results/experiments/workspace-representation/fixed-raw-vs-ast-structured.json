@@ -4,7 +4,7 @@
   "status": "completed",
   "evidence_status": "complete_single_sequential_run_per_arm",
   "source_repository": "https://github.com/hr-chang/trpc-agent-go-benchmark",
-  "question": "Under the same workspace-RAG agent configuration, how do indentation-preserving fixed-raw chunks and AST-structured chunks compare on the canonical SWE-bench Verified 500-case panel?",
+  "question": "Under the intended same workspace-RAG agent configuration, how do indentation-preserving fixed-raw chunks and AST-structured chunks compare on the canonical SWE-bench Verified 500-case panel?",
   "source_artifacts": [
     {
       "role": "ast_plan",
@@ -46,7 +46,8 @@
     "workspace_preload": true,
     "agent_workers": 15,
     "case_timeout": "2h",
-    "only_intended_quality_variable": "workspace representation"
+    "intended_quality_variable": "workspace representation",
+    "execution_difference": "The AST-structured arm used quality-blind recovery for 36 infrastructure-affected cases after host resource discontinuities; the fixed-raw arm had no non-Agent generation failures. Canonical generation outcomes in both arms retain all Agent failures."
   },
   "rate_card": {
     "cached_prompt_per_million": 2.0,
@@ -65,7 +66,8 @@
           "Error": 1
         },
         "empty_patches": 2,
-        "non_agent_failures": 0
+        "non_agent_failures": 0,
+        "quality_blind_recovery_cases": 0
       },
       "official_harness": {
         "resolved": 396,
@@ -118,8 +120,19 @@
       "generation": {
         "cases": 500,
         "predictions": 500,
+        "terminal_counts": {
+          "Submitted": 498,
+          "Error": 2
+        },
         "empty_patches": 2,
-        "non_agent_failures_recovered": true
+        "non_agent_failures_recovered": true,
+        "quality_blind_recovery_cases": 36,
+        "recovery_selection": {
+          "infrastructure_or_environment_errors": 7,
+          "timeouts_under_host_pressure": 6,
+          "unfinished_at_host_termination": 23
+        },
+        "valid_agent_outcomes_rerun": false
       },
       "official_harness": {
         "resolved": 403,
@@ -202,8 +215,10 @@
     }
   },
   "interpretation": {
-    "engineering": "The full-panel realization favored AST-structured retrieval by 7 cases (+1.4 percentage points), supporting continued benchmark adoption and validation of AST retrieval as a configurable capability.",
+    "engineering": "The full-panel realization favored AST-structured preloaded workspace context by 7 cases (+1.4 percentage points), supporting continued validation of AST-structured context representation as a configurable benchmark capability.",
+    "retrieval_boundary": "Workspace preload was enabled and injected for all 500 cases in both arms, while explicit code_search was called only 77 and 81 times. This comparison primarily evaluates the representation of preloaded retrieved context, not the value of enabling retrieval itself.",
     "statistical_boundary": "The paired interval includes zero and the exact discordance test is not significant. One sequential realization per arm cannot establish a stable causal representation gain or estimate run-to-run variance.",
+    "recovery_boundary": "The AST-structured arm canonically recovered 36 quality-blind infrastructure-affected cases after disclosed host resource discontinuities; the fixed-raw arm had no non-Agent generation failures. This execution asymmetry is not part of the intended quality treatment and further limits causal interpretation.",
     "cost_boundary": "In this full-panel realization AST used 6.3% more model tokens and 6.7% more observed model-side cost; cache-standardized costs were 6.4%-6.9% higher.",
     "implementation_boundary": "The historical experiment and the public benchmark rebuild have different tool-order and invocation-dedup contracts. These results validate the method direction but are not attributed to the rebuilt main implementation without revalidation."
   },
@@ -217,6 +232,7 @@
     "generation_fingerprints_match": true,
     "embedding_errors": 0,
     "cache_errors": 0,
+    "recovery_asymmetry_disclosed": true,
     "raw_responses_and_patches_committed": false
   }
 }

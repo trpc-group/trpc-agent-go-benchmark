@@ -13,18 +13,22 @@ package runner
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
 	"math"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"regexp"
 	"sort"
 	"strconv"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"trpc.group/trpc-go/trpc-agent-go-benchmark/swebench/internal/artifact"
@@ -86,6 +90,7 @@ type manifest struct {
 	PredictionCount           int                             `json:"prediction_count"`
 	Workers                   int                             `json:"workers"`
 	RedoExisting              bool                            `json:"redo_existing"`
+	RedoBackup                string                          `json:"redo_backup,omitempty"`
 	Predictions               string                          `json:"predictions"`
 	Progress                  string                          `json:"progress"`
 	ModelConfig               map[string]string               `json:"model_config,omitempty"`
@@ -213,6 +218,8 @@ func Run(args []string) (runErr error) {
 	}
 
 	started := time.Now()
+	runCtx, stopSignals := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stopSignals()
 	build, err := currentBuildMetadata()
 	if err != nil {
 		return err
@@ -282,7 +289,7 @@ func Run(args []string) (runErr error) {
 	var embeddingCache *embeddingcache.Store
 	if embeddingCfg != nil && embeddingCfg.Cache.Enabled {
 		embeddingCache, err = embeddingcache.Open(
-			context.Background(),
+			runCtx,
 			embeddingCfg.Cache.Directory,
 			embeddingCfg.CacheIdentity(),
 		)
@@ -314,7 +321,7 @@ func Run(args []string) (runErr error) {
 		CleanRoom: *cleanRoom, EnableOfflineServices: *cleanRoom,
 		OfflineAssetsDir: *offlineAssetsDir, OfflineAssets: offlineAssetsIdentity,
 	}
-	resolvedImages, err := factory.ResolveImages(context.Background(), selectedSpecs)
+	resolvedImages, err := factory.ResolveImages(runCtx, selectedSpecs)
 	if err != nil {
 		return err
 	}
@@ -357,6 +364,17 @@ func Run(args []string) (runErr error) {
 	}
 
 	predictionsPath := filepath.Join(*output, "preds.json")
+	redoBackup, err := preservePredictionsForRedo(predictionsPath, *redoExisting)
+	if err != nil {
+		return err
+	}
+	redoFallback := map[string]contract.Prediction{}
+	if redoBackup != "" {
+		redoFallback, err = artifact.ReadPredictions(redoBackup)
+		if err != nil {
+			return fmt.Errorf("read redo prediction backup: %w", err)
+		}
+	}
 	identity := runIdentity{
 		RunID: *runID, ObservationCodec: string(codec), SourceRevision: build.SourceRevision,
 		SourceModified: build.SourceModified, BinarySHA256: build.BinarySHA256,
@@ -418,7 +436,21 @@ func Run(args []string) (runErr error) {
 		go func() {
 			defer wg.Done()
 			for c := range jobs {
-				caseResult := exec.Execute(context.Background(), c)
+				caseResult := exec.Execute(runCtx, c)
+				if runCtx.Err() != nil {
+					mu.Lock()
+					progress.Cases[c.InstanceID] = progressCase{
+						Status: "Interrupted", DurationMS: caseResult.DurationMS,
+					}
+					progress.UpdatedAt = time.Now().UTC()
+					if progressErr := artifact.WriteJSON(progressPath, progress); progressErr != nil {
+						artifactWriteErrors = append(artifactWriteErrors,
+							fmt.Errorf("persist interrupted progress %s: %w", c.InstanceID, progressErr))
+					}
+					mu.Unlock()
+					fmt.Printf("instance=%s status=Interrupted\n", c.InstanceID)
+					continue
+				}
 				bundleErr := validateToolLoopWarningTelemetry(c.InstanceID, caseResult)
 				if bundleErr == nil {
 					bundleErr = writeCaseBundle(*output, &caseResult, artifact.WriteJSON)
@@ -449,11 +481,20 @@ func Run(args []string) (runErr error) {
 			}
 		}()
 	}
-	for _, c := range pending {
-		jobs <- c
-	}
+	attemptedCount := dispatchCases(runCtx, jobs, pending)
 	close(jobs)
 	wg.Wait()
+	if runCtx.Err() != nil && len(redoFallback) > 0 {
+		for id, prediction := range redoFallback {
+			if _, ok := preds[id]; !ok {
+				preds[id] = prediction
+			}
+		}
+		if err := persistPredictions(predictionsPath, preds); err != nil {
+			artifactWriteErrors = append(artifactWriteErrors,
+				fmt.Errorf("restore interrupted redo predictions: %w", err))
+		}
+	}
 	if err := validatePersistedPredictions(predictionsPath, preds); err != nil {
 		artifactWriteErrors = append(artifactWriteErrors, err)
 	}
@@ -461,15 +502,31 @@ func Run(args []string) (runErr error) {
 
 	finished := time.Now()
 	aggregate := aggregateResults(results)
+	interruptedCount := 0
+	for _, caseProgress := range progress.Cases {
+		if caseProgress.Status == "Interrupted" {
+			interruptedCount++
+		}
+	}
+	if interruptedCount > 0 {
+		aggregate.ExitStatusCounts["Interrupted"] = interruptedCount
+	}
 	if missingSkipped := len(skipped) - loadedSkipped; missingSkipped > 0 {
 		aggregate.ExitStatusCounts["ExistingPrediction"] = missingSkipped
 	}
 	status := "completed"
+	if runCtx.Err() != nil {
+		status = "interrupted"
+	}
 	if len(skipped) != loadedSkipped || artifactWriteErr != nil {
-		status = "completed_with_errors"
+		if status != "interrupted" {
+			status = "completed_with_errors"
+		}
 	}
 	if aggregate.HasErrors {
-		status = "completed_with_errors"
+		if status != "interrupted" {
+			status = "completed_with_errors"
+		}
 	}
 	var workspacePreloadManifest *bool
 	if *codeSearch {
@@ -498,9 +555,10 @@ func Run(args []string) (runErr error) {
 		StartedAt:  started.UTC(),
 		FinishedAt: finished.UTC(), DurationMS: finished.Sub(started).Milliseconds(),
 		Cases: artifact.AbsPath(*casesPath), OutputDir: artifact.AbsPath(*output), Filter: *filter,
-		CaseCount: len(selected), AttemptedCount: len(pending), SkippedExisting: len(skipped),
+		CaseCount: len(selected), AttemptedCount: attemptedCount, SkippedExisting: len(skipped),
 		CompletedCount:  len(preds),
 		PredictionCount: len(preds), Workers: *workers, RedoExisting: *redoExisting,
+		RedoBackup:  artifact.AbsPath(redoBackup),
 		Predictions: artifact.AbsPath(predictionsPath), Progress: artifact.AbsPath(progressPath),
 		ModelConfig: modelManifestConfig(modelCfg), Environment: artifact.AbsPath(*environmentConfigPath),
 		CommandTimeout: commandTimeout.String(), CaseTimeout: caseTimeout.String(),
@@ -540,16 +598,74 @@ func Run(args []string) (runErr error) {
 			"Workspace retrieval uses a task-start benchmark-local snapshot; the selected representation and embedding configuration hash are frozen in every case artifact.",
 		)
 	}
+	if redoBackup != "" {
+		doc.Notes = append(doc.Notes,
+			"The exact pre-redo preds.json boundary is preserved in redo_backup before selected predictions are replaced.",
+		)
+	}
 	manifestPath := filepath.Join(*output, "native-runner-manifest.json")
 	if err := artifact.WriteJSON(manifestPath, doc); err != nil {
 		return err
 	}
 	fmt.Printf("selected=%d attempted=%d skipped_existing=%d predictions=%s\nprogress=%s\nmanifest=%s\n",
-		len(selected), len(pending), len(skipped), predictionsPath, progressPath, manifestPath)
+		len(selected), attemptedCount, len(skipped), predictionsPath, progressPath, manifestPath)
 	if artifactWriteErr != nil {
 		return fmt.Errorf("persist run artifacts: %w", artifactWriteErr)
 	}
+	if runCtx.Err() != nil {
+		return fmt.Errorf("run interrupted: %w", runCtx.Err())
+	}
 	return nil
+}
+
+func preservePredictionsForRedo(path string, redo bool) (string, error) {
+	if !redo {
+		return "", nil
+	}
+	data, err := os.ReadFile(path)
+	if errors.Is(err, os.ErrNotExist) {
+		return "", nil
+	}
+	if err != nil {
+		return "", fmt.Errorf("read predictions before redo: %w", err)
+	}
+	digest := sha256.Sum256(data)
+	extension := filepath.Ext(path)
+	base := strings.TrimSuffix(filepath.Base(path), extension)
+	backupPath := filepath.Join(
+		filepath.Dir(path),
+		fmt.Sprintf("%s.pre-redo.%s%s", base, hex.EncodeToString(digest[:]), extension),
+	)
+	existing, err := os.ReadFile(backupPath)
+	if err == nil {
+		if !bytes.Equal(existing, data) {
+			return "", fmt.Errorf("redo prediction backup %s has unexpected content", backupPath)
+		}
+		return backupPath, nil
+	}
+	if !errors.Is(err, os.ErrNotExist) {
+		return "", fmt.Errorf("read redo prediction backup: %w", err)
+	}
+	if err := artifact.WriteFileAtomic(backupPath, data, 0o644); err != nil {
+		return "", fmt.Errorf("preserve predictions before redo: %w", err)
+	}
+	return backupPath, nil
+}
+
+func dispatchCases(ctx context.Context, jobs chan<- contract.Case, pending []contract.Case) int {
+	attempted := 0
+	for _, c := range pending {
+		if ctx.Err() != nil {
+			break
+		}
+		select {
+		case jobs <- c:
+			attempted++
+		case <-ctx.Done():
+			return attempted
+		}
+	}
+	return attempted
 }
 
 func progressCaseFromResult(result executor.CaseResult) progressCase {

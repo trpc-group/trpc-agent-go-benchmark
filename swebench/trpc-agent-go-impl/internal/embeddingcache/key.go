@@ -20,17 +20,18 @@ import (
 	"strings"
 )
 
-const schemaVersion = 1
+const schemaVersion = 2
 
 // Key is the content-addressed identifier for one exact embedding input.
 type Key [sha256.Size]byte
 
 // Identity isolates cache entries produced by different embedding models.
 type Identity struct {
-	Provider         string `json:"provider"`
-	Model            string `json:"model"`
-	ModelFingerprint string `json:"model_fingerprint"`
-	Dimensions       int    `json:"dimensions"`
+	Provider           string `json:"provider"`
+	Model              string `json:"model"`
+	ModelFingerprint   string `json:"model_fingerprint"`
+	BackendFingerprint string `json:"backend_fingerprint"`
+	Dimensions         int    `json:"dimensions"`
 }
 
 // Validate checks the fields required for safe persistent reuse.
@@ -44,6 +45,9 @@ func (i Identity) Validate() error {
 	if strings.TrimSpace(i.ModelFingerprint) == "" {
 		return fmt.Errorf("embedding cache model fingerprint is required")
 	}
+	if strings.TrimSpace(i.BackendFingerprint) == "" {
+		return fmt.Errorf("embedding cache backend fingerprint is required")
+	}
 	if i.Dimensions <= 0 {
 		return fmt.Errorf("embedding cache dimensions must be positive")
 	}
@@ -52,10 +56,11 @@ func (i Identity) Validate() error {
 
 func (i Identity) normalized() Identity {
 	return Identity{
-		Provider:         strings.ToLower(strings.TrimSpace(i.Provider)),
-		Model:            strings.TrimSpace(i.Model),
-		ModelFingerprint: strings.TrimSpace(i.ModelFingerprint),
-		Dimensions:       i.Dimensions,
+		Provider:           strings.ToLower(strings.TrimSpace(i.Provider)),
+		Model:              strings.TrimSpace(i.Model),
+		ModelFingerprint:   strings.TrimSpace(i.ModelFingerprint),
+		BackendFingerprint: strings.ToLower(strings.TrimSpace(i.BackendFingerprint)),
+		Dimensions:         i.Dimensions,
 	}
 }
 
@@ -67,6 +72,7 @@ func identityHash(identity Identity) [sha256.Size]byte {
 	writeHashPart(digest, normalized.Provider)
 	writeHashPart(digest, normalized.Model)
 	writeHashPart(digest, normalized.ModelFingerprint)
+	writeHashPart(digest, normalized.BackendFingerprint)
 	writeHashPart(digest, fmt.Sprintf("%d", normalized.Dimensions))
 	var result [sha256.Size]byte
 	copy(result[:], digest.Sum(nil))

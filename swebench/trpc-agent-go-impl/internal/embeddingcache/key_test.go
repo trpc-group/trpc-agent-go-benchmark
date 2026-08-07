@@ -13,16 +13,18 @@ import "testing"
 
 func TestKeyIsolatesIdentityAndExactInput(t *testing.T) {
 	base := Identity{
-		Provider:         " OpenAI ",
-		Model:            "bge-m3",
-		ModelFingerprint: "weights-v1",
-		Dimensions:       3,
+		Provider:           " OpenAI ",
+		Model:              "bge-m3",
+		ModelFingerprint:   "weights-v1",
+		BackendFingerprint: " ABC123 ",
+		Dimensions:         3,
 	}
 	normalized := Identity{
-		Provider:         "openai",
-		Model:            "bge-m3",
-		ModelFingerprint: "weights-v1",
-		Dimensions:       3,
+		Provider:           "openai",
+		Model:              "bge-m3",
+		ModelFingerprint:   "weights-v1",
+		BackendFingerprint: "abc123",
+		Dimensions:         3,
 	}
 	if identityHash(base) != identityHash(normalized) {
 		t.Fatal("normalized identities produced different hashes")
@@ -33,10 +35,11 @@ func TestKeyIsolatesIdentityAndExactInput(t *testing.T) {
 		t.Fatal("different exact inputs produced the same key")
 	}
 	variants := []Identity{
-		{Provider: "other", Model: "bge-m3", ModelFingerprint: "weights-v1", Dimensions: 3},
-		{Provider: "openai", Model: "bge-m3-v2", ModelFingerprint: "weights-v1", Dimensions: 3},
-		{Provider: "openai", Model: "bge-m3", ModelFingerprint: "weights-v2", Dimensions: 3},
-		{Provider: "openai", Model: "bge-m3", ModelFingerprint: "weights-v1", Dimensions: 4},
+		{Provider: "other", Model: "bge-m3", ModelFingerprint: "weights-v1", BackendFingerprint: "abc123", Dimensions: 3},
+		{Provider: "openai", Model: "bge-m3-v2", ModelFingerprint: "weights-v1", BackendFingerprint: "abc123", Dimensions: 3},
+		{Provider: "openai", Model: "bge-m3", ModelFingerprint: "weights-v2", BackendFingerprint: "abc123", Dimensions: 3},
+		{Provider: "openai", Model: "bge-m3", ModelFingerprint: "weights-v1", BackendFingerprint: "def456", Dimensions: 3},
+		{Provider: "openai", Model: "bge-m3", ModelFingerprint: "weights-v1", BackendFingerprint: "abc123", Dimensions: 4},
 	}
 	for _, variant := range variants {
 		if key == keyForText(identityHash(variant), "same text") {

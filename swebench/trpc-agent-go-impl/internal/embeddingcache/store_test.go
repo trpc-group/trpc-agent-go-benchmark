@@ -173,9 +173,10 @@ func TestStoresCoordinateConcurrentWritersThroughSQLite(t *testing.T) {
 
 func testIdentity() Identity {
 	return Identity{
-		Provider:         "openai",
-		Model:            "bge-m3",
-		ModelFingerprint: "weights-v1",
-		Dimensions:       3,
+		Provider:           "openai",
+		Model:              "bge-m3",
+		ModelFingerprint:   "weights-v1",
+		BackendFingerprint: "backend-v1",
+		Dimensions:         3,
 	}
 }

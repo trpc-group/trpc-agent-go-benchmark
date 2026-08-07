@@ -192,6 +192,9 @@ func (i *WorkspaceIndex) Search(ctx context.Context, query string, maxResults in
 func (i *WorkspaceIndex) BuildContext(ctx context.Context, query string) (*WorkspaceContextResult, error) {
 	result, err := i.Search(ctx, query, i.config.MaxResults)
 	if err != nil {
+		if isWorkspaceSearchMiss(err) {
+			return &WorkspaceContextResult{}, nil
+		}
 		return nil, err
 	}
 	var b strings.Builder
@@ -223,6 +226,21 @@ func (i *WorkspaceIndex) BuildContext(ctx context.Context, query string) (*Works
 	}
 	text := strings.TrimSpace(b.String())
 	return &WorkspaceContextResult{Text: text, Documents: count, Chars: utf8.RuneCountInString(text)}, nil
+}
+
+func isWorkspaceSearchMiss(err error) bool {
+	if err == nil {
+		return false
+	}
+	switch strings.TrimSpace(err.Error()) {
+	case "no relevant documents found",
+		"no relevant information found",
+		"search failed: no relevant documents found",
+		"search failed: no relevant information found":
+		return true
+	default:
+		return false
+	}
 }
 
 // Tool returns a query-only code_search tool backed by this index. A wrapper

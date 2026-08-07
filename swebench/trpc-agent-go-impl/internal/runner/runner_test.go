@@ -10,6 +10,7 @@
 package runner
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"os"
@@ -297,6 +298,57 @@ func TestPrepareResumeRedoRemovesOnlySelectedPrediction(t *testing.T) {
 	}
 	if _, ok := preds["case-a"]; ok || !reflect.DeepEqual(pending, selected) || len(skipped) != 0 {
 		t.Fatalf("preds=%#v pending=%#v skipped=%#v", preds, pending, skipped)
+	}
+}
+
+func TestPreservePredictionsForRedoKeepsExactImmutableBoundary(t *testing.T) {
+	directory := t.TempDir()
+	path := filepath.Join(directory, "preds.json")
+	original := []byte("{\n  \"case-a\": {\"instance_id\": \"case-a\", \"model_patch\": \"patch\"}\n}\n")
+	if err := os.WriteFile(path, original, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	backup, err := preservePredictionsForRedo(path, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if backup == "" || backup == path {
+		t.Fatalf("backup path = %q", backup)
+	}
+	got, err := os.ReadFile(backup)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != string(original) {
+		t.Fatalf("backup changed exact predictions boundary:\ngot=%q\nwant=%q", got, original)
+	}
+
+	again, err := preservePredictionsForRedo(path, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if again != backup {
+		t.Fatalf("idempotent backup = %q, want %q", again, backup)
+	}
+	if disabled, err := preservePredictionsForRedo(path, false); err != nil || disabled != "" {
+		t.Fatalf("disabled backup = %q, %v", disabled, err)
+	}
+}
+
+func TestDispatchCasesStopsAtCancellation(t *testing.T) {
+	pending := []contract.Case{{InstanceID: "case-a"}, {InstanceID: "case-b"}}
+
+	canceled, cancel := context.WithCancel(context.Background())
+	cancel()
+	canceledJobs := make(chan contract.Case, len(pending))
+	if got := dispatchCases(canceled, canceledJobs, pending); got != 0 || len(canceledJobs) != 0 {
+		t.Fatalf("canceled dispatch = %d jobs, buffered=%d", got, len(canceledJobs))
+	}
+
+	jobs := make(chan contract.Case, len(pending))
+	if got := dispatchCases(context.Background(), jobs, pending); got != len(pending) || len(jobs) != len(pending) {
+		t.Fatalf("complete dispatch = %d jobs, buffered=%d", got, len(jobs))
 	}
 }
 

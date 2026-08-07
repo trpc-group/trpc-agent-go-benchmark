@@ -22,27 +22,34 @@ func TestIdentityValidate(t *testing.T) {
 	}{
 		{
 			name:     "provider",
-			identity: Identity{Model: "model", ModelFingerprint: "revision", Dimensions: 3},
+			identity: Identity{Model: "model", ModelFingerprint: "revision", BackendFingerprint: "backend", Dimensions: 3},
 			want:     "provider",
 		},
 		{
 			name: "model",
 			identity: Identity{
-				Provider: "openai", ModelFingerprint: "revision", Dimensions: 3,
+				Provider: "openai", ModelFingerprint: "revision", BackendFingerprint: "backend", Dimensions: 3,
 			},
 			want: "model is required",
 		},
 		{
 			name: "fingerprint",
 			identity: Identity{
-				Provider: "openai", Model: "model", Dimensions: 3,
+				Provider: "openai", Model: "model", BackendFingerprint: "backend", Dimensions: 3,
 			},
 			want: "fingerprint",
 		},
 		{
+			name: "backend fingerprint",
+			identity: Identity{
+				Provider: "openai", Model: "model", ModelFingerprint: "revision", Dimensions: 3,
+			},
+			want: "backend fingerprint",
+		},
+		{
 			name: "dimensions",
 			identity: Identity{
-				Provider: "openai", Model: "model", ModelFingerprint: "revision",
+				Provider: "openai", Model: "model", ModelFingerprint: "revision", BackendFingerprint: "backend",
 			},
 			want: "dimensions",
 		},

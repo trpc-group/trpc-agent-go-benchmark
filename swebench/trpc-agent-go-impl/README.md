@@ -48,6 +48,13 @@ missing or mismatched attestation, resume remains fail-closed. Model
 configuration supports arbitrary OpenAI-compatible HTTP headers through the
 shared `modelconfig.HTTPHeaders` normalization.
 
+Before `--redo-existing` removes selected predictions from the active resume
+boundary, the runner preserves the exact prior `preds.json` under a
+content-addressed `preds.pre-redo.*.json` path recorded in the manifest. On
+`SIGINT` or `SIGTERM` it stops dispatching new cases, cancels active case
+contexts so their Docker environments close, restores any not-yet-replaced
+redo predictions, writes an `interrupted` manifest, and exits non-zero.
+
 Case bundles created before the worker-count and response-artifact fingerprints
 were added are rejected during resume. Keep them as historical evidence and use
 a new output directory (or explicitly rerun them) instead of mixing old and new
@@ -133,8 +140,12 @@ embedding endpoint and model identity, then add:
 Only a SHA-256 and redacted configuration summary enter the manifest; endpoint,
 credential and cache paths do not. Persisted embedding and retrieval errors are
 scrubbed using the same local configuration before case bundles are written.
-The optional SQLite cache is exact-input,
-model-fingerprint scoped, and read-through/write-through. Embedding requests,
+The optional SQLite cache is exact-input, model-fingerprint, endpoint, and
+routing-header scoped, and read-through/write-through. Endpoint and header
+values contribute only through an opaque SHA-256 backend fingerprint; API keys
+are excluded so credential rotation does not invalidate semantically identical
+vectors. A preload search with no relevant documents injects empty context and
+continues, while real retrieval/backend errors still fail closed. Embedding requests,
 tokens, latency and cache hits/misses are reported separately
 from agent-model usage. A configured `batch_size` is retained as experiment
 metadata; the current public framework loader invokes the embedder per

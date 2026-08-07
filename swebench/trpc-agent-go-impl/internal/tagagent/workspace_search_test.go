@@ -11,6 +11,7 @@ package tagagent
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -76,6 +77,35 @@ func TestWorkspaceIndexLoadsKeywordModeWithoutEmbedding(t *testing.T) {
 	result, err := callable.Call(context.Background(), []byte(`{"query":"find_user_by_email"}`))
 	if err != nil || result == nil {
 		t.Fatalf("code_search result = %#v, err = %v", result, err)
+	}
+
+	preloaded, err := index.BuildContext(context.Background(), "term-that-does-not-exist-9f1e2d3c")
+	if err != nil {
+		t.Fatalf("BuildContext() zero-hit error = %v", err)
+	}
+	if preloaded.Text != "" || preloaded.Documents != 0 || preloaded.Chars != 0 {
+		t.Fatalf("BuildContext() zero-hit result = %+v, want empty context", preloaded)
+	}
+}
+
+func TestWorkspaceSearchMissClassificationIsExact(t *testing.T) {
+	for _, message := range []string{
+		"no relevant documents found",
+		"no relevant information found",
+		"search failed: no relevant documents found",
+		"search failed: no relevant information found",
+	} {
+		if !isWorkspaceSearchMiss(fmt.Errorf("%s", message)) {
+			t.Fatalf("isWorkspaceSearchMiss(%q) = false", message)
+		}
+	}
+	for _, message := range []string{
+		"no relevant documents found after backend failure",
+		"vector store unavailable",
+	} {
+		if isWorkspaceSearchMiss(fmt.Errorf("%s", message)) {
+			t.Fatalf("isWorkspaceSearchMiss(%q) = true", message)
+		}
 	}
 }
 

@@ -12,9 +12,13 @@ package embeddingconfig
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 	"time"
@@ -156,11 +160,50 @@ func (c *Config) CacheIdentity() embeddingcache.Identity {
 		return embeddingcache.Identity{}
 	}
 	return embeddingcache.Identity{
-		Provider:         c.Embedding.Provider,
-		Model:            c.Embedding.Model,
-		ModelFingerprint: c.Cache.ModelFingerprint,
-		Dimensions:       c.Embedding.Dimensions,
+		Provider:           c.Embedding.Provider,
+		Model:              c.Embedding.Model,
+		ModelFingerprint:   c.Cache.ModelFingerprint,
+		BackendFingerprint: c.backendFingerprint(),
+		Dimensions:         c.Embedding.Dimensions,
 	}
+}
+
+// backendFingerprint binds persistent cache entries to the endpoint and all
+// configured routing headers without persisting their potentially sensitive
+// values. API credentials are intentionally excluded because rotating a key
+// does not change embedding semantics.
+func (c *Config) backendFingerprint() string {
+	if c == nil {
+		return ""
+	}
+	type header struct {
+		Name  string `json:"name"`
+		Value string `json:"value"`
+	}
+	headers := make([]header, 0, len(c.Embedding.ExtraHeaders))
+	for name, value := range c.Embedding.ExtraHeaders {
+		if strings.TrimSpace(name) != "" && strings.TrimSpace(value) != "" {
+			headers = append(headers, header{
+				Name:  strings.ToLower(strings.TrimSpace(name)),
+				Value: strings.TrimSpace(value),
+			})
+		}
+	}
+	sort.Slice(headers, func(i, j int) bool {
+		if headers[i].Name != headers[j].Name {
+			return headers[i].Name < headers[j].Name
+		}
+		return headers[i].Value < headers[j].Value
+	})
+	payload, err := json.Marshal(struct {
+		APIBase string   `json:"api_base"`
+		Headers []header `json:"headers"`
+	}{APIBase: strings.TrimSpace(c.Embedding.APIBase), Headers: headers})
+	if err != nil {
+		return ""
+	}
+	digest := sha256.Sum256(payload)
+	return hex.EncodeToString(digest[:])
 }
 
 // NewEmbedder constructs a configured OpenAI-compatible embedder.
@@ -219,14 +262,16 @@ func (c *Config) Redacted() map[string]any {
 			"enabled":              c.Cache.Enabled,
 			"directory_configured": strings.TrimSpace(c.Cache.Directory) != "",
 			"model_fingerprint":    c.Cache.ModelFingerprint,
+			"backend_fingerprint":  c.backendFingerprint(),
 			"access":               "readwrite",
 		},
 	}
 }
 
-// ScrubSensitiveText removes endpoint, credential, header-value, and local
-// cache-path material before an error is persisted in a portable artifact.
-// The returned string remains diagnostic without disclosing local config.
+// ScrubSensitiveText removes endpoint, credential, header-value, and absolute
+// or path-shaped cache-directory material before an error is persisted in a
+// portable artifact. Short literals and bare relative directory names are not
+// globally replaced because they can be ordinary diagnostic text.
 func (c *Config) ScrubSensitiveText(value string) string {
 	if c == nil || value == "" {
 		return value
@@ -235,26 +280,34 @@ func (c *Config) ScrubSensitiveText(value string) string {
 		value string
 		label string
 	}
-	replacements := []replacement{
-		{value: c.Embedding.APIBase, label: "<redacted-embedding-endpoint>"},
-		{value: strings.TrimSuffix(c.Embedding.APIBase, "/"), label: "<redacted-embedding-endpoint>"},
-		{value: c.Embedding.APIKey, label: "<redacted-embedding-credential>"},
-		{value: c.Cache.Directory, label: "<redacted-embedding-cache-path>"},
+	var replacements []replacement
+	add := func(candidate, label string) {
+		candidate = strings.TrimSpace(candidate)
+		if len(candidate) < 4 {
+			return
+		}
+		replacements = append(replacements, replacement{value: candidate, label: label})
+	}
+	add(c.Embedding.APIBase, "<redacted-embedding-endpoint>")
+	add(strings.TrimSuffix(strings.TrimSpace(c.Embedding.APIBase), "/"), "<redacted-embedding-endpoint>")
+	add(c.Embedding.APIKey, "<redacted-embedding-credential>")
+	cacheDirectory := strings.TrimSpace(c.Cache.Directory)
+	if cacheDirectory != "" {
+		if filepath.IsAbs(cacheDirectory) || strings.ContainsAny(cacheDirectory, `/\`) {
+			add(cacheDirectory, "<redacted-embedding-cache-path>")
+		}
+		if resolvedCacheDirectory, err := filepath.Abs(cacheDirectory); err == nil {
+			add(resolvedCacheDirectory, "<redacted-embedding-cache-path>")
+		}
 	}
 	for _, headerValue := range c.Embedding.ExtraHeaders {
-		replacements = append(replacements, replacement{
-			value: headerValue,
-			label: "<redacted-embedding-header-value>",
-		})
+		add(headerValue, "<redacted-embedding-header-value>")
 	}
 	sort.SliceStable(replacements, func(i, j int) bool {
 		return len(replacements[i].value) > len(replacements[j].value)
 	})
 	seen := map[string]struct{}{}
 	for _, item := range replacements {
-		if item.value == "" {
-			continue
-		}
 		if _, ok := seen[item.value]; ok {
 			continue
 		}

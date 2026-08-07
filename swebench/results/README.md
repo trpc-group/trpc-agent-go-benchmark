@@ -24,7 +24,7 @@ differs.
 | Question | Baseline | Candidate | Official-harness RR | Total tokens | Model-side cost | Evidence boundary |
 | --- | --- | --- | --- | --- | --- | --- |
 | Tool-result observation codec | JSON | XML-like | 77.6% → 79.2% (+1.6pp) | 251.05M → 215.99M (-14.0%) | 626.55 → 553.22 (-11.7%) | One sequential full-500 realization per codec |
-| Workspace representation | fixed-raw | AST-structured | 79.2% → 80.6% (+1.4pp) | 238.43M → 253.43M (+6.3%) | 598.48 → 638.58 (+6.7%) | One sequential full-500 realization per representation; paired interval includes zero |
+| Preloaded workspace-context representation | fixed-raw | AST-structured | 79.2% → 80.6% (+1.4pp) | 238.43M → 253.43M (+6.3%) | 598.48 → 638.58 (+6.7%) | One sequential full-500 realization per representation; paired interval includes zero; recovery histories differ |
 | Exact repeated-tool warning | warning off | warning on | 74.13% → 73.67% (-0.47pp) | 308.51M → 283.44M (-8.1%) | 843.18 → 773.30 (-8.3%) | Three run-level observations per setting, run at different times; historical sensitivity, not strict causality |
 
 Cost is reported in reproducible billing units using the frozen rate card, not
@@ -45,9 +45,12 @@ fixed-cache sensitivity at 0%, 90%, 95%, 98%, and 100% prompt cache hit.
 1. XML-like tool-result observations are a validated configurable benchmark
    capability for this Coding Agent protocol. The result does not justify a
    model-independent serialization default.
-2. The full-panel workspace-RAG realization favored AST-structured retrieval by
-   seven cases. This supports continuing the AST retrieval engineering path,
-   while the single sequential pair does not establish a stable causal gain.
+2. The full-panel workspace-RAG realization favored AST-structured preloaded
+   context by seven cases. Both arms injected preload for every case and made
+   relatively few explicit `code_search` calls, so this primarily validates a
+   context-representation direction rather than retrieval enablement itself.
+   The single sequential pair and differing recovery histories do not establish
+   a stable causal gain.
 3. Warning-on runs used less token and cost volume with nearly unchanged mean
    RR in the historical three-run contrast. Offline replay gives high-confidence
    evidence that substantial exact-repeat tails exist, but it cannot simulate

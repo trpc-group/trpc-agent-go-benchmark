@@ -78,6 +78,7 @@ cache:
 	identity := cfg.CacheIdentity()
 	if identity.Provider != "openai" || identity.Model != "bge-m3" ||
 		identity.ModelFingerprint != "bge-m3-weights-and-tokenizer-v1" ||
+		len(identity.BackendFingerprint) != 64 ||
 		identity.Dimensions != 1024 {
 		t.Fatalf("cache identity = %+v", identity)
 	}
