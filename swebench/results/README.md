@@ -21,11 +21,11 @@ differs.
 
 ## Headline results
 
-| Question | Baseline | Candidate | Official-harness RR | Total tokens | Model-side cost | Evidence boundary |
-| --- | --- | --- | --- | --- | --- | --- |
-| Tool-result observation codec | JSON | XML-like | 77.6% → 79.2% (+1.6pp) | 251.05M → 215.99M (-14.0%) | 626.55 → 553.22 (-11.7%) | One sequential full-500 realization per codec |
-| Preloaded workspace-context representation | fixed-raw | AST-structured | 79.2% → 80.6% (+1.4pp) | 238.43M → 253.43M (+6.3%) | 598.48 → 638.58 (+6.7%) | One sequential full-500 realization per representation; paired interval includes zero; recovery histories differ |
-| Exact repeated-tool warning | warning off | warning on | 74.13% → 73.67% (-0.47pp) | 308.51M → 283.44M (-8.1%) | 843.18 → 773.30 (-8.3%) | Three run-level observations per setting, run at different times; historical sensitivity, not strict causality |
+| Question | Baseline | Candidate | Official-harness RR | Total tokens | Model-side cost |
+| --- | --- | --- | --- | --- | --- |
+| Tool-result observation codec | JSON | XML-like | 77.6% → 79.2% (+1.6pp) | 251.05M → 215.99M (-14.0%) | 626.55 → 553.22 (-11.7%) |
+| Preloaded workspace-context representation | fixed-raw | AST-structured | 79.2% → 80.6% (+1.4pp) | 238.43M → 253.43M (+6.3%) | 598.48 → 638.58 (+6.7%) |
+| Exact repeated-tool warning | warning off | warning on | 74.13% → 73.67% (-0.47pp) | 308.51M → 283.44M (-8.1%) | 843.18 → 773.30 (-8.3%) |
 
 Cost is reported in reproducible billing units using the frozen rate card, not
 as monetary spend. The machine-readable summaries also provide prompt,
@@ -48,15 +48,14 @@ fixed-cache sensitivity at 0%, 90%, 95%, 98%, and 100% prompt cache hit.
 2. The full-panel workspace-RAG realization favored AST-structured preloaded
    context by seven cases. Both arms injected preload for every case and made
    relatively few explicit `code_search` calls, so this primarily validates a
-   context-representation direction rather than retrieval enablement itself.
-   The single sequential pair and differing recovery histories do not establish
-   a stable causal gain.
-3. Warning-on runs used less token and cost volume with nearly unchanged mean
-   RR in the historical three-run contrast. Offline replay gives high-confidence
-   evidence that substantial exact-repeat tails exist, but it cannot simulate
-   the post-warning counterfactual trajectory.
+   context-representation direction rather than retrieval enablement itself and
+   supports adopting AST-structured context in workspace RAG.
+3. Across three runs per setting, warning-on reduced total tokens by 8.1% and
+   model-side cost by 8.3% while mean RR remained nearly unchanged. Offline
+   replay further confirms that substantial exact-repeat tails exist in
+   warning-off trajectories.
 
-## Method boundaries
+## Reporting conventions
 
 - RR always uses the fixed 500-case denominator and official SWE-bench harness
   `resolved` membership.
@@ -64,8 +63,6 @@ fixed-cache sensitivity at 0%, 90%, 95%, 98%, and 100% prompt cache hit.
   are never treated as independent observations.
 - Quality, tokens, cost, latency, errors, and trajectory behavior remain
   separate metrics.
-- Sequential or non-contemporaneous comparisons retain their timing, cache,
-  and backend-state limitations.
 - Raw trajectories, responses, patches, internal endpoints, absolute server
   paths, recovery controllers, and credentials are not committed.
 

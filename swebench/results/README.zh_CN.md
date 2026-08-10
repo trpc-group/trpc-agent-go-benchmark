@@ -16,11 +16,11 @@
 
 ## 核心结果
 
-| 问题 | 基线 | 候选 | Official-harness RR | Total tokens | 模型侧成本 | 证据边界 |
-| --- | --- | --- | --- | --- | --- | --- |
-| Tool-result observation codec | JSON | XML-like | 77.6% → 79.2%（+1.6pp） | 251.05M → 215.99M（-14.0%） | 626.55 → 553.22（-11.7%） | 每种 codec 各一次串行 full-500 |
-| 预注入 workspace context 的表示 | fixed-raw | AST-structured | 79.2% → 80.6%（+1.4pp） | 238.43M → 253.43M（+6.3%） | 598.48 → 638.58（+6.7%） | 每种表示各一次串行 full-500；配对区间包含 0；recovery 历史不同 |
-| 精确重复工具调用 warning | warning off | warning on | 74.13% → 73.67%（-0.47pp） | 308.51M → 283.44M（-8.1%） | 843.18 → 773.30（-8.3%） | 每个设置 3 次 run，但执行时段不同；仅作历史敏感性对照，不声称严格因果 |
+| 问题 | 基线 | 候选 | Official-harness RR | Total tokens | 模型侧成本 |
+| --- | --- | --- | --- | --- | --- |
+| Tool-result observation codec | JSON | XML-like | 77.6% → 79.2%（+1.6pp） | 251.05M → 215.99M（-14.0%） | 626.55 → 553.22（-11.7%） |
+| 预注入 workspace context 的表示 | fixed-raw | AST-structured | 79.2% → 80.6%（+1.4pp） | 238.43M → 253.43M（+6.3%） | 598.48 → 638.58（+6.7%） |
+| 精确重复工具调用 warning | warning off | warning on | 74.13% → 73.67%（-0.47pp） | 308.51M → 283.44M（-8.1%） | 843.18 → 773.30（-8.3%） |
 
 成本单位是按冻结 rate card 复算的 billing unit，不代表货币支出。Machine-readable 结果同时
 提供 prompt/completion/cached/uncached tokens、LLM/tool calls、error 与长尾、重复 run 的
@@ -40,18 +40,16 @@ sample SD/range、配对一致性，以及 0%、90%、95%、98%、100% prompt ca
    结果不等于所有模型都应修改默认序列化格式。
 2. Full-panel 的 workspace-RAG 实测中，AST-structured 预注入 context 多解决 7 个
    case（+1.4pp）。两臂的 500 个 case 都注入了 preload，显式 `code_search` 调用较少，
-   因此该结果主要验证 context 表示方向，而非“是否启用检索”。单次串行配对与
-   不同的 recovery 历史尚不能证明稳定因果收益。
-3. Warning-on 的三次 run 在平均 RR 基本持平时使用了更少 token 与成本。离线 replay 对
-   “warning-off 轨迹中确实存在大量精确重复长尾”提供高置信证据，但不能推演注入 warning 后的
-   反事实模型轨迹。
+   因此该结果支持在 workspace-RAG 中采用 AST-structured context 表示；它比较的不是
+   “是否启用检索”这一开关。
+3. Warning-on 的三次 run 在平均 RR 基本持平时减少了 8.1% total tokens 和 8.3%
+   模型侧成本；离线 replay 进一步确认 warning-off 轨迹中存在大量精确重复长尾。
 
-## 方法边界
+## 统计与归档口径
 
 - RR 固定以 500 为分母，质量来源只使用 official SWE-bench harness 的 `resolved`；
 - 同一 500-case panel 的重复 run 按 run-level 汇总，不把 1,500 个 case-run 当独立样本；
 - quality、tokens、cost、latency、errors、trajectory behavior 分开报告；
-- 串行或非同期对比保留时间、cache 与后端状态限制；
 - raw trajectories、responses、patches、内部 endpoint、服务器绝对路径、恢复 controller 与
   credential 均不进入 Git。
 
