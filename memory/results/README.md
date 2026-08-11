@@ -168,10 +168,10 @@ Each `results.json` contains:
 
 LongMemEval is the cross-session user-memory benchmark. The current maintained
 harness uses Runner replay, sanitizer validation, and memory-only QA. The
-latest development comparison covers Auto `Merge Similar`, `Preserve History`, and
-`Append Only` update policies plus Mem0 OSS. The report intentionally omits all
-earlier LongMemEval result tables because their build or governance contracts
-differ from the current turn-pair harness.
+latest development comparison covers Auto `Merge Similar`, `Preserve History`,
+and `Append Only` update policies plus Mem0 OSS. The report intentionally omits
+earlier LongMemEval tables whose build or governance contracts differ from the
+current turn-pair harness.
 
 These are current display names for behaviorally identical historical runs;
 the underlying metrics and raw artifacts were not regenerated for the rename.
@@ -190,11 +190,10 @@ New maintained runs use a fixed-denominator publication contract:
 - Provider token counts are never estimated. `tokens_known=false` distinguishes
   unavailable usage from a provider-reported zero.
 
-Historical or log-recovered files without this publication metadata are
-diagnostic only. The maintained report generator rejects them rather than
-silently promoting them. In particular, results produced with backend-specific
-truncation, different retrieval limits, incomplete cost accounting, or the
-obsolete whole-session build protocol are not maintained baselines.
+The maintained report generator accepts only artifacts that satisfy this
+contract. This prevents results produced with backend-specific truncation,
+different retrieval limits, incomplete cost accounting, or the obsolete
+whole-session build protocol from being mixed into the current comparison.
 
 Comparable maintained runs must share the exact dataset, case manifest,
 canonical replay, build plan, model configuration, tokenizer, fixed turn-pair
@@ -241,8 +240,8 @@ partial rows from failed attempts are excluded. The assistant-enabled rows use
 the final conditional two-stage implementation, not the earlier extraction
 prototype.
 
-This snapshot remains diagnostic because the selected manifest uses the legacy
-`case_ids`-only schema. The assistant-enabled archives also did not pass the
-current clean-worktree publication gate and two policies have one incomplete
-memory build each. The table must therefore not be presented as a maintained
-holdout baseline.
+This is a valid comparison on one frozen 50-case development manifest. The
+legacy `case_ids`-only schema does not define a seeded blind split, so the table
+must not be presented as a blind holdout baseline. Two assistant-enabled rows
+have one incomplete memory build each; those failures remain in the fixed
+denominator and score as incorrect.

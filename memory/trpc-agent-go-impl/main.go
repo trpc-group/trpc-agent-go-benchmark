@@ -208,6 +208,11 @@ var (
 		"",
 		"Unique split proxy run ID for scoped Mem0 usage accounting (env MEM0_PROXY_RUN_ID)",
 	)
+	flagLMESessionRecallUserOnly = flag.Bool(
+		"lme-session-recall-user-only",
+		true,
+		"Index only user turns for LongMemEval session_recall because retrieval is user-role only",
+	)
 	// Debug flags (auto scenario diagnosis).
 	flagDebugDumpMemories = flag.Bool("debug-dump-memories", false, "Dump extracted memories (auto scenario only)")
 	flagDebugMemLimit     = flag.Int("debug-mem-limit", 200, "Max memories to dump when debug-dump-memories is enabled")

@@ -58,17 +58,17 @@ func TestNewLMEExtractorUsesDefaultBehavior(t *testing.T) {
 }
 
 func TestNewLMEExtractorUsesConfiguredUpdatePolicy(t *testing.T) {
-	tests := []extractor.UpdatePolicy{
-		extractor.UpdatePolicyPreserveHistory,
-		extractor.UpdatePolicyAppendOnly,
+	tests := []lmeAutoUpdatePolicy{
+		lmeAutoUpdatePolicyPreserveHistory,
+		lmeAutoUpdatePolicyAppendOnly,
 	}
 	for _, policy := range tests {
 		t.Run(string(policy), func(t *testing.T) {
 			ext := newLMEExtractor(memoryServiceOptions{
 				autoUpdatePolicy: policy,
 			})
-			if got := ext.Metadata()["update_policy"]; got != policy {
-				t.Fatalf("update_policy = %v, want %s", got, policy)
+			if _, ok := ext.Metadata()["update_policy"]; ok {
+				t.Fatal("configured extractor exposes behavioral metadata")
 			}
 			provider, ok := ext.(interface {
 				UpdatePolicy() extractor.UpdatePolicy
@@ -76,8 +76,12 @@ func TestNewLMEExtractorUsesConfiguredUpdatePolicy(t *testing.T) {
 			if !ok {
 				t.Fatal("tracing extractor does not expose its update policy")
 			}
-			if got := provider.UpdatePolicy(); got != policy {
+			if got := provider.UpdatePolicy(); got != extractor.UpdatePolicy(policy) {
 				t.Fatalf("UpdatePolicy() = %q, want %q", got, policy)
+			}
+			wrapper := ext.(*lmeTracingExtractor)
+			if wrapper.UnwrapMemoryExtractor() == nil {
+				t.Fatal("tracing extractor did not expose its wrapped extractor")
 			}
 		})
 	}
@@ -87,13 +91,12 @@ func TestNewLMEExtractorUsesAssistantEpisodeExtraction(t *testing.T) {
 	ext := newLMEExtractor(memoryServiceOptions{
 		conversationExtraction: lmeConversationExtractionAssistantEpisode,
 	})
-	if got := ext.Metadata()["conversation_extraction"]; got !=
-		string(lmeConversationExtractionAssistantEpisode) {
-		t.Fatalf(
-			"conversation_extraction = %v, want %s",
-			got,
-			lmeConversationExtractionAssistantEpisode,
-		)
+	if _, ok := ext.Metadata()["conversation_extraction"]; ok {
+		t.Fatal("configured extractor exposes behavioral metadata")
+	}
+	wrapper := ext.(*lmeTracingExtractor)
+	if wrapper.UnwrapMemoryExtractor() == nil {
+		t.Fatal("tracing extractor did not expose its wrapped extractor")
 	}
 }
 
@@ -101,13 +104,13 @@ func TestParseLMEAutoUpdatePolicy(t *testing.T) {
 	tests := []struct {
 		name    string
 		raw     string
-		want    extractor.UpdatePolicy
+		want    lmeAutoUpdatePolicy
 		wantErr bool
 	}{
-		{name: "empty defaults to merge similar", want: extractor.UpdatePolicyMergeSimilar},
-		{name: "merge similar", raw: "merge_similar", want: extractor.UpdatePolicyMergeSimilar},
-		{name: "preserve history", raw: " PRESERVE_HISTORY ", want: extractor.UpdatePolicyPreserveHistory},
-		{name: "append only", raw: "append_only", want: extractor.UpdatePolicyAppendOnly},
+		{name: "empty defaults to merge similar", want: lmeAutoUpdatePolicyMergeSimilar},
+		{name: "merge similar", raw: "merge_similar", want: lmeAutoUpdatePolicyMergeSimilar},
+		{name: "preserve history", raw: " PRESERVE_HISTORY ", want: lmeAutoUpdatePolicyPreserveHistory},
+		{name: "append only", raw: "append_only", want: lmeAutoUpdatePolicyAppendOnly},
 		{name: "invalid", raw: "conservative", wantErr: true},
 	}
 	for _, test := range tests {
@@ -341,14 +344,14 @@ func (s *recordingResidualClearMemoryService) DeleteMemory(
 
 func TestSetLMERunMetadataReportsAutoUpdatePolicy(t *testing.T) {
 	result := newLMERunResult("auto", "pgvector", lmeRunConfig{
-		AutoUpdatePolicy:       extractor.UpdatePolicyPreserveHistory,
+		AutoUpdatePolicy:       lmeAutoUpdatePolicyPreserveHistory,
 		ConversationExtraction: string(lmeConversationExtractionAssistantEpisode),
 	}, 1)
 	result.Summary.CompletedCases = 1
 	setLMERunMetadata(result, &lmeAutoEvaluator{})
 
-	if got := result.Metadata.MemoryBuild["update_policy"]; got != extractor.UpdatePolicyPreserveHistory {
-		t.Fatalf("update_policy = %v, want %s", got, extractor.UpdatePolicyPreserveHistory)
+	if got := result.Metadata.MemoryBuild["update_policy"]; got != lmeAutoUpdatePolicyPreserveHistory {
+		t.Fatalf("update_policy = %v, want %s", got, lmeAutoUpdatePolicyPreserveHistory)
 	}
 	if got := result.Metadata.MemoryBuild["conversation_extraction"]; got !=
 		string(lmeConversationExtractionAssistantEpisode) {
@@ -378,7 +381,7 @@ func TestSetLMERunMetadataReportsAutoUpdatePolicy(t *testing.T) {
 
 func TestSetLMERunMetadataOmitsAutoPolicyForMem0(t *testing.T) {
 	result := newLMERunResult("mem0_oss", "mem0_oss", lmeRunConfig{
-		AutoUpdatePolicy: extractor.UpdatePolicyMergeSimilar,
+		AutoUpdatePolicy: lmeAutoUpdatePolicyMergeSimilar,
 	}, 1)
 	result.Summary.CompletedCases = 1
 	setLMERunMetadata(result, &lmeMem0OSSEvaluator{})

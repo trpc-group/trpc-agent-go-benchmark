@@ -301,6 +301,9 @@ func TestTracingExtractorDelegatesConfiguration(t *testing.T) {
 	if got := wrapper.Metadata()["name"]; got != "test" {
 		t.Fatalf("Metadata()[name] = %v", got)
 	}
+	if got := wrapper.UnwrapMemoryExtractor(); got != inner {
+		t.Fatalf("UnwrapMemoryExtractor() = %T, want original extractor", got)
+	}
 }
 
 func TestMemoryFingerprintIsDeterministic(t *testing.T) {

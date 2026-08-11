@@ -72,7 +72,11 @@ jobs:
           import subprocess
 
           source_root = "trpc.group/trpc-go/trpc-agent-go"
-          expected_remote_root = "github.com/trpc-group/trpc-agent-go"
+          expected_remote_root = "github.com/print-happy/trpc-agent-go"
+          expected_version = "v0.0.0-20260716032212-1b3adb2f4bb8"
+          allowed_remote_roots = {
+              expected_remote_root,
+          }
           module = json.loads(
               subprocess.check_output(["go", "mod", "edit", "-json"])
           )
@@ -84,41 +88,40 @@ jobs:
           ]
           if not pins:
               raise SystemExit("no trpc-agent-go dependency pins found")
-
-          root_pin = next((
-              pin for pin in pins if pin["Old"]["Path"] == source_root
-          ), None)
-          if root_pin is None:
-              raise SystemExit("root trpc-agent-go dependency pin is missing")
-          expected_version = root_pin["New"].get("Version", "")
-          if not expected_version:
-              raise SystemExit("root trpc-agent-go dependency is not pinned")
-
+          pinned_roots = set()
           for pin in pins:
-              old_path = pin["Old"]["Path"]
               path = pin["New"].get("Path", "")
               version = pin["New"].get("Version", "")
-              suffix = old_path[len(source_root):]
-              expected_path = expected_remote_root + suffix
-              if path != expected_path:
-                  raise SystemExit(
-                      f"unexpected trpc-agent-go replacement for {old_path}: "
-                      f"{path}, want {expected_path}"
-                  )
-              if version != expected_version:
-                  raise SystemExit(
-                      f"trpc-agent-go replacement {path} uses {version}, "
-                      f"want {expected_version}"
-                  )
-          if not expected_version.startswith("v0.0.0-"):
+              root = next((
+                  candidate
+                  for candidate in allowed_remote_roots
+                  if path == candidate or path.startswith(candidate + "/")
+              ), None)
+              if root is None:
+                  raise SystemExit(f"non-remote trpc-agent-go replacement: {path}")
+              pinned_roots.add(root)
+              if not version:
+                  raise SystemExit(f"unpinned trpc-agent-go replacement: {path}")
+          if len(pinned_roots) != 1:
               raise SystemExit(
-                  "trpc-agent-go dependencies must use an immutable "
-                  f"pseudo-version, got {expected_version}"
+                  "trpc-agent-go replacements use different repositories: "
+                  + ", ".join(sorted(pinned_roots))
               )
-          print(
-              "trpc-agent-go dependency pin:",
-              expected_remote_root + "@" + expected_version,
-          )
+          versions = {pin["New"]["Version"] for pin in pins}
+          if len(versions) != 1:
+              raise SystemExit(
+                  "trpc-agent-go replacements use different versions: "
+                  + ", ".join(sorted(versions))
+              )
+          version = versions.pop()
+          if pinned_roots != {expected_remote_root} or version != expected_version:
+              raise SystemExit(
+                  "unexpected trpc-agent-go dependency pin: "
+                  + ", ".join(sorted(pinned_roots))
+                  + "@"
+                  + version
+              )
+          print("trpc-agent-go dependency pin:", version)
           PY
       - name: Verify module dependencies
         working-directory: memory/trpc-agent-go-impl

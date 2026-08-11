@@ -2,14 +2,14 @@
 
 ## LongMemEval
 
-> **Development snapshots.** Sections 1-5 document the fixed 50-case turn-pair
-> run `turn_pair_full50_parallel4_20260717`, including case-local recovery of
+> **Fixed development-set results.** Sections 1-5 document the fixed 50-case
+> turn-pair run `turn_pair_full50_parallel4_20260717`, including case-local recovery of
 > transient infrastructure failures. Section 6 adds the final conditional
-> two-stage assistant-episode extraction diagnostic. Earlier LongMemEval
+> two-stage assistant-episode extraction comparison. Earlier LongMemEval
 > numbers used different build protocols or result governance and have been
-> removed. These snapshots are useful for development comparison, but their
-> legacy case-ID manifest and archived artifact locators did not pass the
-> publication gate, so neither is an official holdout baseline.
+> removed. The reported rows are valid, directly comparable results for this
+> frozen development manifest and protocol. Because the legacy manifest does
+> not define a seeded blind split, they are not a blind holdout baseline.
 
 Policy labels in this report use the current names. This is a documentation
 relabeling of behaviorally identical historical runs; the metrics and raw
@@ -118,8 +118,8 @@ population reported above.
    28% to 82%. Every Merge Similar success is also correct under Preserve
    History; Preserve History adds 27 correct cases without a regression unique
    to Merge Similar. Its completed cases retain about 5.2 times as many final
-   entries per case as Merge Similar, showing how strongly Merge Similar
-   reconciliation reduces the stored evidence set.
+   entries per case as Merge Similar, showing how strongly the legacy
+   reconciliation policy reduces the stored evidence set.
 2. **Preserve History and Append Only tie on Accuracy but preserve different
    evidence.** They agree on 39 correct cases and each has two unique successes.
    Preserve History is stronger on multi-session and single-session-user
@@ -129,15 +129,14 @@ population reported above.
    History agree on 38 correct cases; Mem0 has four unique successes and
    Preserve History has three. Mem0 is strongest on assistant-memory questions,
    while Preserve History leads multi-session and temporal Accuracy.
-4. **The sample is not an official holdout.** Its manifest uses the legacy
-   `case_ids`-only schema and records neither a seeded selection method nor a
-   dev/holdout split. Archived artifact paths also fail current publication
-   validation. Case-local recovery removes transient infrastructure failures
-   but does not make this legacy sample an official holdout.
+4. **The comparison is scoped to a fixed development set.** Its legacy
+   `case_ids`-only manifest fixes the exact sample but records neither a seeded
+   selection method nor a blind dev/holdout split. This limits generalization
+   claims, but does not invalidate comparisons among rows using this manifest.
 
 ### 6. Policy and Assistant-Episode Matrix
 
-This diagnostic compares the three Auto update policies with
+This section compares the three Auto update policies with
 assistant-episode extraction disabled and enabled. The enabled rows use the
 final conditional two-stage extractor: ordinary user-memory extraction runs
 first, and a bounded assistant-result extraction request is issued only for a
@@ -163,19 +162,37 @@ complete experimental configuration.
 
 #### Complete-Build Memory Inventory
 
-| Policy / backend | Assistant extraction | Active memories | Complete builds |
-| --- | --- | ---: | ---: |
-| Merge Similar | Disabled | 2,955 | 50/50 |
-| Merge Similar | Enabled | 6,011 | 50/50 |
-| Preserve History | Disabled | 15,353 | 50/50 |
-| Preserve History | Enabled | 17,696 | 49/50 |
-| Append Only | Disabled | 16,280 | 50/50 |
-| Append Only | Enabled | 18,728 | 49/50 |
-| Mem0 OSS | Native | 28,041 | 50/50 |
+| Policy / backend | Assistant extraction | Active memories | Complete builds | Memories / complete build |
+| --- | --- | ---: | ---: | ---: |
+| Merge Similar | Disabled | 2,955 | 50/50 | 59.10 |
+| Merge Similar | Enabled | 6,011 | 50/50 | 120.22 |
+| Preserve History | Disabled | 15,353 | 50/50 | 307.06 |
+| Preserve History | Enabled | 17,696 | 49/50 | 361.14 |
+| Append Only | Disabled | 16,280 | 50/50 | 325.60 |
+| Append Only | Enabled | 18,728 | 49/50 | 382.20 |
+| Mem0 OSS | Native | 28,041 | 50/50 | 560.82 |
 
 The inventory counts only the final successful persistence snapshot for each
 fully built case. A failed Preserve History attempt left 357 partial entries
 and a failed Append Only attempt left 162; neither is included.
+
+#### Cost
+
+| Policy / backend | Assistant extraction | Build LLM calls | Build LLM tokens | QA+judge calls | QA+judge tokens | Build embedding requests | Remote embedding calls | Cache hits |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Merge Similar | Disabled | 12,281 | 96,999,123 | 240 | 2,048,381 | 37,907 | 26,074 | 11,833 |
+| Merge Similar | Enabled | 15,647 | 83,758,408 | 201 | 1,619,884 | 40,254 | 28,737 | 11,517 |
+| Preserve History | Disabled | 12,336 | 95,086,050 | 163 | 434,852 | 28,028 | 27,581 | 447 |
+| Preserve History | Enabled | 15,602 | 86,783,156 | 153 | 399,363 | 30,579 | 30,122 | 457 |
+| Append Only | Disabled | 12,411 | 84,701,403 | 168 | 467,266 | 28,860 | 28,401 | 459 |
+| Append Only | Enabled | 15,496 | 76,326,984 | 153 | 406,198 | 31,044 | 30,583 | 461 |
+| Mem0 OSS | Native | 12,359 | 113,205,317* | 171 | 410,912 | 23,044 | 23,044 | 0 |
+
+Costs include requests made by failed or incomplete attempts because those
+requests were actually issued. Memory inventory follows a different rule: it
+includes only the final successful persistence snapshot from each complete
+build. `*` Mem0 reports `tokens_known=false`, so its token total is observable
+proxy accounting rather than complete provider usage.
 
 #### Interpretation and Limits
 
@@ -186,10 +203,9 @@ and a failed Append Only attempt left 162; neither is included.
   Accuracy.
 - Mem0 remains a native external baseline and is not configured with the
   Auto-only assistant option.
-- These are development diagnostics. The manifest uses the legacy
-  `case_ids`-only schema, the assistant-enabled archives did not pass the
-  current clean-worktree publication gate, and two assistant-enabled rows have
-  one incomplete memory build each.
+- These rows use the same fixed development manifest rather than a blind
+  holdout. Two assistant-enabled rows have one incomplete memory build each;
+  those failures remain in the fixed denominator and score as incorrect.
 
 ## Evaluating Long-Term Conversational Memory on LoCoMo Benchmark
 

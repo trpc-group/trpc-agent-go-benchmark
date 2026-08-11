@@ -25,8 +25,6 @@ CLAUDE.md
 *test*.sh
 *test*.exp
 *test*.py
-!memory/adapter/test_longmemeval_report.py
-!memory/adapter/test_openai_split_proxy.py
 *.db
 .codex
 pnpm-lock.yaml

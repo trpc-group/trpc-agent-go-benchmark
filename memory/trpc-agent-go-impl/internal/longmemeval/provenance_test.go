@@ -22,7 +22,6 @@ import (
 	"time"
 
 	"trpc.group/trpc-go/trpc-agent-go-benchmark/memory/trpc-agent-go-impl/evaluation/dataset"
-	"trpc.group/trpc-go/trpc-agent-go/memory/extractor"
 )
 
 const (
@@ -215,19 +214,19 @@ func TestAutoUpdatePolicyIsExplicitTreatmentOutsideComparisonControls(t *testing
 	mergeSimilar := &lmeRunManifest{
 		Run: lmeRunIdentity{
 			Scenario:         "auto",
-			AutoUpdatePolicy: string(extractor.UpdatePolicyMergeSimilar),
+			AutoUpdatePolicy: string(lmeAutoUpdatePolicyMergeSimilar),
 		},
 		Config: map[string]any{
-			"auto_update_policy": string(extractor.UpdatePolicyMergeSimilar),
+			"auto_update_policy": string(lmeAutoUpdatePolicyMergeSimilar),
 		},
 	}
 	preserveHistory := &lmeRunManifest{
 		Run: lmeRunIdentity{
 			Scenario:         "auto",
-			AutoUpdatePolicy: string(extractor.UpdatePolicyPreserveHistory),
+			AutoUpdatePolicy: string(lmeAutoUpdatePolicyPreserveHistory),
 		},
 		Config: map[string]any{
-			"auto_update_policy": string(extractor.UpdatePolicyPreserveHistory),
+			"auto_update_policy": string(lmeAutoUpdatePolicyPreserveHistory),
 		},
 	}
 	mergeSimilarDigest, err := calculateLMERunCompatibilityDigest(mergeSimilar)
@@ -852,7 +851,7 @@ func newLMEProvenanceFixture(t *testing.T) *lmeProvenanceFixture {
 		JudgeMaxTokens:               10240,
 		AutoExtractionWait:           10 * time.Minute,
 		AutoMemoryTable:              "memory_eval_auto_test",
-		AutoUpdatePolicy:             extractor.UpdatePolicyMergeSimilar,
+		AutoUpdatePolicy:             lmeAutoUpdatePolicyMergeSimilar,
 		ConversationExtraction:       string(lmeConversationExtractionDisabled),
 		EmbeddingCacheEnabled:        true,
 		EmbeddingCachePath:           filepath.Join(root, "cache"),

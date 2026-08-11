@@ -263,7 +263,7 @@ type memoryServiceOptions struct {
 	memoryJobTimeout       time.Duration
 	tableName              string
 	vectorTopK             int
-	autoUpdatePolicy       extractor.UpdatePolicy
+	autoUpdatePolicy       lmeAutoUpdatePolicy
 	conversationExtraction lmeConversationExtraction
 }
 
@@ -338,7 +338,7 @@ func createAutoMemoryService(opts memoryServiceOptions) (memory.Service, error) 
 }
 
 func newLMEExtractor(opts memoryServiceOptions) extractor.MemoryExtractor {
-	policy := opts.autoUpdatePolicy
+	policy := extractor.UpdatePolicy(opts.autoUpdatePolicy)
 	extractorOpts := []extractor.Option{
 		extractor.WithUpdatePolicy(policy),
 	}

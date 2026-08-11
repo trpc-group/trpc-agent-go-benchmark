@@ -26,7 +26,6 @@ import (
 	"trpc.group/trpc-go/trpc-agent-go-benchmark/memory/trpc-agent-go-impl/evaluation/dataset"
 	"trpc.group/trpc-go/trpc-agent-go-benchmark/memory/trpc-agent-go-impl/evaluation/metrics"
 	"trpc.group/trpc-go/trpc-agent-go-benchmark/memory/trpc-agent-go-impl/evaluation/scenarios"
-	"trpc.group/trpc-go/trpc-agent-go/memory/extractor"
 )
 
 func TestReadLMEBoundedResultFile(t *testing.T) {
@@ -891,7 +890,7 @@ func testLMEResult(ids []string, statuses []lmeCaseStatus) *lmeRunResult {
 		EmbedModelName:               "test-embedding",
 		LLMEndpointFingerprint:       "provider-default",
 		EmbeddingEndpointFingerprint: "provider-default",
-		AutoUpdatePolicy:             extractor.UpdatePolicyMergeSimilar,
+		AutoUpdatePolicy:             lmeAutoUpdatePolicyMergeSimilar,
 		ConversationExtraction:       string(lmeConversationExtractionDisabled),
 		RetrievalTopK:                lmeRetrievalTopK,
 		TraceContentMode:             lmeTraceContentHash,

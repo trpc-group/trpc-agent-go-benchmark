@@ -1194,6 +1194,10 @@ func (e *lmeTracingExtractor) Metadata() map[string]any {
 	return e.inner.Metadata()
 }
 
+func (e *lmeTracingExtractor) UnwrapMemoryExtractor() extractor.MemoryExtractor {
+	return e.inner
+}
+
 func (e *lmeTracingExtractor) UpdatePolicy() extractor.UpdatePolicy {
 	return e.updatePolicy
 }

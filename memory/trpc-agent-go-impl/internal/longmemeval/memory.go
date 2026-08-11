@@ -21,7 +21,6 @@ import (
 	"trpc.group/trpc-go/trpc-agent-go-benchmark/memory/trpc-agent-go-impl/evaluation/dataset"
 	"trpc.group/trpc-go/trpc-agent-go-benchmark/memory/trpc-agent-go-impl/evaluation/scenarios"
 	"trpc.group/trpc-go/trpc-agent-go-benchmark/memory/trpc-agent-go-impl/internal/benchruntime"
-	"trpc.group/trpc-go/trpc-agent-go/memory/extractor"
 	"trpc.group/trpc-go/trpc-agent-go/model"
 )
 
@@ -317,18 +316,18 @@ func completeLMEMem0Preflight(cfg *lmeRunConfig) error {
 	return nil
 }
 
-func parseLMEAutoUpdatePolicy(raw string) (extractor.UpdatePolicy, error) {
+func parseLMEAutoUpdatePolicy(raw string) (lmeAutoUpdatePolicy, error) {
 	normalized := strings.ToLower(strings.TrimSpace(raw))
 	if normalized == "" {
-		return extractor.UpdatePolicyMergeSimilar, nil
+		return lmeAutoUpdatePolicyMergeSimilar, nil
 	}
 	switch normalized {
-	case string(extractor.UpdatePolicyMergeSimilar):
-		return extractor.UpdatePolicyMergeSimilar, nil
-	case string(extractor.UpdatePolicyPreserveHistory):
-		return extractor.UpdatePolicyPreserveHistory, nil
-	case string(extractor.UpdatePolicyAppendOnly):
-		return extractor.UpdatePolicyAppendOnly, nil
+	case string(lmeAutoUpdatePolicyMergeSimilar):
+		return lmeAutoUpdatePolicyMergeSimilar, nil
+	case string(lmeAutoUpdatePolicyPreserveHistory):
+		return lmeAutoUpdatePolicyPreserveHistory, nil
+	case string(lmeAutoUpdatePolicyAppendOnly):
+		return lmeAutoUpdatePolicyAppendOnly, nil
 	default:
 		return "", fmt.Errorf(
 			"invalid LongMemEval auto update policy %q: expected merge_similar, preserve_history, or append_only",

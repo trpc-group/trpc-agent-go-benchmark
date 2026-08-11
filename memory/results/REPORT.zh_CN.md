@@ -2,13 +2,13 @@
 
 ## LongMemEval
 
-> **开发阶段评测快照。** 第 1-5 节记录固定 50-case turn-pair 评测
+> **固定开发集评测结果。** 第 1-5 节记录固定 50-case turn-pair 评测
 > `turn_pair_full50_parallel4_20260717`，并包含对瞬时基础设施失败的
 > case-local 恢复；第 6 节记录最终条件式两阶段 assistant-episode 提取
-> 诊断实验。更早的 LongMemEval 结果使用了不同的建库协议或结果治理
-> 方式，现已从文档删除。这些结果可用于开发阶段比较，但 legacy case-ID
-> manifest 和归档后的 artifact locator 未通过 publication gate，因此都
-> 不能称为正式 holdout baseline。
+> 对比。更早的 LongMemEval 结果使用了不同的建库协议或结果治理方式，
+> 现已从文档删除。这里各行是在同一份冻结开发集 manifest 和相同协议下
+> 得到的有效、可直接比较结果；由于 legacy manifest 没有定义 seeded blind
+> split，因此不能将其表述为盲测 holdout baseline。
 
 本报告已统一使用当前 policy 名称。这只是对行为完全相同的历史运行进行文档
 重命名，指标和原始 artifact 均未重新生成。
@@ -109,7 +109,7 @@ provider usage。共享 cache 和并发运行也意味着远程调用量与 wall
    仍然正确，Preserve History 额外答对 27 个 case，且没有仅在 Merge Similar 中
    答对的回退 case。
    在完整建库 case 中，Preserve History 每 case 最终保留的条目约为 Merge Similar 的
-   5.2 倍，说明 Merge Similar reconcile policy 会显著压缩最终证据集合。
+   5.2 倍，说明 legacy reconcile policy 会显著压缩最终证据集合。
 2. **Preserve History 与 Append Only 的 Accuracy 相同，但保留的信息不同。** 两者共同
    答对 39 个 case，各有两个独有正确 case。Preserve History 在 multi-session 和
    single-session-user 上更强；Append Only 在 knowledge-update、assistant
@@ -118,10 +118,9 @@ provider usage。共享 cache 和并发运行也意味着远程调用量与 wall
    共同答对 38 个 case；Mem0 有四个独有正确 case，Preserve History 有三个。Mem0 在
    assistant-memory 问题上最强，Preserve History 则在 multi-session 和 temporal
    Accuracy 上领先。
-4. **该样本不是正式 holdout。** Manifest 仍是 legacy `case_ids`-only
-   schema，没有记录 seeded selection method 或 dev/holdout split；归档后的
-   artifact path 也未通过当前 publication validation。Case-local 恢复消除
-   了瞬时基础设施失败，但不会让这份 legacy 样本自动成为正式 holdout。
+4. **对比结论仅适用于固定开发集。** Legacy `case_ids`-only manifest 固定了
+   精确样本，但没有记录 seeded selection method 或 blind dev/holdout split。
+   这会限制结果的泛化范围，但不影响同一 manifest 下各行之间的公平比较。
 
 ### 6. Policy 与 Assistant-Episode 矩阵
 
@@ -149,19 +148,36 @@ assistant-result 提取。Mem0 保持其原生提取行为。
 
 #### 完整建库 Memory 统计
 
-| Policy / 后端 | Assistant 提取 | Active memories | 完整建库 |
-| --- | --- | ---: | ---: |
-| Merge Similar | 关闭 | 2,955 | 50/50 |
-| Merge Similar | 开启 | 6,011 | 50/50 |
-| Preserve History | 关闭 | 15,353 | 50/50 |
-| Preserve History | 开启 | 17,696 | 49/50 |
-| Append Only | 关闭 | 16,280 | 50/50 |
-| Append Only | 开启 | 18,728 | 49/50 |
-| Mem0 OSS | 原生 | 28,041 | 50/50 |
+| Policy / 后端 | Assistant 提取 | Active memories | 完整建库 | 每个完整建库 Case 的条目数 |
+| --- | --- | ---: | ---: | ---: |
+| Merge Similar | 关闭 | 2,955 | 50/50 | 59.10 |
+| Merge Similar | 开启 | 6,011 | 50/50 | 120.22 |
+| Preserve History | 关闭 | 15,353 | 50/50 | 307.06 |
+| Preserve History | 开启 | 17,696 | 49/50 | 361.14 |
+| Append Only | 关闭 | 16,280 | 50/50 | 325.60 |
+| Append Only | 开启 | 18,728 | 49/50 | 382.20 |
+| Mem0 OSS | 原生 | 28,041 | 50/50 | 560.82 |
 
 统计只计入每个完整建库 case 最后一次成功的 persistence snapshot。
 Preserve History 的失败 attempt 留下 357 条部分数据，Append Only 的失败
 attempt 留下 162 条，均未计入。
+
+#### 成本
+
+| Policy / 后端 | Assistant 提取 | Build LLM calls | Build LLM tokens | QA+judge calls | QA+judge tokens | Build embedding requests | 远程 embedding calls | Cache hits |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Merge Similar | 关闭 | 12,281 | 96,999,123 | 240 | 2,048,381 | 37,907 | 26,074 | 11,833 |
+| Merge Similar | 开启 | 15,647 | 83,758,408 | 201 | 1,619,884 | 40,254 | 28,737 | 11,517 |
+| Preserve History | 关闭 | 12,336 | 95,086,050 | 163 | 434,852 | 28,028 | 27,581 | 447 |
+| Preserve History | 开启 | 15,602 | 86,783,156 | 153 | 399,363 | 30,579 | 30,122 | 457 |
+| Append Only | 关闭 | 12,411 | 84,701,403 | 168 | 467,266 | 28,860 | 28,401 | 459 |
+| Append Only | 开启 | 15,496 | 76,326,984 | 153 | 406,198 | 31,044 | 30,583 | 461 |
+| Mem0 OSS | 原生 | 12,359 | 113,205,317* | 171 | 410,912 | 23,044 | 23,044 | 0 |
+
+成本包含失败或未完整建库 attempt 已经实际发出的请求。Memory inventory
+采用不同口径，只统计每个完整建库 case 最后一次成功的 persistence
+snapshot。`*` Mem0 的 `tokens_known=false`，因此 token 总数只是 proxy
+可观测计数，不代表完整的 provider usage。
 
 #### 结论与限制
 
@@ -170,9 +186,9 @@ attempt 留下 162 条，均未计入。
 - Append Only + assistant 的词面重合指标最高；Preserve History +
   assistant 的 Accuracy 最高。
 - Mem0 是原生外部 baseline，不启用 Auto 专属 assistant 选项。
-- 这些结果仍是开发诊断：manifest 使用 legacy `case_ids`-only schema，
-  assistant 开启的归档没有通过当前 clean-worktree publication gate，并且
-  其中两行各有一个未完成的 memory build。
+- 这些结果使用同一份固定开发集 manifest，而不是盲测 holdout。其中两条
+  assistant 开启行各有一个未完成的 memory build；这些失败仍保留在固定
+  分母中并记为错误。
 
 ## 基于 LoCoMo 基准的长期对话记忆评估
 

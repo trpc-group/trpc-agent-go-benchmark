@@ -628,9 +628,9 @@ selection method, seed, resolved quotas, case types, exact order, semantic
 digest of the declared question-type candidate pool, and self-excluding
 manifest digest. Existing manifests that contain only `case_ids`, including
 frozen 50-case development/regression manifests, remain readable and are not
-rewritten, but they are diagnostic only and cannot pass the maintained
-publication gate. Likewise, `legacy-first` and sampled manifests without an
-explicit `dev` or `holdout` split are ineligible for maintained comparison.
+rewritten. They support reproducible fixed-set comparisons but do not establish
+a seeded blind holdout. Likewise, `legacy-first` and sampled manifests without
+an explicit `dev` or `holdout` split must not be described as blind holdouts.
 Smoke tests must use a separate rich 2-case manifest with its own digest;
 `-max-tasks 2` cannot be used to truncate a maintained 50- or 70-case
 manifest.

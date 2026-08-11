@@ -20,7 +20,6 @@ import (
 	"trpc.group/trpc-go/trpc-agent-go-benchmark/memory/trpc-agent-go-impl/evaluation/metrics"
 	"trpc.group/trpc-go/trpc-agent-go-benchmark/memory/trpc-agent-go-impl/evaluation/scenarios"
 	"trpc.group/trpc-go/trpc-agent-go/memory"
-	"trpc.group/trpc-go/trpc-agent-go/memory/extractor"
 	"trpc.group/trpc-go/trpc-agent-go/model"
 )
 
@@ -42,6 +41,14 @@ const (
 	lmeMem0TemporalContext           = "custom_prompt_reference_date"
 	lmeRetrievalTopK                 = 20
 	lmeMemoryReadLimit               = 10000
+)
+
+type lmeAutoUpdatePolicy string
+
+const (
+	lmeAutoUpdatePolicyMergeSimilar    lmeAutoUpdatePolicy = "merge_similar"
+	lmeAutoUpdatePolicyPreserveHistory lmeAutoUpdatePolicy = "preserve_history"
+	lmeAutoUpdatePolicyAppendOnly      lmeAutoUpdatePolicy = "append_only"
 )
 
 type lmeConversationExtraction string
@@ -112,52 +119,52 @@ type Config struct {
 }
 
 type lmeRunConfig struct {
-	ModelName                     string                 `json:"model_name"`
-	EmbedModelName                string                 `json:"embed_model_name,omitempty"`
-	LLMEndpointFingerprint        string                 `json:"llm_endpoint_fingerprint,omitempty"`
-	EmbeddingEndpointFingerprint  string                 `json:"embedding_endpoint_fingerprint,omitempty"`
-	DatasetPath                   string                 `json:"dataset_path"`
-	ManifestPath                  string                 `json:"manifest_path,omitempty"`
-	ReplayRoot                    string                 `json:"replay_root,omitempty"`
-	BuildPlanRoot                 string                 `json:"build_plan_root,omitempty"`
-	ReplayDigest                  string                 `json:"replay_digest,omitempty"`
-	BuildPlanDigest               string                 `json:"build_plan_digest,omitempty"`
-	BuildMaxTokens                int                    `json:"build_max_tokens"`
-	BuildTokenizer                string                 `json:"build_tokenizer,omitempty"`
-	BuildTokenizerModel           string                 `json:"build_tokenizer_model,omitempty"`
-	BuildTokenizerEncoding        string                 `json:"build_tokenizer_encoding,omitempty"`
-	BuildStats                    lmeBuildStats          `json:"build_stats"`
-	QuestionTypes                 []string               `json:"question_types,omitempty"`
-	MaxTasks                      int                    `json:"max_tasks,omitempty"`
-	RetrievalTopK                 int                    `json:"retrieval_top_k"`
-	MaxRetries                    int                    `json:"max_retries"`
-	AnswerMaxTokens               int                    `json:"answer_max_tokens"`
-	JudgeMaxTokens                int                    `json:"judge_max_tokens"`
-	AutoExtractionWait            time.Duration          `json:"auto_extraction_wait"`
-	AutoQAOnly                    bool                   `json:"auto_qa_only,omitempty"`
-	AutoMemoryTable               string                 `json:"auto_memory_table,omitempty"`
-	AutoUpdatePolicy              extractor.UpdatePolicy `json:"auto_update_policy"`
-	ConversationExtraction        string                 `json:"conversation_extraction"`
-	EmbeddingCacheEnabled         bool                   `json:"embedding_cache_enabled,omitempty"`
-	EmbeddingCachePath            string                 `json:"embedding_cache_path,omitempty"`
-	TransportRetryEnabled         bool                   `json:"transport_retry_enabled"`
-	TransportRetryStrategy        string                 `json:"transport_retry_strategy"`
-	FullQALog                     bool                   `json:"full_qa_log,omitempty"`
-	Mem0Host                      string                 `json:"mem0_host,omitempty"`
-	Mem0APIKeySet                 bool                   `json:"mem0_api_key_set,omitempty"`
-	Mem0Version                   string                 `json:"mem0_version,omitempty"`
-	Mem0Revision                  string                 `json:"mem0_revision,omitempty"`
-	Mem0PreflightPath             string                 `json:"mem0_preflight_path,omitempty"`
-	Mem0PreflightDigest           string                 `json:"mem0_preflight_digest,omitempty"`
-	Mem0EnvironmentLockDigest     string                 `json:"mem0_environment_lock_digest,omitempty"`
-	Mem0RuntimeLLMModel           string                 `json:"mem0_runtime_llm_model,omitempty"`
-	Mem0RuntimeEmbedModel         string                 `json:"mem0_runtime_embed_model,omitempty"`
-	Mem0ObservationPromptVerified bool                   `json:"mem0_observation_prompt_verified,omitempty"`
-	Mem0IngestTimeout             time.Duration          `json:"mem0_ingest_timeout,omitempty"`
-	Mem0ProxyUsageLog             string                 `json:"mem0_proxy_usage_log,omitempty"`
-	Mem0ProxyRunID                string                 `json:"mem0_proxy_run_id,omitempty"`
-	TraceContentMode              lmeTraceContentMode    `json:"trace_content_mode"`
-	TraceGzip                     bool                   `json:"trace_gzip,omitempty"`
+	ModelName                     string              `json:"model_name"`
+	EmbedModelName                string              `json:"embed_model_name,omitempty"`
+	LLMEndpointFingerprint        string              `json:"llm_endpoint_fingerprint,omitempty"`
+	EmbeddingEndpointFingerprint  string              `json:"embedding_endpoint_fingerprint,omitempty"`
+	DatasetPath                   string              `json:"dataset_path"`
+	ManifestPath                  string              `json:"manifest_path,omitempty"`
+	ReplayRoot                    string              `json:"replay_root,omitempty"`
+	BuildPlanRoot                 string              `json:"build_plan_root,omitempty"`
+	ReplayDigest                  string              `json:"replay_digest,omitempty"`
+	BuildPlanDigest               string              `json:"build_plan_digest,omitempty"`
+	BuildMaxTokens                int                 `json:"build_max_tokens"`
+	BuildTokenizer                string              `json:"build_tokenizer,omitempty"`
+	BuildTokenizerModel           string              `json:"build_tokenizer_model,omitempty"`
+	BuildTokenizerEncoding        string              `json:"build_tokenizer_encoding,omitempty"`
+	BuildStats                    lmeBuildStats       `json:"build_stats"`
+	QuestionTypes                 []string            `json:"question_types,omitempty"`
+	MaxTasks                      int                 `json:"max_tasks,omitempty"`
+	RetrievalTopK                 int                 `json:"retrieval_top_k"`
+	MaxRetries                    int                 `json:"max_retries"`
+	AnswerMaxTokens               int                 `json:"answer_max_tokens"`
+	JudgeMaxTokens                int                 `json:"judge_max_tokens"`
+	AutoExtractionWait            time.Duration       `json:"auto_extraction_wait"`
+	AutoQAOnly                    bool                `json:"auto_qa_only,omitempty"`
+	AutoMemoryTable               string              `json:"auto_memory_table,omitempty"`
+	AutoUpdatePolicy              lmeAutoUpdatePolicy `json:"auto_update_policy"`
+	ConversationExtraction        string              `json:"conversation_extraction"`
+	EmbeddingCacheEnabled         bool                `json:"embedding_cache_enabled,omitempty"`
+	EmbeddingCachePath            string              `json:"embedding_cache_path,omitempty"`
+	TransportRetryEnabled         bool                `json:"transport_retry_enabled"`
+	TransportRetryStrategy        string              `json:"transport_retry_strategy"`
+	FullQALog                     bool                `json:"full_qa_log,omitempty"`
+	Mem0Host                      string              `json:"mem0_host,omitempty"`
+	Mem0APIKeySet                 bool                `json:"mem0_api_key_set,omitempty"`
+	Mem0Version                   string              `json:"mem0_version,omitempty"`
+	Mem0Revision                  string              `json:"mem0_revision,omitempty"`
+	Mem0PreflightPath             string              `json:"mem0_preflight_path,omitempty"`
+	Mem0PreflightDigest           string              `json:"mem0_preflight_digest,omitempty"`
+	Mem0EnvironmentLockDigest     string              `json:"mem0_environment_lock_digest,omitempty"`
+	Mem0RuntimeLLMModel           string              `json:"mem0_runtime_llm_model,omitempty"`
+	Mem0RuntimeEmbedModel         string              `json:"mem0_runtime_embed_model,omitempty"`
+	Mem0ObservationPromptVerified bool                `json:"mem0_observation_prompt_verified,omitempty"`
+	Mem0IngestTimeout             time.Duration       `json:"mem0_ingest_timeout,omitempty"`
+	Mem0ProxyUsageLog             string              `json:"mem0_proxy_usage_log,omitempty"`
+	Mem0ProxyRunID                string              `json:"mem0_proxy_run_id,omitempty"`
+	TraceContentMode              lmeTraceContentMode `json:"trace_content_mode"`
+	TraceGzip                     bool                `json:"trace_gzip,omitempty"`
 }
 
 type lmeMetadata struct {
