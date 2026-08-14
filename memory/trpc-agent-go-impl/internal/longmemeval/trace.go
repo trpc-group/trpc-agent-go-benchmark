@@ -306,7 +306,7 @@ func lmeSHA256(value string) string {
 	return hex.EncodeToString(digest[:])
 }
 
-const lmeTraceSchemaVersion = "longmemeval.build_trace/v4"
+const lmeTraceSchemaVersion = "longmemeval.build_trace/v1"
 
 type lmeTraceContentMode string
 

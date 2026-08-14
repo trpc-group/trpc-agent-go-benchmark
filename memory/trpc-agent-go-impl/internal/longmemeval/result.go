@@ -32,7 +32,7 @@ const (
 	lmeDefaultJudgeMaxTokens         = 10240
 	lmeDefaultMaxRetries             = 3
 	lmeDefaultBuildMaxTokens         = 7500
-	lmeBuildProtocol                 = "turn-pair"
+	lmeBuildProtocol                 = "turn-pair-fragment"
 	lmeBuildRunnerLifecycle          = "one-runner-per-case"
 	lmeBuildSessionLifecycle         = "source-session-continuous"
 	lmeTemporalReferenceSource       = "build_plan_session_observation_time"
@@ -328,7 +328,7 @@ type lmeMemoryQA struct {
 }
 
 const (
-	lmeResultSchemaVersion       = 2
+	lmeResultSchemaVersion       = 1
 	lmeResultClassMaintained     = "maintained"
 	lmeResultOriginNativeRunner  = "native_runner"
 	lmeTraceArtifactPurpose      = "best-effort-diagnostic"

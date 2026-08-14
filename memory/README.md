@@ -363,7 +363,7 @@ Results are saved in JSON format:
 LongMemEval uses a three-stage benchmark:
 
 1. Build or reuse a fixed manifest and Runner replay artifact.
-2. Derive one immutable, lossless turn-pair build plan from that replay.
+2. Derive one immutable `turn-pair-fragment` build plan from that replay.
 3. Run each memory implementation from the same build plan and answer with
    memory-only QA.
 
@@ -396,14 +396,22 @@ Before starting a run:
 
 Runner replay stores sanitized user/assistant turns. The build plan preserves
 their order and content, groups them into chronological user/assistant pairs,
-and uses the configured tokenizer only to split a pair that exceeds the
-provider context limit. Splitting never drops a turn or truncates its content.
-Sessions that begin with an assistant message preserve that message as a
-singleton pair; the benchmark does not invent an empty user turn. The pair
-protocol is fixed and has no command-line mode switch.
+and uses the configured tokenizer to split only a pair that exceeds the
+provider context limit. Splitting never drops or truncates content, but each
+fragment is a separate Runner call and extraction boundary, so it is not
+semantically identical to one atomic pair. Future results record affected case
+IDs in `fragmented_case_ids`. Sessions that begin with an assistant message
+preserve that message as a singleton pair; the benchmark does not invent an
+empty user turn. The protocol is fixed and has no command-line mode switch.
+
+Manifest, replay, build-plan, run-manifest, result, and trace schemas are
+versioned independently from `v1`. Changing dataset size, case quotas, or the
+number of question types does not require a schema change. A version is bumped
+only when an artifact's structure or semantics changes, and readers reject
+unsupported versions instead of guessing compatibility.
 
 Auto and Mem0 OSS consume the same immutable build-plan artifacts and confirm
-each pair before advancing. One Runner is reused for the complete case. Every
+each fragment before advancing. One Runner is reused for the complete case. Every
 source session keeps its original session ID, all pairs in that source session
 run sequentially through the same Runner session, and a different source
 session starts isolated session history while retaining the same user-level
@@ -443,12 +451,10 @@ memory snapshots through its public API. Reports label this method as
 `heuristic_session_provenance`; it must not be interpreted as definitive proof
 that a particular fact was extracted or reconciled correctly.
 
-The benchmark module currently uses one immutable commit from the contributor
-fork that carries the APIs under review in `trpc-group/trpc-agent-go#2233`.
-Standalone CI verifies the repository, exact pseudo-version, module sums, and
-`go test ./...`. After that root change is merged, the pin must move to the
-corresponding reachable upstream commit in the same benchmark change; local
-filesystem replacements are never accepted for maintained results.
+The benchmark module pins all trpc-agent-go modules to the same reachable
+upstream commit. That commit contains the update-policy, assistant-episode,
+and Mem0 ingestion APIs exercised here. Local filesystem and contributor-fork
+replacements are not accepted for maintained runs.
 
 ### Evaluation Scenarios
 
@@ -495,7 +501,7 @@ The following options are relevant to the Go LongMemEval harness:
 | `-lme-question-types` | empty | Comma-separated LongMemEval question types; empty means all manifest cases |
 | `-lme-manifest` | empty | Fixed case-ID manifest path |
 | `-lme-replay-root` | `<output>/longmemeval/replay` | Shared Runner replay artifact root |
-| `-lme-build-max-tokens` | `7500` | Maximum embedding-model tokens in one lossless turn-pair chunk, leaving headroom below the common 8192-token limit |
+| `-lme-build-max-tokens` | `7500` | Maximum embedding-model tokens in one build fragment, leaving headroom below the common 8192-token limit; an oversized pair creates multiple extraction boundaries |
 | `-lme-build-tokenizer-model` | `-embed-model` | Tokenizer model recorded in the immutable build plan |
 | `-lme-build-tokenizer-encoding` | `cl100k_base` for known OpenAI embedding models | Explicit tiktoken encoding for compatible model aliases |
 | `-lme-auto-qa-only` | `false` | Skip Auto memory build and rerun QA against an existing pgvector table |
@@ -623,29 +629,14 @@ go run ./cmd/longmemeval-manifest \
   -holdout-manifest ../results/lme/manifests/holdout_50.json
 ```
 
-Rich manifests retain the compatibility `case_ids` array and also record the
-selection method, seed, resolved quotas, case types, exact order, semantic
-digest of the declared question-type candidate pool, and self-excluding
-manifest digest. Existing manifests that contain only `case_ids`, including
-frozen 50-case development/regression manifests, remain readable and are not
-rewritten. They support reproducible fixed-set comparisons but do not establish
-a seeded blind holdout. Likewise, `legacy-first` and sampled manifests without
-an explicit `dev` or `holdout` split must not be described as blind holdouts.
-Smoke tests must use a separate rich 2-case manifest with its own digest;
+Manifests record the ordered `case_ids`, selection method, seed, resolved
+quotas, case types, semantic digest of the declared question-type candidate
+pool, and self-excluding manifest digest. Case-ID-only manifests are rejected
+because they cannot establish dataset or selection provenance. Sampled
+manifests without an explicit `dev` or `holdout` split must not be described as
+blind holdouts. Smoke tests must use a separate 2-case manifest with its own digest;
 `-max-tasks 2` cannot be used to truncate a maintained 50- or 70-case
 manifest.
-
-For exact reproduction of old source-order subsets only, opt in to the
-non-default historical method:
-
-```bash
-go run ./cmd/longmemeval-manifest \
-  -dataset ../data/longmemeval-cleaned/longmemeval_s_cleaned.json \
-  -method legacy-first \
-  -types single-session-user \
-  -per-type 2 \
-  -output ../results/lme/manifests/historical_first_2.json
-```
 
 #### 3. Generate the shared Runner replay
 
@@ -759,11 +750,10 @@ python3 adapter/longmemeval_report.py \
   --root results/lme_ssu_v2/full_70/longmemeval
 ```
 
-The main reports compare Auto Merge Similar, Preserve History, and Append Only policies
-with Mem0 OSS. They intentionally contain only the latest fixed 50-case
-turn-pair development snapshot. Earlier LongMemEval result tables have been
-removed because they used different build protocols or result-governance
-contracts. See [`results/REPORT.md`](results/REPORT.md) and
+The main reports compare Auto Merge Similar, Preserve History, and Append Only
+policies with Mem0 OSS. They retain the fixed 50-case development snapshot;
+assistant-enabled rows are historical references because assistant extraction
+changed after those runs. See [`results/REPORT.md`](results/REPORT.md) and
 [`results/REPORT.zh_CN.md`](results/REPORT.zh_CN.md).
 
 ## Verification

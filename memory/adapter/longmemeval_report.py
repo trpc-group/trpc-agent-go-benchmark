@@ -329,7 +329,10 @@ def validate_comparable_case_sets(results: list[ResultView]) -> None:
         if identity.get("effective_top_k") != 20:
             raise ValueError("LongMemEval main report requires effective_top_k=20")
         if identity.get("build_protocol") != _BUILD_PROTOCOL:
-            raise ValueError("LongMemEval main report requires build_protocol=turn-pair")
+            raise ValueError(
+                "LongMemEval main report requires "
+                "build_protocol=turn-pair-fragment"
+            )
     for item in results[1:]:
         if item.case_ids != expected.case_ids:
             raise ValueError(
@@ -611,8 +614,8 @@ def _append_build_audit_section(
         title,
         "",
         "| Result | Protocol | Sessions | Turns | Pairs | Chunks | "
-        "Chunked sessions | Chunked pairs | Split turns |",
-        "| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
+        "Chunked sessions | Chunked pairs | Split turns | Fragmented cases |",
+        "| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |",
     ])
     for item in results:
         build = item.memory_build
@@ -624,7 +627,8 @@ def _append_build_audit_section(
             f"{int(build.get('chunk_count') or 0)} | "
             f"{int(build.get('chunked_session_count') or 0)} | "
             f"{int(build.get('chunked_pair_count') or 0)} | "
-            f"{int(build.get('split_turn_count') or 0)} |"
+            f"{int(build.get('split_turn_count') or 0)} | "
+            f"{', '.join(build.get('fragmented_case_ids') or []) or '-'} |"
         )
     lines.extend([
         "",
@@ -825,8 +829,8 @@ def _append_fairness_section(lines: list[str], zh: bool) -> None:
         lines.append("")
         lines.append("- **`long_context`**：仅作为参考上界复用既有结果，本轮不重跑。")
         lines.append("- **外部系统**：Mem0 OSS 使用其 native memory 能力；memory 表示、抽取策略、向量库和工具暴露方式可能不同。")
-        lines.append("- **统一输入协议**：可比较结果必须使用相同 dataset、manifest、canonical replay、turn-pair build plan、模型、tokenizer 与 `top-k=20`；报告会拒绝混用。")
-        lines.append("- **构建与时间**：每个 session 按顺序拆成 user/assistant pair；数据中已有的 leading assistant 会作为 singleton pair 原样保留。超过模型限制的 pair 会无损分块。每个分块通过公开的 `runner.Run` 执行；benchmark 在进入 memory builder 前校验消息并设置确定性事件时间。Auto 通过公开的 extractor reference-date capability 接收原始 session 日期；Mem0 通过官方 `POST /memories` 的 `prompt` 字段接收同一日期，作为 extraction custom instructions。日期不会被加入消息正文。")
+        lines.append("- **统一输入协议**：可比较结果必须使用相同 dataset、manifest、canonical replay、turn-pair-fragment build plan、模型、tokenizer 与 `top-k=20`；报告会拒绝混用。")
+        lines.append("- **构建与时间**：每个 session 按顺序拆成 user/assistant pair；数据中已有的 leading assistant 会作为 singleton pair 原样保留。超过模型限制的 pair 会保持内容无损地分块，但每个 fragment 都是独立的 `runner.Run` 和 extraction 边界，报告会列出受影响的 case。Benchmark 在进入 memory builder 前校验消息并设置确定性事件时间。Auto 通过公开的 extractor reference-date capability 接收原始 session 日期；Mem0 通过官方 `POST /memories` 的 `prompt` 字段接收同一日期，作为 extraction custom instructions。日期不会被加入消息正文。")
         lines.append("- **Mem0 环境校验**：正式 Mem0 结果必须关联成功的 sanitized preflight；其源码 commit、版本、LLM、embedding、environment lock 和 observation-prompt capability 必须与本轮配置一致。")
         lines.append("- **运行范围**：主报告严格使用 publication 中的固定 manifest 分母与顺序；缺失、重复、额外或未完成样本会直接失败。")
         lines.append("- **失败策略**：LongMemEval judge 输出必须严格解析为 `yes` 或 `no`，不做隐式 fallback 或静默补分。")
@@ -835,8 +839,8 @@ def _append_fairness_section(lines: list[str], zh: bool) -> None:
         lines.append("")
         lines.append("- **`long_context`**: reused only as a reference upper bound and not rerun.")
         lines.append("- **External systems**: Mem0 OSS uses its native memory capability; memory representation, extraction strategy, vector store, and tool exposure may differ.")
-        lines.append("- **Shared input protocol**: comparable results must use the same dataset, manifest, canonical replay, turn-pair build plan, models, tokenizer, and `top-k=20`; mixed inputs are rejected.")
-        lines.append("- **Build and time**: each session is processed as ordered user/assistant pairs; leading assistant turns already present in the dataset are preserved as singleton pairs. Oversized pairs are split losslessly. Every chunk runs through public `runner.Run`; the benchmark validates messages and assigns deterministic event times before the memory builder. Auto receives the original session date through the public extractor reference-date capability. Mem0 receives the same date as extraction custom instructions through the official `POST /memories` `prompt` field. The date is not added to message content.")
+        lines.append("- **Shared input protocol**: comparable results must use the same dataset, manifest, canonical replay, turn-pair-fragment build plan, models, tokenizer, and `top-k=20`; mixed inputs are rejected.")
+        lines.append("- **Build and time**: each session is processed as ordered user/assistant pairs; leading assistant turns already present in the dataset are preserved as singleton pairs. Oversized pairs retain all content, but every fragment is a separate `runner.Run` and extraction boundary; the report lists affected cases. The benchmark validates messages and assigns deterministic event times before the memory builder. Auto receives the original session date through the public extractor reference-date capability. Mem0 receives the same date as extraction custom instructions through the official `POST /memories` `prompt` field. The date is not added to message content.")
         lines.append("- **Mem0 environment validation**: a maintained Mem0 result requires a successful sanitized preflight whose source commit, version, LLM, embedding model, environment lock, and observation-prompt capability match the active run.")
         lines.append("- **Run scope**: the report uses the exact fixed-manifest denominator and order from publication metadata; missing, duplicate, extra, or incomplete cases fail fast.")
         lines.append("- **Failure policy**: LongMemEval judge responses must strictly parse as `yes` or `no`; there is no implicit fallback or silent credit.")

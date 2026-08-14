@@ -124,7 +124,7 @@ var (
 	flagLMEBuildMaxTokens = flag.Int(
 		"lme-build-max-tokens",
 		7500,
-		"Maximum embedding-model tokens per LongMemEval turn-pair chunk",
+		"Maximum embedding-model tokens per LongMemEval build fragment",
 	)
 	flagLMEBuildTokenizerModel = flag.String(
 		"lme-build-tokenizer-model",

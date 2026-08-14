@@ -35,17 +35,17 @@ class ResultEligibilityError(ValueError):
         )
 
 
-_RUN_MANIFEST_SCHEMA_VERSION = 5
-_RESULT_SCHEMA_VERSION = 2
-_BUILD_PLAN_VERSION = 5
+_RUN_MANIFEST_SCHEMA_VERSION = 1
+_RESULT_SCHEMA_VERSION = 1
+_BUILD_PLAN_VERSION = 1
 _MAINTAINED_RESULT_ORIGIN = "native_runner"
-_BUILD_PROTOCOL = "turn-pair"
+_BUILD_PROTOCOL = "turn-pair-fragment"
 _AUTO_TEMPORAL_CONTEXT = "extractor_reference_date"
 _MEM0_TEMPORAL_CONTEXT = "custom_prompt_reference_date"
 _TEMPORAL_REFERENCE_SOURCE = "build_plan_session_observation_time"
 _TEMPORAL_REFERENCE_FORMAT = "YYYY-MM-DD"
 _TRACE_SELECTION_SCHEMA = "longmemeval.build_trace_selection/v1"
-_TRACE_SCHEMA = "longmemeval.build_trace/v4"
+_TRACE_SCHEMA = "longmemeval.build_trace/v1"
 _TRACE_PURPOSE = "best-effort-diagnostic"
 _TRACE_COMPARABILITY = "backend-specific-not-cross-comparable"
 _TRACE_MAX_FILE_BYTES = 64 << 20
@@ -386,7 +386,7 @@ def _run_manifest_unknown_field_blockers(manifest: dict[str, Any]) -> list[str]:
         "llm_endpoint_fingerprint", "embedding_endpoint_fingerprint",
         "tokenizer_name", "effective_top_k", "build_protocol",
         "case_manifest_schema_version", "case_manifest_method",
-        "case_manifest_split", "case_manifest_legacy",
+        "case_manifest_split",
         "backend_version", "backend_revision",
     }, "run")
     if not isinstance(manifest.get("config"), dict):
@@ -438,17 +438,11 @@ def _derive_manifest_blockers(manifest: dict[str, Any]) -> list[str]:
     split = str(run.get("case_manifest_split") or "")
     if not method:
         blockers.append("case_manifest_method is unavailable")
-    if run.get("case_manifest_legacy") is True:
-        blockers.append("case manifest uses the legacy case_ids-only schema")
     if method == "full-category" and split:
         blockers.append("full-category case manifest must not declare a split")
     elif method == "stratified-sha256" and split not in {"dev", "holdout"}:
         blockers.append(
             "sampled case manifest must declare a dev or holdout split"
-        )
-    elif method == "legacy-first":
-        blockers.append(
-            "legacy-first case selection is not eligible for maintained comparison"
         )
     scenario = str(run.get("scenario") or "")
     if scenario not in {"auto", "mem0_oss"}:
@@ -621,7 +615,7 @@ def _validate_input_artifacts(
     if str(config.get("build_plan_digest") or "") != build_digest:
         blockers.append("build plan logical digest does not match provenance")
     if str(build_index.get("protocol") or "") != _BUILD_PROTOCOL:
-        blockers.append("build plan protocol is not turn-pair")
+        blockers.append("build plan protocol is not turn-pair-fragment")
     if int(build_index.get("version") or 0) != _BUILD_PLAN_VERSION:
         blockers.append("unsupported build plan version")
     build_config = build_index.get("config") or {}
@@ -733,6 +727,7 @@ def _validate_turn_pair_case(
     if max_tokens <= 0:
         raise ValueError("max tokens must be positive")
     actual_stats = _empty_build_stats()
+    case_id = str(build_case.get("case_id") or "")
     actual_stats["case_count"] = 1
     seen_sessions: set[str] = set()
     seen_pairs: set[str] = set()
@@ -822,6 +817,8 @@ def _validate_turn_pair_case(
         actual_stats["max_session_tokens"] = max(
             actual_stats["max_session_tokens"], session_tokens
         )
+    if actual_stats["chunked_pair_count"]:
+        actual_stats["fragmented_case_ids"] = [case_id]
     _require_build_stats(build_case.get("stats"), actual_stats, "case")
     return actual_stats
 
@@ -937,7 +934,7 @@ def _non_negative_int(value: Any, label: str) -> int:
     return value
 
 
-def _empty_build_stats() -> dict[str, int]:
+def _empty_build_stats() -> dict[str, Any]:
     return {
         "case_count": 0,
         "session_count": 0,
@@ -955,21 +952,36 @@ def _empty_build_stats() -> dict[str, int]:
         "max_original_pair_tokens": 0,
         "max_session_tokens": 0,
         "max_chunk_tokens": 0,
+        "fragmented_case_ids": [],
     }
 
 
-def _require_build_stats(value: Any, expected: dict[str, int], label: str) -> None:
-    if not isinstance(value, dict) or set(value) != set(expected):
+def _require_build_stats(value: Any, expected: dict[str, Any], label: str) -> None:
+    optional = {"fragmented_case_ids"}
+    if (
+        not isinstance(value, dict)
+        or set(value) - optional != set(expected) - optional
+        or not set(value).issubset(set(expected))
+    ):
         raise ValueError(f"{label} build statistics are invalid")
     actual = {
         key: _non_negative_int(value.get(key), f"{label} {key}")
         for key in expected
+        if key not in optional
     }
+    case_ids = value.get("fragmented_case_ids") or []
+    if (
+        not isinstance(case_ids, list)
+        or any(not isinstance(item, str) or not item for item in case_ids)
+        or case_ids != sorted(set(case_ids))
+    ):
+        raise ValueError(f"{label} fragmented case IDs are invalid")
+    actual["fragmented_case_ids"] = case_ids
     if actual != expected:
         raise ValueError(f"{label} build statistics mismatch")
 
 
-def _add_build_stats(target: dict[str, int], source: dict[str, int]) -> None:
+def _add_build_stats(target: dict[str, Any], source: dict[str, Any]) -> None:
     maximums = {
         "max_original_turn_tokens",
         "max_original_pair_tokens",
@@ -977,6 +989,9 @@ def _add_build_stats(target: dict[str, int], source: dict[str, int]) -> None:
         "max_chunk_tokens",
     }
     for key in target:
+        if key == "fragmented_case_ids":
+            target[key] = sorted(set(target[key]) | set(source[key]))
+            continue
         if key in maximums:
             target[key] = max(target[key], source[key])
         else:
@@ -1180,9 +1195,6 @@ def _run_compatibility_digest(manifest: dict[str, Any]) -> str:
         compatible_run["case_manifest_method"] = run["case_manifest_method"]
     if run.get("case_manifest_split"):
         compatible_run["case_manifest_split"] = run["case_manifest_split"]
-    compatible_run["case_manifest_legacy"] = bool(
-        run.get("case_manifest_legacy")
-    )
     for key in ("backend_version", "backend_revision"):
         if run.get(key):
             compatible_run[key] = run[key]

@@ -93,21 +93,6 @@ func buildLongMemEvalManifest(
 		if err != nil {
 			return nil, err
 		}
-	case LongMemEvalManifestMethodLegacyFirst:
-		if selection.Seed != "" || split != "" || len(rankOffsets) != 0 {
-			return nil, errors.New("LongMemEval legacy-first selection does not accept seed, split, or rank offsets")
-		}
-		quotas, err = resolveLongMemEvalAllocation(
-			questionTypes,
-			availability,
-			LongMemEvalManifestAllocation{
-				TotalSize: selection.TotalSize,
-				Quotas:    selection.Quotas,
-			},
-		)
-		if err != nil {
-			return nil, err
-		}
 	default:
 		return nil, fmt.Errorf("unsupported LongMemEval manifest method %q", selection.Method)
 	}
@@ -153,8 +138,6 @@ func selectLongMemEvalManifestCases(
 			})
 		case LongMemEvalManifestMethodStratifiedSHA256:
 			sortLongMemEvalBySeededRank(candidates, seed)
-		case LongMemEvalManifestMethodLegacyFirst:
-			// Preserve dataset order only for explicit historical reproduction.
 		}
 		start := rankOffsets[questionType]
 		quota := quotas[questionType]

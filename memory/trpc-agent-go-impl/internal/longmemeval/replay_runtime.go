@@ -48,7 +48,8 @@ type lmeBuildRuntime struct {
 }
 
 // executeLMEBuildCase uses one Runner per case and preserves source-session
-// identity while consuming each planned pair exactly once.
+// identity while consuming each planned fragment exactly once. A normal pair
+// has one fragment; an over-limit pair has multiple extraction boundaries.
 func executeLMEBuildCase(
 	ctx context.Context,
 	cfg lmeRunConfig,

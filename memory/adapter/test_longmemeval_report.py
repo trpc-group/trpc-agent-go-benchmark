@@ -25,6 +25,16 @@ from memory.adapter import longmemeval_validation as validation
 
 
 class LongMemEvalReportTest(unittest.TestCase):
+    def test_build_stats_validate_fragmented_case_ids(self) -> None:
+        expected = validation._empty_build_stats()
+        expected["fragmented_case_ids"] = ["case-1"]
+        validation._require_build_stats(dict(expected), expected, "fixture")
+
+        invalid = dict(expected)
+        invalid["fragmented_case_ids"] = ["case-1", "case-1"]
+        with self.assertRaisesRegex(ValueError, "fragmented case IDs"):
+            validation._require_build_stats(invalid, expected, "fixture")
+
     def test_turn_pair_validator_rejects_unsupported_role(self) -> None:
         turns = [
             {
@@ -53,7 +63,7 @@ class LongMemEvalReportTest(unittest.TestCase):
             }],
         }
         build_case = {
-            "version": 5,
+            "version": 1,
             "case_id": "case-1",
             "sessions": [{
                 "session_index": 0,
@@ -147,7 +157,10 @@ class LongMemEvalReportTest(unittest.TestCase):
             english = report.render([view], zh=False)
             self.assertIn("Overall Results", english)
             self.assertIn("Memory Build Audit", english)
-            self.assertIn("| Auto | turn-pair | 1 | 2 | 1 | 1 |", english)
+            self.assertIn(
+                "| Auto | turn-pair-fragment | 1 | 2 | 1 | 1 |",
+                english,
+            )
             self.assertIn("extraction custom instructions", english)
             self.assertIn("总体结果", report.render([view], zh=True))
 
@@ -196,7 +209,7 @@ class LongMemEvalReportTest(unittest.TestCase):
         manifest = {
             "run": {
                 "scenario": "mem0_oss",
-                "build_protocol": "turn-pair",
+                "build_protocol": "turn-pair-fragment",
                 "temporal_context": "custom_prompt_reference_date",
             },
             "config": {
@@ -210,7 +223,7 @@ class LongMemEvalReportTest(unittest.TestCase):
         }
         metadata = {
             "memory_build": {
-                "protocol": "turn-pair",
+                "protocol": "turn-pair-fragment",
                 "temporal_context": "storage_metadata_only",
                 "temporal_reference_source": (
                     "build_plan_session_observation_time"
@@ -370,7 +383,7 @@ class LongMemEvalReportTest(unittest.TestCase):
 
     def test_trace_record_limit_applies_to_jsonl_and_gzip(self) -> None:
         record = {
-            "schema_version": "longmemeval.build_trace/v4",
+            "schema_version": "longmemeval.build_trace/v1",
             "sequence": 1,
             "recorded_at": "2026-01-01T00:00:00Z",
             "case_id": "case-1",
@@ -554,7 +567,7 @@ class LongMemEvalReportTest(unittest.TestCase):
             "trace_gzip": False,
         }
         run_manifest = {
-            "schema_version": 5,
+            "schema_version": 1,
             "created_at": "2026-01-01T00:00:00Z",
             "reproducible": True,
             "official_status": "eligible",
@@ -590,10 +603,9 @@ class LongMemEvalReportTest(unittest.TestCase):
                 "embedding_endpoint_fingerprint": "provider-default",
                 "tokenizer_name": "test-tokenizer",
                 "effective_top_k": 20,
-                "build_protocol": "turn-pair",
+                "build_protocol": "turn-pair-fragment",
                 "case_manifest_schema_version": 1,
                 "case_manifest_method": "full-category",
-                "case_manifest_legacy": False,
             },
             "config": manifest_config,
         }
@@ -612,7 +624,7 @@ class LongMemEvalReportTest(unittest.TestCase):
                 "comparison_limitations": [],
                 "memory_build": {
                     "status": "completed",
-                    "protocol": "turn-pair",
+                    "protocol": "turn-pair-fragment",
                     "total_sessions_ingested": 1,
                     "temporal_context": "extractor_reference_date",
                     "temporal_reference_source": (
@@ -621,7 +633,7 @@ class LongMemEvalReportTest(unittest.TestCase):
                     "temporal_reference_format": "YYYY-MM-DD",
                     **manifest_config["build_stats"],
                 },
-                "run_manifest_version": 5,
+                "run_manifest_version": 1,
                 "run_compatibility_digest": compatibility,
                 "run_comparison_digest": comparison,
                 "official_status": "eligible",
@@ -649,13 +661,13 @@ class LongMemEvalReportTest(unittest.TestCase):
                 },
             },
             "publication": {
-                "schema_version": 2,
+                "schema_version": 1,
                 "classification": "maintained",
                 "origin": "native_runner",
                 "eligible": True,
                 "finalized_at": "2026-01-01T00:00:00Z",
                 "run_manifest": {
-                    "schema_version": 5,
+                    "schema_version": 1,
                     "compatibility_digest": compatibility,
                     "comparison_digest": comparison,
                 },
@@ -664,7 +676,7 @@ class LongMemEvalReportTest(unittest.TestCase):
         }
 
         aggregate = {
-            "schema_version": 2,
+            "schema_version": 1,
             "classification": "maintained",
             "scenario": "auto",
             "backend": "pgvector",
@@ -681,7 +693,7 @@ class LongMemEvalReportTest(unittest.TestCase):
             ],
         }
         bad_cases = {
-            "schema_version": 2,
+            "schema_version": 1,
             "classification": "maintained",
             "scenario": "auto",
             "backend": "pgvector",
@@ -774,8 +786,8 @@ class LongMemEvalReportTest(unittest.TestCase):
         build_root.mkdir(parents=True)
         (build_root / "index.json").write_text(
             json.dumps({
-                "version": 5,
-                "protocol": "turn-pair",
+                "version": 1,
+                "protocol": "turn-pair-fragment",
                 "config": {
                     "tokenizer": "test-tokenizer",
                     "model": "test-model",
@@ -825,7 +837,7 @@ class LongMemEvalReportTest(unittest.TestCase):
             "max_chunk_tokens": 12,
         }
         build_case = {
-            "version": 5,
+            "version": 1,
             "case_id": "case-1",
             "replay_digest": replay_digest,
             "config_digest": "4" * 64,
@@ -973,7 +985,7 @@ class LongMemEvalReportTest(unittest.TestCase):
         encoded_records: list[bytes] = []
         for sequence, record in enumerate(records, 1):
             value = {
-                "schema_version": "longmemeval.build_trace/v4",
+                "schema_version": "longmemeval.build_trace/v1",
                 "sequence": sequence,
                 "recorded_at": "2026-01-01T00:00:00Z",
                 "case_id": "case-1",

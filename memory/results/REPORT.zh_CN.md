@@ -2,13 +2,11 @@
 
 ## LongMemEval
 
-> **固定开发集评测结果。** 第 1-5 节记录固定 50-case turn-pair 评测
+> **固定开发集评测结果。** 第 1-5 节记录固定 50-case 评测
 > `turn_pair_full50_parallel4_20260717`，并包含对瞬时基础设施失败的
-> case-local 恢复；第 6 节记录最终条件式两阶段 assistant-episode 提取
-> 对比。更早的 LongMemEval 结果使用了不同的建库协议或结果治理方式，
-> 现已从文档删除。这里各行是在同一份冻结开发集 manifest 和相同协议下
-> 得到的有效、可直接比较结果；由于 legacy manifest 没有定义 seeded blind
-> split，因此不能将其表述为盲测 holdout baseline。
+> case-local 恢复。第 6 节保留 assistant-episode 历史结果供参考；该次评测
+> 早于最终合入实现，不能视为当前 head 的复现结果。归档的 case 选择 artifact
+> 没有定义 seeded blind split，因此这些结果也不是盲测 holdout baseline。
 
 本报告已统一使用当前 policy 名称。这只是对行为完全相同的历史运行进行文档
 重命名，指标和原始 artifact 均未重新生成。
@@ -21,8 +19,8 @@
 | Case | 覆盖全部六类问题的固定 50 case |
 | 分布 | knowledge-update 8；multi-session 13；assistant 6；preference 3；user 7；temporal 13 |
 | 输入规模 | 2,353 sessions；24,370 turns；12,280 user/assistant pairs |
-| 建库协议 | 无损 turn-pair replay；共用同一个 replay 和 build plan |
-| Build chunk 上限 | 6,000 `cl100k_base` tokens；仅一个 pair 需要无损拆分 |
+| 建库协议 | 有序 turn-pair fragments；共用同一个 replay 和 build plan |
+| Build chunk 上限 | 6,000 `cl100k_base` tokens；一个 pair 的内容被无损拆到多个独立 extraction 边界 |
 | 回答、提取与评判模型 | `glm52` |
 | Embedding 模型 | `text-embedding-ada-002` |
 | 检索 | 标准 `memory_search`，固定 `top-k=20` |
@@ -78,8 +76,9 @@ build 失败。Merge Similar 没有需要恢复的瞬时 build 失败；其两�
 | Mem0 OSS | 50/50 | 28,041 | 560.82 | 564.5 | 465-602 |
 
 该统计从每个完整建库 case 最后一次成功的 persistence snapshot 中还原。
-Snapshot 读取上限为 10,000 条，显著高于本轮观测到的最大值 602，因此没有
-发生条目截断。这里统计的是 ingestion 完成后的 active memory entries，而非
+通用 snapshot reader 最多请求 10,000 条，Mem0 OSS adapter 的可观测上限为
+1,000 条。两者均高于本轮观测到的最大值 602，因此没有发生条目截断。这里
+统计的是 ingestion 完成后的 active memory entries，而非
 extraction operation 数量，也不是多个 case 共享数据库中的物理行数。
 
 对于恢复 case，失败 attempt 的部分库存会被丢弃，并由成功的 case-local
@@ -109,7 +108,7 @@ provider usage。共享 cache 和并发运行也意味着远程调用量与 wall
    仍然正确，Preserve History 额外答对 27 个 case，且没有仅在 Merge Similar 中
    答对的回退 case。
    在完整建库 case 中，Preserve History 每 case 最终保留的条目约为 Merge Similar 的
-   5.2 倍，说明 legacy reconcile policy 会显著压缩最终证据集合。
+   5.2 倍，说明 Merge Similar reconcile policy 会显著压缩最终证据集合。
 2. **Preserve History 与 Append Only 的 Accuracy 相同，但保留的信息不同。** 两者共同
    答对 39 个 case，各有两个独有正确 case。Preserve History 在 multi-session 和
    single-session-user 上更强；Append Only 在 knowledge-update、assistant
@@ -118,20 +117,20 @@ provider usage。共享 cache 和并发运行也意味着远程调用量与 wall
    共同答对 38 个 case；Mem0 有四个独有正确 case，Preserve History 有三个。Mem0 在
    assistant-memory 问题上最强，Preserve History 则在 multi-session 和 temporal
    Accuracy 上领先。
-4. **对比结论仅适用于固定开发集。** Legacy `case_ids`-only manifest 固定了
-   精确样本，但没有记录 seeded selection method 或 blind dev/holdout split。
-   这会限制结果的泛化范围，但不影响同一 manifest 下各行之间的公平比较。
+4. **对比结论仅适用于固定开发集。** 归档的 case 选择固定了精确样本，但没有
+   记录 seeded selection method 或 blind dev/holdout split。这会限制结果的
+   泛化范围，但不影响使用同一选择的各行之间的公平比较。
 
 ### 6. Policy 与 Assistant-Episode 矩阵
 
 本节对比三种 Auto update policy 在关闭和开启 assistant-episode 提取时的
-结果。开启后的行使用最终的条件式两阶段实现：先执行普通用户记忆提取，仅在
-当前 user/assistant pair 明显包含结构化结果时，才发起一次输入受限的
-assistant-result 提取。Mem0 保持其原生提取行为。
+结果。开启行使用当时的两阶段实现；由于最终合入前 eligibility、grounding
+和请求构造均有变化，开启行仅作历史参考，不能代表当前 head。Mem0 保持其
+原生提取行为。
 
 七行实验使用完全相同的 50 个 case 及顺序、`glm52`、
-`text-embedding-ada-002`、无损 turn-pair replay、6,000-token chunk
-上限和 `top-k=20`。
+`text-embedding-ada-002`、相同的有序 turn-pair fragments、6,000-token
+chunk 上限和 `top-k=20`。
 
 | Policy / 后端 | Assistant 提取 | QA 成功 | 失败 | 正确 | Accuracy | F1 | BLEU | ROUGE-L |
 | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
@@ -144,7 +143,7 @@ assistant-result 提取。Mem0 保持其原生提取行为。
 | Mem0 OSS | 原生 | 50/50 | 0 | 42 | 0.8400 | 0.1681 | 0.1067 | 0.1588 |
 
 失败 QA 仍保留在固定 50-case 分母中并记为错误。Assistant 开启行不是按
-得分筛选的替换结果，每一行都代表一组完整的实验配置。
+得分筛选的替换结果，但只能作为历史参考，不能作为当前实现的正式结果。
 
 #### 完整建库 Memory 统计
 
@@ -181,8 +180,9 @@ snapshot。`*` Mem0 的 `tokens_known=false`，因此 token 总数只是 proxy
 
 #### 结论与限制
 
-- 开启 assistant 提取后，Merge Similar、Preserve History 和 Append Only
-  的 Accuracy 分别提高 30、8 和 6 个百分点。
+- 在当时实现中，开启 assistant 提取后，Merge Similar、Preserve History
+  和 Append Only 的 Accuracy 分别提高 30、8 和 6 个百分点；这些增益需要
+  用当前实现重跑后才能重新归因。
 - Append Only + assistant 的词面重合指标最高；Preserve History +
   assistant 的 Accuracy 最高。
 - Mem0 是原生外部 baseline，不启用 Auto 专属 assistant 选项。

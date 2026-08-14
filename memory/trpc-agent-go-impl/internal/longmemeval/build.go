@@ -15,6 +15,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -24,7 +26,7 @@ import (
 	"github.com/tiktoken-go/tokenizer"
 )
 
-const lmeBuildPlanVersion = 5
+const lmeBuildPlanVersion = 1
 
 type lmeBuildPlanConfig struct {
 	Tokenizer    string `json:"tokenizer"`
@@ -35,22 +37,23 @@ type lmeBuildPlanConfig struct {
 }
 
 type lmeBuildStats struct {
-	CaseCount             int `json:"case_count"`
-	SessionCount          int `json:"session_count"`
-	TurnCount             int `json:"turn_count"`
-	PairCount             int `json:"pair_count"`
-	ChunkCount            int `json:"chunk_count"`
-	ChunkedSessionCount   int `json:"chunked_session_count"`
-	ChunkedPairCount      int `json:"chunked_pair_count"`
-	SplitTurnCount        int `json:"split_turn_count"`
-	OriginalTokens        int `json:"original_tokens"`
-	FinalTokens           int `json:"final_tokens"`
-	OriginalBytes         int `json:"original_bytes"`
-	FinalBytes            int `json:"final_bytes"`
-	MaxOriginalTurnTokens int `json:"max_original_turn_tokens"`
-	MaxOriginalPairTokens int `json:"max_original_pair_tokens"`
-	MaxSessionTokens      int `json:"max_session_tokens"`
-	MaxChunkTokens        int `json:"max_chunk_tokens"`
+	CaseCount             int      `json:"case_count"`
+	SessionCount          int      `json:"session_count"`
+	TurnCount             int      `json:"turn_count"`
+	PairCount             int      `json:"pair_count"`
+	ChunkCount            int      `json:"chunk_count"`
+	ChunkedSessionCount   int      `json:"chunked_session_count"`
+	ChunkedPairCount      int      `json:"chunked_pair_count"`
+	SplitTurnCount        int      `json:"split_turn_count"`
+	OriginalTokens        int      `json:"original_tokens"`
+	FinalTokens           int      `json:"final_tokens"`
+	OriginalBytes         int      `json:"original_bytes"`
+	FinalBytes            int      `json:"final_bytes"`
+	MaxOriginalTurnTokens int      `json:"max_original_turn_tokens"`
+	MaxOriginalPairTokens int      `json:"max_original_pair_tokens"`
+	MaxSessionTokens      int      `json:"max_session_tokens"`
+	MaxChunkTokens        int      `json:"max_chunk_tokens"`
+	FragmentedCaseIDs     []string `json:"fragmented_case_ids,omitempty"`
 }
 
 type lmeBuildPlanIndex struct {
@@ -164,6 +167,9 @@ func (p *lmeBuildPlanner) buildCase(
 		}
 		plan.Sessions = append(plan.Sessions, sessionPlan)
 		accumulateLMEBuildSessionStats(&plan.Stats, sessionPlan)
+	}
+	if plan.Stats.ChunkedPairCount > 0 {
+		plan.Stats.FragmentedCaseIDs = []string{plan.CaseID}
 	}
 	return plan, nil
 }
@@ -381,6 +387,20 @@ func addLMEBuildStats(target *lmeBuildStats, source lmeBuildStats) {
 	target.MaxOriginalPairTokens = max(target.MaxOriginalPairTokens, source.MaxOriginalPairTokens)
 	target.MaxSessionTokens = max(target.MaxSessionTokens, source.MaxSessionTokens)
 	target.MaxChunkTokens = max(target.MaxChunkTokens, source.MaxChunkTokens)
+	for _, caseID := range source.FragmentedCaseIDs {
+		if !slices.Contains(target.FragmentedCaseIDs, caseID) {
+			target.FragmentedCaseIDs = append(target.FragmentedCaseIDs, caseID)
+		}
+	}
+	slices.Sort(target.FragmentedCaseIDs)
+}
+
+func equalLMEBuildStats(left, right lmeBuildStats) bool {
+	leftCaseIDs := left.FragmentedCaseIDs
+	rightCaseIDs := right.FragmentedCaseIDs
+	left.FragmentedCaseIDs = nil
+	right.FragmentedCaseIDs = nil
+	return reflect.DeepEqual(left, right) && slices.Equal(leftCaseIDs, rightCaseIDs)
 }
 
 const lmeChunkFragmentAttempts = 8
@@ -738,7 +758,11 @@ func ensureLMEBuildPlan(
 		MaxTokens:    cfg.BuildMaxTokens,
 		ReplayDigest: replay.Index.ReplayDigest,
 	}
-	configDigest, err := lmeJSONDigest(config)
+	configDigest, err := lmeBuildPlanConfigDigest(
+		lmeBuildPlanVersion,
+		lmeBuildProtocol,
+		config,
+	)
 	if err != nil {
 		return nil, "", fmt.Errorf("digest LongMemEval build config: %w", err)
 	}
@@ -848,7 +872,7 @@ func loadLMEBuildPlan(root string) (*lmeBuildPlanCorpus, error) {
 	if err != nil {
 		return nil, err
 	}
-	if actualStats != index.Stats {
+	if !equalLMEBuildStats(actualStats, index.Stats) {
 		return nil, fmt.Errorf("build plan aggregate statistics mismatch")
 	}
 	return &lmeBuildPlanCorpus{Index: index, Cases: cases}, nil
@@ -868,7 +892,11 @@ func loadLMEBuildPlanIndex(root string) (*lmeBuildPlanIndex, error) {
 	if err := validateLMEBuildPlanConfig(index.Config); err != nil {
 		return nil, fmt.Errorf("validate build plan configuration: %w", err)
 	}
-	configDigest, err := lmeJSONDigest(index.Config)
+	configDigest, err := lmeBuildPlanConfigDigest(
+		index.Version,
+		index.Protocol,
+		index.Config,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -883,6 +911,22 @@ func loadLMEBuildPlanIndex(root string) (*lmeBuildPlanIndex, error) {
 		return nil, fmt.Errorf("build plan digest mismatch: got %s want %s", digest, index.BuildPlanDigest)
 	}
 	return &index, nil
+}
+
+func lmeBuildPlanConfigDigest(
+	version int,
+	protocol string,
+	config lmeBuildPlanConfig,
+) (string, error) {
+	return lmeJSONDigest(struct {
+		Version  int                `json:"version"`
+		Protocol string             `json:"protocol"`
+		Config   lmeBuildPlanConfig `json:"config"`
+	}{
+		Version:  version,
+		Protocol: protocol,
+		Config:   config,
+	})
 }
 
 func loadLMEBuildPlanCases(
@@ -978,7 +1022,10 @@ func validateLMEBuildCasePlan(plan *lmeBuildCasePlan, maxTokens int) error {
 		}
 		accumulateLMEBuildSessionStats(&actualStats, sessionPlan)
 	}
-	if actualStats != plan.Stats {
+	if actualStats.ChunkedPairCount > 0 {
+		actualStats.FragmentedCaseIDs = []string{plan.CaseID}
+	}
+	if !equalLMEBuildStats(actualStats, plan.Stats) {
 		return fmt.Errorf("case build statistics mismatch")
 	}
 	return nil

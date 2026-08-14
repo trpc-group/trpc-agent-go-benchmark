@@ -32,7 +32,7 @@ var lmeImmutableRevisionPattern = regexp.MustCompile(
 )
 
 const (
-	lmeRunManifestSchemaVersion = 5
+	lmeRunManifestSchemaVersion = 1
 	lmeRunManifestFileName      = "run_manifest.json"
 	lmeOfficialStatusEligible   = "eligible"
 	lmeOfficialStatusBlocked    = "blocked"
@@ -114,7 +114,6 @@ type lmeRunIdentity struct {
 	CaseManifestSchemaVersion    int    `json:"case_manifest_schema_version"`
 	CaseManifestMethod           string `json:"case_manifest_method,omitempty"`
 	CaseManifestSplit            string `json:"case_manifest_split,omitempty"`
-	CaseManifestLegacy           bool   `json:"case_manifest_legacy"`
 	BackendVersion               string `json:"backend_version,omitempty"`
 	BackendRevision              string `json:"backend_revision,omitempty"`
 }
@@ -237,7 +236,7 @@ func ensureLMERunManifestWithDependencies(
 		}
 		return stored, nil
 	}
-	if err := rejectLegacyLMEOutputWithoutManifest(outputDir, path); err != nil {
+	if err := rejectUnversionedLMEOutput(outputDir, path); err != nil {
 		return nil, err
 	}
 	if err := writeLMERunManifestCreateOnce(path, current); err != nil {
@@ -299,7 +298,6 @@ func buildLMERunManifestAt(
 		run.CaseManifestSchemaVersion = caseManifest.SchemaVersion
 		run.CaseManifestMethod = string(caseManifest.Method)
 		run.CaseManifestSplit = caseManifest.Split
-		run.CaseManifestLegacy = caseManifest.IsLegacy()
 	}
 	_ = validateLMERunIdentity(run, unavailable)
 	manifest := &lmeRunManifest{
@@ -391,7 +389,7 @@ func validateLMERunIdentity(run lmeRunIdentity, unavailable map[string]string) [
 			"unsupported build protocol %q",
 			run.BuildProtocol,
 		))
-		unavailable["run.build_protocol"] = "only turn-pair is supported"
+		unavailable["run.build_protocol"] = "only turn-pair-fragment is supported"
 	}
 	if run.Backend == "" {
 		unavailable["run.backend"] = "not applicable or not reported"
@@ -508,9 +506,6 @@ func validateLMEManifestMethodology(run lmeRunIdentity) []string {
 	if run.Scenario != "auto" && run.Scenario != "mem0_oss" {
 		blockers = append(blockers, "scenario is not eligible for maintained comparison")
 	}
-	if run.CaseManifestLegacy {
-		blockers = append(blockers, "case manifest uses the legacy case_ids-only schema")
-	}
 	switch dataset.LongMemEvalManifestMethod(run.CaseManifestMethod) {
 	case dataset.LongMemEvalManifestMethodFullCategory:
 		if run.CaseManifestSplit != "" {
@@ -521,8 +516,6 @@ func validateLMEManifestMethodology(run lmeRunIdentity) []string {
 			run.CaseManifestSplit != dataset.LongMemEvalManifestSplitHoldout {
 			blockers = append(blockers, "sampled case manifest must declare a dev or holdout split")
 		}
-	case dataset.LongMemEvalManifestMethodLegacyFirst:
-		blockers = append(blockers, "legacy-first case selection is not eligible for maintained comparison")
 	}
 	return blockers
 }
@@ -764,7 +757,6 @@ func compareLMERunIdentity(stored, current lmeRunIdentity) error {
 		{"case manifest schema", stored.CaseManifestSchemaVersion, current.CaseManifestSchemaVersion},
 		{"case manifest method", stored.CaseManifestMethod, current.CaseManifestMethod},
 		{"case manifest split", stored.CaseManifestSplit, current.CaseManifestSplit},
-		{"case manifest legacy status", stored.CaseManifestLegacy, current.CaseManifestLegacy},
 		{"backend version", stored.BackendVersion, current.BackendVersion},
 		{"backend revision", stored.BackendRevision, current.BackendRevision},
 	}

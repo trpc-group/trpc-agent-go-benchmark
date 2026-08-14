@@ -196,13 +196,15 @@ different retrieval limits, incomplete cost accounting, or the obsolete
 whole-session build protocol from being mixed into the current comparison.
 
 Comparable maintained runs must share the exact dataset, case manifest,
-canonical replay, build plan, model configuration, tokenizer, fixed turn-pair
-protocol, and retrieval limit. The harness builds memory after each
-user/assistant turn pair through public `Runner.Run`. One Runner is reused per
-case; pairs from one source session share its original session ID, while other
-source sessions use isolated histories under the same user-level memory. The
-harness validates and timestamps the resulting builder input, uses lossless
-token-aware chunking, and applies `top-k=20` to every memory backend. Auto
+canonical replay, build plan, model configuration, tokenizer, fixed
+`turn-pair-fragment` protocol, and retrieval limit. The harness normally builds
+memory once per user/assistant pair through public `Runner.Run`. An over-limit
+pair is split without content loss, but each fragment is a separate Runner call
+and extraction boundary; affected case IDs are recorded in provenance. One
+Runner is reused per case, and every backend consumes the same fragments. Pairs
+from one source session share its original session ID, while other source
+sessions use isolated histories under the same user-level memory. The harness
+applies `top-k=20` to every memory backend. Auto
 receives the session date through its extractor reference-date capability;
 Mem0 receives the same date as extraction custom instructions through the
 official `POST /memories` `prompt` field. The date comes from the immutable
@@ -219,10 +221,12 @@ digest, and observation-prompt capability match the benchmark configuration.
 
 ### LongMemEval Policy and Assistant Matrix
 
-The latest comparable development snapshot covers all three Auto update
-policies with assistant-episode extraction disabled and enabled, plus native
-Mem0 OSS. Every row uses the same legacy 50-case manifest, `glm52`,
-`text-embedding-ada-002`, lossless turn-pair replay, and `top-k=20`.
+The development snapshot covers all three Auto update policies with
+assistant-episode extraction disabled and enabled, plus native Mem0 OSS. Every
+row uses the same fixed 50-case selection, `glm52`,
+`text-embedding-ada-002`, ordered turn-pair fragments, and `top-k=20`.
+Assistant-enabled rows are historical references because their extraction
+implementation predates the current merged implementation.
 
 | Policy / backend | Assistant extraction | QA succeeded | Correct | Accuracy | F1 | BLEU | ROUGE-L | Complete-build memories |
 | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
@@ -237,11 +241,9 @@ Mem0 OSS. Every row uses the same legacy 50-case manifest, `glm52`,
 Accuracy always uses the fixed denominator of 50. Memory totals include only
 the last successful persistence snapshot for each completely built case;
 partial rows from failed attempts are excluded. The assistant-enabled rows use
-the final conditional two-stage implementation, not the earlier extraction
-prototype.
+an earlier two-stage implementation and do not reproduce the current head.
 
-This is a valid comparison on one frozen 50-case development manifest. The
-legacy `case_ids`-only schema does not define a seeded blind split, so the table
+The archived case selection does not define a seeded blind split, so the table
 must not be presented as a blind holdout baseline. Two assistant-enabled rows
 have one incomplete memory build each; those failures remain in the fixed
 denominator and score as incorrect.

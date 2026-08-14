@@ -44,7 +44,7 @@ semantic-only degradation:
 
 - synchronous, inferred, ADD-only extraction through the official OSS API;
 - the observation date supplied as extraction custom instructions;
-- lossless turn-pair ingestion with no backend-specific transcript truncation;
+- ordered turn-pair fragments with no backend-specific transcript truncation;
 - hybrid retrieval combining semantic candidates, lemmatized BM25, and entity
   linking/boosting;
 - Mem0's native semantic threshold of `0.1` and the benchmark-wide retrieval

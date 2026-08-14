@@ -471,6 +471,9 @@ func TestExecuteLMEBuildCaseRunsOncePerTokenBoundedChunk(t *testing.T) {
 	if casePlan.Stats.ChunkCount < 2 {
 		t.Fatalf("chunk count = %d, want a split pair", casePlan.Stats.ChunkCount)
 	}
+	if got, want := casePlan.Stats.FragmentedCaseIDs, []string{casePlan.CaseID}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("fragmented case IDs = %v, want %v", got, want)
+	}
 	recorder := &recordingLMEBuildIngestor{}
 	err = executeLMEBuildCase(context.Background(), lmeRunConfig{
 		BuildMaxTokens: 5,
@@ -481,6 +484,9 @@ func TestExecuteLMEBuildCaseRunsOncePerTokenBoundedChunk(t *testing.T) {
 	}
 	if len(recorder.calls) != casePlan.Stats.ChunkCount {
 		t.Fatalf("runtime calls = %d, chunks = %d", len(recorder.calls), casePlan.Stats.ChunkCount)
+	}
+	if len(recorder.calls) == 1 {
+		t.Fatal("over-limit pair must expose separate fragment boundaries")
 	}
 	if !reflect.DeepEqual(recorder.sessionIDs, lmeRuntimeSourceSessionIDs(casePlan)) {
 		t.Fatalf("runtime session IDs = %v", recorder.sessionIDs)

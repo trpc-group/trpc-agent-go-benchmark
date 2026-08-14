@@ -177,7 +177,11 @@ func TestLMEBuildPlanProtocolIsNotConfigurable(t *testing.T) {
 		},
 		Cases: map[string]*lmeReplayCase{replayCase.CaseID: replayCase},
 	}
-	configDigest, err := lmeJSONDigest(planner.config)
+	configDigest, err := lmeBuildPlanConfigDigest(
+		lmeBuildPlanVersion,
+		lmeBuildProtocol,
+		planner.config,
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -201,10 +205,7 @@ func TestVerifyLMEBuildPlanSourceRejectsContentMismatch(t *testing.T) {
 		Cases: map[string]*lmeReplayCase{replayCase.CaseID: replayCase},
 	}
 	planner := testLMEBuildPlanner(t, 100)
-	configDigest, err := lmeJSONDigest(planner.config)
-	if err != nil {
-		t.Fatal(err)
-	}
+	configDigest := testLMEBuildPlanConfigDigest(t, planner.config)
 	plan, err := newLMEBuildPlanCorpus(planner, replay, configDigest)
 	if err != nil {
 		t.Fatal(err)
@@ -240,10 +241,7 @@ func TestVerifyLMEBuildPlanSourceRejectsRelabeledSessionBatch(t *testing.T) {
 		Cases: map[string]*lmeReplayCase{replayCase.CaseID: replayCase},
 	}
 	planner := testLMEBuildPlanner(t, 100)
-	configDigest, err := lmeJSONDigest(planner.config)
-	if err != nil {
-		t.Fatal(err)
-	}
+	configDigest := testLMEBuildPlanConfigDigest(t, planner.config)
 	plan, err := newLMEBuildPlanCorpus(planner, replay, configDigest)
 	if err != nil {
 		t.Fatal(err)
@@ -394,7 +392,7 @@ func TestLMEBuildPlanAllowsStrictRetokenizationAccounting(t *testing.T) {
 	}
 }
 
-func TestLMEBuildPlanOverLimitPairIsLosslessWithoutLegacyLimit(t *testing.T) {
+func TestLMEBuildPlanOverLimitPairIsLosslessWithoutTruncation(t *testing.T) {
 	userContent := strings.Repeat("界", 2500)
 	assistantContent := strings.Repeat("a", 5000)
 	replayCase := singleSessionReplayCase(userContent, assistantContent)
@@ -430,6 +428,9 @@ func TestLMEBuildPlanOverLimitPairIsLosslessWithoutLegacyLimit(t *testing.T) {
 		stats.SplitTurnCount != 2 {
 		t.Fatalf("build audit counters = %+v", stats)
 	}
+	if got, want := stats.FragmentedCaseIDs, []string{plan.CaseID}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("fragmented case IDs = %v, want %v", got, want)
+	}
 	if stats.MaxOriginalPairTokens != pair.OriginalTokens ||
 		stats.MaxSessionTokens != pair.OriginalTokens ||
 		stats.MaxOriginalTurnTokens <= 0 ||
@@ -443,10 +444,43 @@ func TestLMEBuildPlanOverLimitPairIsLosslessWithoutLegacyLimit(t *testing.T) {
 	if strings.Contains(string(data), "runner_session_id") {
 		t.Fatal("build chunks must not define synthetic Runner sessions")
 	}
-	for _, legacy := range []string{"content truncated", "longmemeval_mem0_content_truncated"} {
-		if strings.Contains(strings.ToLower(string(data)), legacy) {
-			t.Fatalf("build plan contains legacy truncation marker %q", legacy)
+	for _, marker := range []string{"content truncated", "longmemeval_mem0_content_truncated"} {
+		if strings.Contains(strings.ToLower(string(data)), marker) {
+			t.Fatalf("build plan contains truncation marker %q", marker)
 		}
+	}
+}
+
+func TestAddLMEBuildStatsMergesFragmentedCaseIDs(t *testing.T) {
+	target := lmeBuildStats{FragmentedCaseIDs: []string{"case-b"}}
+	addLMEBuildStats(&target, lmeBuildStats{
+		FragmentedCaseIDs: []string{"case-a", "case-b"},
+	})
+	if got, want := target.FragmentedCaseIDs, []string{"case-a", "case-b"}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("fragmented case IDs = %v, want %v", got, want)
+	}
+}
+
+func TestLMEBuildPlanConfigDigestIncludesProtocolIdentity(t *testing.T) {
+	config := testLMEBuildPlanner(t, 100).config
+	current, err := lmeBuildPlanConfigDigest(
+		lmeBuildPlanVersion,
+		lmeBuildProtocol,
+		config,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	previous, err := lmeBuildPlanConfigDigest(
+		lmeBuildPlanVersion-1,
+		"turn-pair",
+		config,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if current == previous {
+		t.Fatal("different build protocols produced the same config digest")
 	}
 }
 
@@ -461,10 +495,7 @@ func TestLoadLMEBuildPlanRejectsConfigDigestMismatch(t *testing.T) {
 		Cases: map[string]*lmeReplayCase{replayCase.CaseID: replayCase},
 	}
 	planner := testLMEBuildPlanner(t, 100)
-	configDigest, err := lmeJSONDigest(planner.config)
-	if err != nil {
-		t.Fatal(err)
-	}
+	configDigest := testLMEBuildPlanConfigDigest(t, planner.config)
 	corpus, err := newLMEBuildPlanCorpus(planner, replay, configDigest)
 	if err != nil {
 		t.Fatal(err)
@@ -506,10 +537,7 @@ func TestLoadLMEBuildPlanRejectsNonTurnPairProtocol(t *testing.T) {
 		Cases: map[string]*lmeReplayCase{replayCase.CaseID: replayCase},
 	}
 	planner := testLMEBuildPlanner(t, 100)
-	configDigest, err := lmeJSONDigest(planner.config)
-	if err != nil {
-		t.Fatal(err)
-	}
+	configDigest := testLMEBuildPlanConfigDigest(t, planner.config)
 	corpus, err := newLMEBuildPlanCorpus(planner, replay, configDigest)
 	if err != nil {
 		t.Fatal(err)
@@ -540,10 +568,7 @@ func TestLoadLMEBuildCasePlanIsReadOnlyAndRejectsTampering(t *testing.T) {
 		Cases: map[string]*lmeReplayCase{replayCase.CaseID: replayCase},
 	}
 	planner := testLMEBuildPlanner(t, 100)
-	configDigest, err := lmeJSONDigest(planner.config)
-	if err != nil {
-		t.Fatal(err)
-	}
+	configDigest := testLMEBuildPlanConfigDigest(t, planner.config)
 	corpus, err := newLMEBuildPlanCorpus(planner, replay, configDigest)
 	if err != nil {
 		t.Fatal(err)
@@ -598,6 +623,22 @@ func testLMEBuildPlanner(
 		t.Fatalf("newLMEBuildPlanner() error = %v", err)
 	}
 	return planner
+}
+
+func testLMEBuildPlanConfigDigest(
+	t *testing.T,
+	config lmeBuildPlanConfig,
+) string {
+	t.Helper()
+	digest, err := lmeBuildPlanConfigDigest(
+		lmeBuildPlanVersion,
+		lmeBuildProtocol,
+		config,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return digest
 }
 
 func singleSessionReplayCase(userContent string, assistantContent string) *lmeReplayCase {

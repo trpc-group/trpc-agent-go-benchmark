@@ -1044,14 +1044,14 @@ func validateLMEInputPlanMetadata(
 		plan.Index.Config.Encoding != cfg.BuildTokenizerEncoding {
 		blockers = append(blockers, "build plan tokenizer configuration does not match result metadata")
 	}
-	if plan.Index.Stats != cfg.BuildStats {
+	if !equalLMEBuildStats(plan.Index.Stats, cfg.BuildStats) {
 		blockers = append(blockers, "build plan chunking statistics do not match result metadata")
 	}
 	if !equalLMEJSON(manifest.Config["build_stats"], plan.Index.Stats) {
 		blockers = append(blockers, "build plan chunking statistics do not match run provenance")
 	}
 	if manifest.Run.BuildProtocol != lmeBuildProtocol {
-		blockers = append(blockers, "run provenance build protocol is not turn-pair")
+		blockers = append(blockers, "run provenance build protocol is not turn-pair-fragment")
 	}
 	return blockers
 }

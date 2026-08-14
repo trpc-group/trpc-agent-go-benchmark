@@ -87,7 +87,7 @@ func TestRunGenerateAndVerify(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoadLongMemEvalManifest() error = %v", err)
 	}
-	if manifest.TotalSize != 4 || manifest.IsLegacy() {
+	if manifest.TotalSize != 4 || manifest.SchemaVersion != dataset.LongMemEvalManifestSchemaVersion {
 		t.Fatalf("generated manifest = %#v", manifest)
 	}
 	output.Reset()
@@ -154,7 +154,7 @@ func TestRunRejectsInvalidManifestConfig(t *testing.T) {
 		{
 			name: "negative per type",
 			args: []string{
-				"-dataset", datasetPath, "-method", "legacy-first", "-per-type", "-1",
+				"-dataset", datasetPath, "-per-type", "-1",
 				"-output", filepath.Join(outputDir, "negative.json"),
 			},
 			want: "must not be negative",

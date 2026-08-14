@@ -220,7 +220,7 @@ func TestPrepareLMECaseRecordsOrdersAndNormalizesCheckpoint(t *testing.T) {
 		t.Fatalf("pending case = %+v", result.Cases[0])
 	}
 	if result.Cases[1].Status != lmeCaseStatusJudgeFailed {
-		t.Fatalf("legacy judge case = %+v", result.Cases[1])
+		t.Fatalf("existing judge case = %+v", result.Cases[1])
 	}
 	if count := countLMEProcessedCases(result.Cases); count != 1 {
 		t.Fatalf("processed cases = %d", count)
@@ -559,9 +559,9 @@ func TestFinalizeLMERunResultEligibilityBlockers(t *testing.T) {
 		{
 			name: "schema",
 			mutate: func(manifest map[string]any) {
-				manifest["schema_version"] = 1
+				manifest["schema_version"] = 2
 			},
-			blocker: "run manifest schema version is 1, want 5",
+			blocker: "run manifest schema version is 2, want 1",
 		},
 		{
 			name: "dirty provenance",
@@ -1111,7 +1111,11 @@ func writeLMEPublicationBuildPlanFixture(
 	if err != nil {
 		t.Fatal(err)
 	}
-	configDigest, err := lmeJSONDigest(config)
+	configDigest, err := lmeBuildPlanConfigDigest(
+		lmeBuildPlanVersion,
+		lmeBuildProtocol,
+		config,
+	)
 	if err != nil {
 		t.Fatal(err)
 	}

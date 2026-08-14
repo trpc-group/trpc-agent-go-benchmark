@@ -101,10 +101,9 @@ dataset order cannot change the selected cases. The generator supports either
 explicit per-type quotas or proportional total-size allocation, as well as
 disjoint development/holdout pairs.
 
-Generated manifests preserve `case_ids` for older runners while adding the
-selection metadata and SHA-256 digests needed for verification. Historical
-case-ID-only manifests remain readable. Use `legacy-first` only when
-reproducing an older source-order selection; it is not the default method.
+Generated manifests record the ordered `case_ids`, selection metadata, and
+SHA-256 digests needed for verification. Case-ID-only manifests are rejected
+because they do not identify the dataset or selection procedure.
 
 ## References
 

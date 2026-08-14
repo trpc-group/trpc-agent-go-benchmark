@@ -140,35 +140,6 @@ func TestEnsureLMERunManifestRejectsDirtyResume(t *testing.T) {
 	}
 }
 
-func TestBuildLMERunManifestBlocksLegacyCaseManifest(t *testing.T) {
-	fixture := newLMEProvenanceFixture(t)
-	writeLMEProvenanceTestFile(
-		t,
-		fixture.request.Config.ManifestPath,
-		`{"case_ids":["case-1","case-2"]}`,
-	)
-	manifest, err := buildLMERunManifest(
-		context.Background(),
-		fixture.request,
-		testLMEProvenanceDependencies(time.Unix(1, 0)),
-	)
-	if err != nil {
-		t.Fatalf("buildLMERunManifest() error = %v", err)
-	}
-	if !manifest.Run.CaseManifestLegacy {
-		t.Fatal("CaseManifestLegacy = false, want true")
-	}
-	if manifest.OfficialStatus != lmeOfficialStatusBlocked {
-		t.Fatalf("OfficialStatus = %q, want %q", manifest.OfficialStatus, lmeOfficialStatusBlocked)
-	}
-	if !strings.Contains(
-		strings.Join(manifest.OfficialBlockers, "\n"),
-		"legacy case_ids-only schema",
-	) {
-		t.Fatalf("OfficialBlockers = %v, want legacy manifest blocker", manifest.OfficialBlockers)
-	}
-}
-
 func TestDeriveLMERunManifestBlockersRejectsBiasedCaseSelection(t *testing.T) {
 	tests := []struct {
 		name   string
@@ -186,11 +157,6 @@ func TestDeriveLMERunManifestBlockersRejectsBiasedCaseSelection(t *testing.T) {
 			name:   "sample without split",
 			method: dataset.LongMemEvalManifestMethodStratifiedSHA256,
 			want:   "sampled case manifest must declare a dev or holdout split",
-		},
-		{
-			name:   "legacy first",
-			method: dataset.LongMemEvalManifestMethodLegacyFirst,
-			want:   "legacy-first case selection is not eligible",
 		},
 	}
 	for _, test := range tests {
@@ -449,7 +415,11 @@ func TestEnsureLMERunManifestResumeMismatch(t *testing.T) {
 			name: "case manifest",
 			want: "case manifest artifact changed",
 			mutate: func(t *testing.T, fixture *lmeProvenanceFixture) {
-				writeLMEProvenanceTestFile(t, fixture.request.Config.ManifestPath, `{"case_ids":["case-2"]}`)
+				data, err := os.ReadFile(fixture.request.Config.ManifestPath)
+				if err != nil {
+					t.Fatalf("ReadFile(case manifest) error = %v", err)
+				}
+				writeLMEProvenanceTestFile(t, fixture.request.Config.ManifestPath, string(data)+"\n")
 			},
 		},
 		{
@@ -830,7 +800,7 @@ func newLMEProvenanceFixture(t *testing.T) *lmeProvenanceFixture {
 		t.Fatalf("WriteLongMemEvalManifest() error = %v", err)
 	}
 	writeLMEProvenanceTestFile(t, filepath.Join(replayPath, "case-1.json"), `{"case_id":"case-1"}`)
-	writeLMEProvenanceTestFile(t, buildPlanPath, `{"protocol":"turn-pair","chunks":1}`)
+	writeLMEProvenanceTestFile(t, buildPlanPath, `{"protocol":"turn-pair-fragment","chunks":1}`)
 	cfg := lmeRunConfig{
 		ModelName:                    "gpt-4o-mini",
 		EmbedModelName:               "text-embedding-3-small",

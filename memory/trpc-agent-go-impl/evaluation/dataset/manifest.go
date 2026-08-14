@@ -19,7 +19,7 @@ import (
 )
 
 const (
-	// LongMemEvalManifestSchemaVersion is the current rich manifest schema.
+	// LongMemEvalManifestSchemaVersion is the current manifest schema.
 	LongMemEvalManifestSchemaVersion = 1
 
 	// LongMemEvalManifestSplitDev identifies the development side of a split.
@@ -36,8 +36,6 @@ const (
 	LongMemEvalManifestMethodStratifiedSHA256 LongMemEvalManifestMethod = "stratified-sha256"
 	// LongMemEvalManifestMethodFullCategory selects every case from each requested question type.
 	LongMemEvalManifestMethodFullCategory LongMemEvalManifestMethod = "full-category"
-	// LongMemEvalManifestMethodLegacyFirst preserves historical source-order selection.
-	LongMemEvalManifestMethodLegacyFirst LongMemEvalManifestMethod = "legacy-first"
 )
 
 // LongMemEvalManifestCase binds a selected case ID to its question type.
@@ -46,11 +44,7 @@ type LongMemEvalManifestCase struct {
 	QuestionType string `json:"question_type"`
 }
 
-// LongMemEvalManifest stores a fixed LongMemEval case subset.
-//
-// CaseIDs remains the compatibility field consumed by older benchmark
-// versions. The other fields make newly generated manifests reproducible and
-// auditable. A legacy manifest containing only case_ids remains valid.
+// LongMemEvalManifest stores a reproducible fixed LongMemEval case subset.
 type LongMemEvalManifest struct {
 	SchemaVersion int                       `json:"schema_version,omitempty"`
 	Method        LongMemEvalManifestMethod `json:"method,omitempty"`
@@ -66,17 +60,6 @@ type LongMemEvalManifest struct {
 	DatasetDigest string                    `json:"dataset_digest,omitempty"`
 	// ManifestDigest covers the complete manifest except this field itself.
 	ManifestDigest string `json:"manifest_digest,omitempty"`
-}
-
-// IsLegacy reports whether the manifest uses the historical case_ids-only schema.
-func (m *LongMemEvalManifest) IsLegacy() bool {
-	if m == nil {
-		return false
-	}
-	return m.SchemaVersion == 0 && m.Method == "" && m.Seed == "" &&
-		m.Split == "" && len(m.QuestionTypes) == 0 && len(m.Quotas) == 0 &&
-		len(m.RankOffsets) == 0 && m.TotalSize == 0 && len(m.Cases) == 0 &&
-		m.DatasetDigest == "" && m.ManifestDigest == ""
 }
 
 // ParseLongMemEvalManifest parses and validates a LongMemEval manifest.
@@ -131,7 +114,7 @@ func VerifyLongMemEvalManifest(
 	if err := validateLongMemEvalManifestShape(manifest); err != nil {
 		return err
 	}
-	inventory, err := newLongMemEvalManifestInventory(instances, !manifest.IsLegacy())
+	inventory, err := newLongMemEvalManifestInventory(instances, true)
 	if err != nil {
 		return err
 	}
@@ -140,9 +123,6 @@ func VerifyLongMemEvalManifest(
 		inst := inventory.byID[id]
 		if inst == nil {
 			return fmt.Errorf("LongMemEval manifest case_id %q not found in dataset", id)
-		}
-		if manifest.IsLegacy() {
-			continue
 		}
 		caseType := manifest.Cases[i].QuestionType
 		if caseType != inst.QuestionType {
@@ -154,9 +134,6 @@ func VerifyLongMemEvalManifest(
 			)
 		}
 		selectedCounts[caseType]++
-	}
-	if manifest.IsLegacy() {
-		return nil
 	}
 	digestInstances := filterLongMemEvalManifestQuestionTypes(instances, manifest.QuestionTypes)
 	datasetDigest, err := LongMemEvalDatasetDigest(digestInstances)
@@ -214,9 +191,6 @@ func VerifyLongMemEvalManifestSplit(
 	}
 	if err := validateLongMemEvalManifestShape(holdout); err != nil {
 		return fmt.Errorf("validate holdout manifest: %w", err)
-	}
-	if dev.IsLegacy() || holdout.IsLegacy() {
-		return errors.New("LongMemEval dev/holdout verification requires rich manifests")
 	}
 	if dev.Split != LongMemEvalManifestSplitDev {
 		return fmt.Errorf("development manifest split is %q, want %q", dev.Split, LongMemEvalManifestSplitDev)
@@ -291,9 +265,6 @@ func validateLongMemEvalManifestShape(manifest *LongMemEvalManifest) error {
 	}
 	if err := validateLongMemEvalCaseIDs(manifest.CaseIDs); err != nil {
 		return err
-	}
-	if manifest.IsLegacy() {
-		return nil
 	}
 	if manifest.SchemaVersion != LongMemEvalManifestSchemaVersion {
 		return fmt.Errorf(
@@ -377,7 +348,7 @@ func validateLongMemEvalManifestMethod(manifest *LongMemEvalManifest) error {
 			manifest.Split != LongMemEvalManifestSplitHoldout {
 			return fmt.Errorf("invalid LongMemEval manifest split %q", manifest.Split)
 		}
-	case LongMemEvalManifestMethodFullCategory, LongMemEvalManifestMethodLegacyFirst:
+	case LongMemEvalManifestMethodFullCategory:
 		if manifest.Seed != "" {
 			return fmt.Errorf("LongMemEval %s manifest must not set seed", manifest.Method)
 		}

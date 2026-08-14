@@ -245,13 +245,13 @@ func parseCommandOptions(args []string) (commandOptions, error) {
 		&opts.method,
 		"method",
 		string(dataset.LongMemEvalManifestMethodStratifiedSHA256),
-		"Selection method: stratified-sha256, full-category, or legacy-first",
+		"Selection method: stratified-sha256 or full-category",
 	)
 	flags.StringVar(&opts.seed, "seed", "", "Explicit seed for SHA-256 selection")
 	flags.StringVar(&opts.questionTypes, "types", defaultQuestionTypes, "Comma-separated question types")
 	flags.IntVar(&opts.totalSize, "total-size", 0, "Total selected cases, allocated by largest remainder")
 	flags.StringVar(&opts.quotas, "quotas", "", "Per-type quotas as type=count,type=count")
-	flags.IntVar(&opts.perType, "per-type", 0, "Equal per-type quota; use legacy-first for historical selection")
+	flags.IntVar(&opts.perType, "per-type", 0, "Equal per-type quota")
 	flags.StringVar(&opts.devOutput, "dev-output", "", "Development manifest output path")
 	flags.StringVar(&opts.holdoutOutput, "holdout-output", "", "Holdout manifest output path")
 	flags.IntVar(&opts.devSize, "dev-size", 0, "Development total size")

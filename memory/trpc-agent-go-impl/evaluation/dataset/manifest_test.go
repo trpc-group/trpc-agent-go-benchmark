@@ -248,22 +248,6 @@ func TestBuildLongMemEvalManifestFull70HasNoSamplingBias(t *testing.T) {
 	}
 }
 
-func TestBuildLongMemEvalManifestLegacyFirstPreservesSourceOrder(t *testing.T) {
-	instances := []*LongMemEvalInstance{
-		{QuestionID: "a-2", QuestionType: "type-a"},
-		{QuestionID: "a-1", QuestionType: "type-a"},
-		{QuestionID: "a-3", QuestionType: "type-a"},
-	}
-	manifest := mustBuildManifest(t, instances, LongMemEvalManifestSelection{
-		Method:        LongMemEvalManifestMethodLegacyFirst,
-		QuestionTypes: []string{"type-a"},
-		Quotas:        map[string]int{"type-a": 2},
-	})
-	if !reflect.DeepEqual(manifest.CaseIDs, []string{"a-2", "a-1"}) {
-		t.Fatalf("CaseIDs = %v, want source-order prefix", manifest.CaseIDs)
-	}
-}
-
 func TestBuildAndVerifyLongMemEvalManifestSplit(t *testing.T) {
 	instances := manifestTestInstances(map[string]int{"type-a": 10, "type-b": 10})
 	selection := LongMemEvalManifestSplitSelection{
@@ -500,28 +484,6 @@ func TestVerifyLongMemEvalManifestRejectsDatasetDigestMismatch(t *testing.T) {
 	}
 }
 
-func TestParseLongMemEvalManifestSupportsLegacyCaseIDs(t *testing.T) {
-	manifest, err := ParseLongMemEvalManifest([]byte(`{"case_ids":["c","a"]}`))
-	if err != nil {
-		t.Fatalf("ParseLongMemEvalManifest() error = %v", err)
-	}
-	if !manifest.IsLegacy() {
-		t.Fatal("IsLegacy() = false, want true")
-	}
-	instances := []*LongMemEvalInstance{
-		{QuestionID: "a"},
-		{QuestionID: "b"},
-		{QuestionID: "c"},
-	}
-	filtered, err := FilterLongMemEvalByManifest(instances, manifest)
-	if err != nil {
-		t.Fatalf("FilterLongMemEvalByManifest() error = %v", err)
-	}
-	if filtered[0].QuestionID != "c" || filtered[1].QuestionID != "a" {
-		t.Fatalf("filtered order = %s, %s", filtered[0].QuestionID, filtered[1].QuestionID)
-	}
-}
-
 func TestParseLongMemEvalManifestRejectsMalformedManifests(t *testing.T) {
 	tests := []struct {
 		name string
@@ -530,6 +492,7 @@ func TestParseLongMemEvalManifestRejectsMalformedManifests(t *testing.T) {
 	}{
 		{name: "empty", data: `{}`, want: "no case_ids"},
 		{name: "duplicate", data: `{"case_ids":["a","a"]}`, want: "duplicate case_id"},
+		{name: "case IDs only", data: `{"case_ids":["a"]}`, want: "schema_version 0"},
 		{
 			name: "partial rich schema",
 			data: `{"schema_version":1,"method":"stratified-sha256","case_ids":["a"]}`,
@@ -609,9 +572,17 @@ func TestVerifyLongMemEvalManifestAcceptsQuestionTypePrefilter(t *testing.T) {
 }
 
 func TestFilterLongMemEvalByManifestRejectsMissingID(t *testing.T) {
+	instances := []*LongMemEvalInstance{
+		{QuestionID: "a", QuestionType: "type-a"},
+		{QuestionID: "missing", QuestionType: "type-a"},
+	}
+	manifest := mustBuildManifest(t, instances, LongMemEvalManifestSelection{
+		Method:        LongMemEvalManifestMethodFullCategory,
+		QuestionTypes: []string{"type-a"},
+	})
 	_, err := FilterLongMemEvalByManifest(
-		[]*LongMemEvalInstance{{QuestionID: "a"}},
-		&LongMemEvalManifest{CaseIDs: []string{"missing"}},
+		instances[:1],
+		manifest,
 	)
 	if err == nil || !strings.Contains(err.Error(), "missing") {
 		t.Fatalf("FilterLongMemEvalByManifest() error = %v, want missing ID", err)

@@ -2,28 +2,15 @@ module trpc.group/trpc-go/trpc-agent-go-benchmark/memory/trpc-agent-go-impl
 
 go 1.24.0
 
-replace (
-	// This immutable fork pin carries the root APIs exercised by this benchmark.
-	// Replace it with the corresponding upstream commit after merge.
-	trpc.group/trpc-go/trpc-agent-go => github.com/print-happy/trpc-agent-go v0.0.0-20260722093037-ea2ec7d54b07
-	trpc.group/trpc-go/trpc-agent-go/memory/mysql => github.com/print-happy/trpc-agent-go/memory/mysql v0.0.0-20260716032212-1b3adb2f4bb8
-	trpc.group/trpc-go/trpc-agent-go/memory/pgvector => github.com/print-happy/trpc-agent-go/memory/pgvector v0.0.0-20260716032212-1b3adb2f4bb8
-	trpc.group/trpc-go/trpc-agent-go/memory/sqlite => github.com/print-happy/trpc-agent-go/memory/sqlite v0.0.0-20260716032212-1b3adb2f4bb8
-	trpc.group/trpc-go/trpc-agent-go/memory/sqlitevec => github.com/print-happy/trpc-agent-go/memory/sqlitevec v0.0.0-20260716032212-1b3adb2f4bb8
-	trpc.group/trpc-go/trpc-agent-go/session/pgvector => github.com/print-happy/trpc-agent-go/session/pgvector v0.0.0-20260716032212-1b3adb2f4bb8
-	trpc.group/trpc-go/trpc-agent-go/storage/mysql => github.com/print-happy/trpc-agent-go/storage/mysql v0.0.0-20260716032212-1b3adb2f4bb8
-	trpc.group/trpc-go/trpc-agent-go/storage/postgres => github.com/print-happy/trpc-agent-go/storage/postgres v0.0.0-20260716032212-1b3adb2f4bb8
-)
-
 require (
 	github.com/mattn/go-sqlite3 v1.14.32
 	github.com/tiktoken-go/tokenizer v0.7.0
-	trpc.group/trpc-go/trpc-agent-go v1.7.0
-	trpc.group/trpc-go/trpc-agent-go/memory/mysql v1.7.0
-	trpc.group/trpc-go/trpc-agent-go/memory/pgvector v1.7.0
-	trpc.group/trpc-go/trpc-agent-go/memory/sqlite v1.7.0
-	trpc.group/trpc-go/trpc-agent-go/memory/sqlitevec v1.7.0
-	trpc.group/trpc-go/trpc-agent-go/session/pgvector v1.7.0
+	trpc.group/trpc-go/trpc-agent-go v1.11.1-0.20260813085753-76eefc785772
+	trpc.group/trpc-go/trpc-agent-go/memory/mysql v1.11.1-0.20260813085753-76eefc785772
+	trpc.group/trpc-go/trpc-agent-go/memory/pgvector v1.11.1-0.20260813085753-76eefc785772
+	trpc.group/trpc-go/trpc-agent-go/memory/sqlite v1.11.1-0.20260813085753-76eefc785772
+	trpc.group/trpc-go/trpc-agent-go/memory/sqlitevec v1.11.1-0.20260813085753-76eefc785772
+	trpc.group/trpc-go/trpc-agent-go/session/pgvector v1.11.1-0.20260813085753-76eefc785772
 )
 
 require (
@@ -77,7 +64,7 @@ require (
 	google.golang.org/grpc v1.79.3 // indirect
 	google.golang.org/protobuf v1.36.10 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
-	trpc.group/trpc-go/trpc-a2a-go v0.2.5 // indirect
-	trpc.group/trpc-go/trpc-agent-go/storage/mysql v0.0.0-20251126064502-c8c2594d2519 // indirect
-	trpc.group/trpc-go/trpc-agent-go/storage/postgres v1.6.0 // indirect
+	trpc.group/trpc-go/trpc-a2a-go v0.2.6-0.20260721084546-18c8244d0acb // indirect
+	trpc.group/trpc-go/trpc-agent-go/storage/mysql v1.11.1-0.20260813085753-76eefc785772 // indirect
+	trpc.group/trpc-go/trpc-agent-go/storage/postgres v1.11.1-0.20260813085753-76eefc785772 // indirect
 )

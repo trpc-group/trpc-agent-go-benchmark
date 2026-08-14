@@ -34,7 +34,7 @@ import (
 	"trpc.group/trpc-go/trpc-agent-go/tool"
 )
 
-const lmeReplayVersion = 2
+const lmeReplayVersion = 1
 
 type lmeSeedAgent struct {
 	mu               sync.Mutex

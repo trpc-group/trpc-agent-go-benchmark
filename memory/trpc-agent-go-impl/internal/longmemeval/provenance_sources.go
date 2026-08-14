@@ -578,7 +578,7 @@ func uniqueSortedStrings(values []string) []string {
 	return out
 }
 
-func rejectLegacyLMEOutputWithoutManifest(outputDir, manifestPath string) error {
+func rejectUnversionedLMEOutput(outputDir, manifestPath string) error {
 	if _, err := os.Stat(manifestPath); err == nil {
 		return fmt.Errorf("run_manifest.json already exists; use resume with the exact run configuration")
 	} else if !os.IsNotExist(err) {
@@ -587,9 +587,9 @@ func rejectLegacyLMEOutputWithoutManifest(outputDir, manifestPath string) error 
 	for _, name := range []string{"checkpoint.json", "results.json"} {
 		path := filepath.Join(outputDir, name)
 		if _, err := os.Stat(path); err == nil {
-			return fmt.Errorf("legacy %s exists without run_manifest.json; use a fresh output directory", name)
+			return fmt.Errorf("%s exists without run_manifest.json; use a fresh output directory", name)
 		} else if !os.IsNotExist(err) {
-			return fmt.Errorf("inspect legacy result %s: %w", name, err)
+			return fmt.Errorf("inspect unversioned result %s: %w", name, err)
 		}
 	}
 	return nil

@@ -525,6 +525,7 @@ func newLMEMemoryBuildMetadata(
 		"chunked_session_count":     config.BuildStats.ChunkedSessionCount,
 		"chunked_pair_count":        config.BuildStats.ChunkedPairCount,
 		"split_turn_count":          config.BuildStats.SplitTurnCount,
+		"fragmented_case_ids":       append([]string(nil), config.BuildStats.FragmentedCaseIDs...),
 		"original_tokens":           config.BuildStats.OriginalTokens,
 		"final_tokens":              config.BuildStats.FinalTokens,
 		"original_bytes":            config.BuildStats.OriginalBytes,

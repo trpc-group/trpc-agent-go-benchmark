@@ -3,13 +3,12 @@
 ## LongMemEval
 
 > **Fixed development-set results.** Sections 1-5 document the fixed 50-case
-> turn-pair run `turn_pair_full50_parallel4_20260717`, including case-local recovery of
-> transient infrastructure failures. Section 6 adds the final conditional
-> two-stage assistant-episode extraction comparison. Earlier LongMemEval
-> numbers used different build protocols or result governance and have been
-> removed. The reported rows are valid, directly comparable results for this
-> frozen development manifest and protocol. Because the legacy manifest does
-> not define a seeded blind split, they are not a blind holdout baseline.
+> run `turn_pair_full50_parallel4_20260717`, including case-local recovery of
+> transient infrastructure failures. Section 6 retains assistant-episode runs
+> as historical reference only because their extraction implementation predates
+> the current merged implementation. The archived case-selection artifact does
+> not define a seeded blind split, so these results are not a blind holdout
+> baseline.
 
 Policy labels in this report use the current names. This is a documentation
 relabeling of behaviorally identical historical runs; the metrics and raw
@@ -23,8 +22,8 @@ artifacts were not regenerated.
 | Cases | 50 fixed cases across all six question types |
 | Distribution | knowledge-update 8; multi-session 13; assistant 6; preference 3; user 7; temporal 13 |
 | Input | 2,353 sessions; 24,370 turns; 12,280 user/assistant pairs |
-| Build protocol | Lossless turn-pair replay; one shared replay and build plan |
-| Build chunk limit | 6,000 `cl100k_base` tokens; one pair required lossless splitting |
+| Build protocol | Ordered turn-pair fragments; one shared replay and build plan |
+| Build chunk limit | 6,000 `cl100k_base` tokens; one pair was split losslessly across separate extraction boundaries |
 | Answer, extraction, and judge model | `glm52` |
 | Embedding model | `text-embedding-ada-002` |
 | Retrieval | Standard `memory_search`, fixed `top-k=20` |
@@ -84,9 +83,10 @@ eight tool iterations remain incorrect in the fixed denominator.
 | Mem0 OSS | 50/50 | 28,041 | 560.82 | 564.5 | 465-602 |
 
 The inventory is reconstructed from the last successful persistence snapshot
-for each case whose memory build completed. The snapshot reader limit is
-10,000 entries, well above the observed maximum of 602, so these counts are
-not truncated. They count active entries after ingestion, not extraction
+for each case whose memory build completed. The shared snapshot reader requests
+up to 10,000 entries, while the Mem0 OSS adapter exposes at most 1,000 entries.
+Both limits exceed the observed maximum of 602, so these counts are not
+truncated. They count active entries after ingestion, not extraction
 operations or database rows shared across cases.
 
 For recovered cases, the failed attempt's partial inventory is discarded and
@@ -118,8 +118,8 @@ population reported above.
    28% to 82%. Every Merge Similar success is also correct under Preserve
    History; Preserve History adds 27 correct cases without a regression unique
    to Merge Similar. Its completed cases retain about 5.2 times as many final
-   entries per case as Merge Similar, showing how strongly the legacy
-   reconciliation policy reduces the stored evidence set.
+   entries per case as Merge Similar, showing how strongly Merge Similar
+   reconciliation reduces the stored evidence set.
 2. **Preserve History and Append Only tie on Accuracy but preserve different
    evidence.** They agree on 39 correct cases and each has two unique successes.
    Preserve History is stronger on multi-session and single-session-user
@@ -129,22 +129,23 @@ population reported above.
    History agree on 38 correct cases; Mem0 has four unique successes and
    Preserve History has three. Mem0 is strongest on assistant-memory questions,
    while Preserve History leads multi-session and temporal Accuracy.
-4. **The comparison is scoped to a fixed development set.** Its legacy
-   `case_ids`-only manifest fixes the exact sample but records neither a seeded
-   selection method nor a blind dev/holdout split. This limits generalization
-   claims, but does not invalidate comparisons among rows using this manifest.
+4. **The comparison is scoped to a fixed development set.** Its archived case
+   selection fixes the exact sample but records neither a seeded selection
+   method nor a blind dev/holdout split. This limits generalization claims, but
+   does not invalidate comparisons among rows using the same selection.
 
 ### 6. Policy and Assistant-Episode Matrix
 
 This section compares the three Auto update policies with
 assistant-episode extraction disabled and enabled. The enabled rows use the
-final conditional two-stage extractor: ordinary user-memory extraction runs
-first, and a bounded assistant-result extraction request is issued only for a
-strong structured-result candidate. Mem0 uses its native extraction behavior.
+historical two-stage implementation used by those runs. Since eligibility,
+grounding, and request construction changed before the feature merged, enabled
+rows are reference values and do not reproduce the current head. Mem0 uses its
+native extraction behavior.
 
 All seven rows use the same 50 cases and order, `glm52`,
-`text-embedding-ada-002`, lossless turn-pair replay, the same 6,000-token
-chunk limit, and `top-k=20`.
+`text-embedding-ada-002`, the same ordered turn-pair fragments, the same
+6,000-token chunk limit, and `top-k=20`.
 
 | Policy / backend | Assistant extraction | QA succeeded | Failed | Correct | Accuracy | F1 | BLEU | ROUGE-L |
 | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
@@ -157,8 +158,8 @@ chunk limit, and `top-k=20`.
 | Mem0 OSS | Native | 50/50 | 0 | 42 | 0.8400 | 0.1681 | 0.1067 | 0.1588 |
 
 Failed QA remains in the fixed denominator and scores as incorrect. The
-assistant-enabled runs are not replacements selected by score; each row is one
-complete experimental configuration.
+assistant-enabled runs are not replacements selected by score, but they should
+be treated only as historical references rather than current-head results.
 
 #### Complete-Build Memory Inventory
 
@@ -196,8 +197,10 @@ proxy accounting rather than complete provider usage.
 
 #### Interpretation and Limits
 
-- Enabling assistant extraction raises Accuracy by 30 points for Merge Similar,
-  8 points for Preserve History, and 6 points for Append Only on this sample.
+- In the historical implementation, enabling assistant extraction raised
+  Accuracy by 30 points for Merge Similar, 8 points for Preserve History, and
+  6 points for Append Only on this sample. These deltas require rerunning before
+  they can be attributed to the current implementation.
 - Append Only with assistant extraction has the strongest lexical-overlap
   metrics, while Preserve History with assistant extraction has the highest
   Accuracy.
