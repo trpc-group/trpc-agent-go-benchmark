@@ -17,6 +17,7 @@ import (
 	"io"
 	"net/http"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -29,10 +30,41 @@ import (
 	"trpc.group/trpc-go/trpc-agent-go/model"
 )
 
-func TestGetLMEScenariosMem0OSS(t *testing.T) {
-	got := getLMEScenarios("mem0_oss")
-	if len(got) != 1 || got[0] != scenarios.ScenarioMem0OSS {
-		t.Fatalf("getLMEScenarios(mem0_oss) = %v, want [%s]", got, scenarios.ScenarioMem0OSS)
+func TestGetLMEScenarios(t *testing.T) {
+	tests := []struct {
+		name    string
+		raw     string
+		want    []scenarios.ScenarioType
+		wantErr bool
+	}{
+		{
+			name: "concrete scenarios",
+			raw:  "auto, mem0_oss, auto",
+			want: []scenarios.ScenarioType{
+				scenarios.ScenarioAuto,
+				scenarios.ScenarioMem0OSS,
+			},
+		},
+		{name: "all alias is unsupported", raw: "all", wantErr: true},
+		{name: "unknown scenario", raw: "session_recall", wantErr: true},
+		{name: "empty selection", raw: " , ", wantErr: true},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			got, err := getLMEScenarios(test.raw)
+			if test.wantErr {
+				if err == nil {
+					t.Fatalf("getLMEScenarios(%q) error = nil", test.raw)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("getLMEScenarios(%q) error = %v", test.raw, err)
+			}
+			if !reflect.DeepEqual(got, test.want) {
+				t.Fatalf("getLMEScenarios(%q) = %v, want %v", test.raw, got, test.want)
+			}
+		})
 	}
 }
 

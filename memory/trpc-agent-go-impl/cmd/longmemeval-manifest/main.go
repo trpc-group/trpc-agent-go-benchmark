@@ -43,6 +43,8 @@ type commandOptions struct {
 	holdoutQuotas   string
 	manifestPath    string
 	holdoutManifest string
+	methodSet       bool
+	typesSet        bool
 }
 
 func main() {
@@ -53,7 +55,10 @@ func main() {
 }
 
 func run(args []string, stdout io.Writer) error {
-	opts, err := parseCommandOptions(args)
+	opts, err := parseCommandOptions(args, stdout)
+	if errors.Is(err, flag.ErrHelp) {
+		return nil
+	}
 	if err != nil {
 		return err
 	}
@@ -200,7 +205,8 @@ func runVerify(
 	if opts.manifestPath == "" {
 		return errors.New("-manifest is required for verify")
 	}
-	if opts.outputPath != "" || opts.seed != "" || opts.totalSize != 0 || opts.quotas != "" ||
+	if opts.methodSet || opts.typesSet || opts.outputPath != "" || opts.seed != "" ||
+		opts.totalSize != 0 || opts.quotas != "" ||
 		opts.perType != 0 || opts.devOutput != "" || opts.holdoutOutput != "" || opts.devSize != 0 ||
 		opts.holdoutSize != 0 || opts.devQuotas != "" || opts.holdoutQuotas != "" {
 		return errors.New("generation and split flags cannot be used with verify")
@@ -234,10 +240,10 @@ func runVerify(
 	return nil
 }
 
-func parseCommandOptions(args []string) (commandOptions, error) {
+func parseCommandOptions(args []string, output io.Writer) (commandOptions, error) {
 	var opts commandOptions
 	flags := flag.NewFlagSet("longmemeval-manifest", flag.ContinueOnError)
-	flags.SetOutput(io.Discard)
+	flags.SetOutput(output)
 	flags.StringVar(&opts.action, "action", "generate", "Action: generate, split, or verify")
 	flags.StringVar(&opts.datasetPath, "dataset", "", "LongMemEval dataset JSON path")
 	flags.StringVar(&opts.outputPath, "output", "", "Generated manifest JSON path")
@@ -261,8 +267,19 @@ func parseCommandOptions(args []string) (commandOptions, error) {
 	flags.StringVar(&opts.manifestPath, "manifest", "", "Manifest to verify, or development manifest in pair verification")
 	flags.StringVar(&opts.holdoutManifest, "holdout-manifest", "", "Holdout manifest for pair verification")
 	if err := flags.Parse(args); err != nil {
+		if errors.Is(err, flag.ErrHelp) {
+			return commandOptions{}, err
+		}
 		return commandOptions{}, fmt.Errorf("parse flags: %w", err)
 	}
+	flags.Visit(func(parsed *flag.Flag) {
+		switch parsed.Name {
+		case "method":
+			opts.methodSet = true
+		case "types":
+			opts.typesSet = true
+		}
+	})
 	if flags.NArg() != 0 {
 		return commandOptions{}, fmt.Errorf("unexpected positional arguments: %s", strings.Join(flags.Args(), " "))
 	}

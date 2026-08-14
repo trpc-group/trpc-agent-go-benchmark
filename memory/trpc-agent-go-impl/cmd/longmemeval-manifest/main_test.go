@@ -56,7 +56,10 @@ func TestParseQuotasRejectsMalformedValues(t *testing.T) {
 }
 
 func TestParseCommandOptionsDefaultsToStratifiedSelection(t *testing.T) {
-	opts, err := parseCommandOptions([]string{"-dataset", "dataset.json", "-output", "manifest.json"})
+	opts, err := parseCommandOptions(
+		[]string{"-dataset", "dataset.json", "-output", "manifest.json"},
+		&bytes.Buffer{},
+	)
 	if err != nil {
 		t.Fatalf("parseCommandOptions() error = %v", err)
 	}
@@ -65,6 +68,16 @@ func TestParseCommandOptionsDefaultsToStratifiedSelection(t *testing.T) {
 	}
 	if opts.perType != 0 {
 		t.Fatalf("perType = %d, want 0", opts.perType)
+	}
+}
+
+func TestRunHelp(t *testing.T) {
+	var output bytes.Buffer
+	if err := run([]string{"-h"}, &output); err != nil {
+		t.Fatalf("run(-h) error = %v", err)
+	}
+	if !strings.Contains(output.String(), "Usage of longmemeval-manifest") {
+		t.Fatalf("run(-h) output = %q", output.String())
 	}
 }
 
@@ -101,6 +114,21 @@ func TestRunGenerateAndVerify(t *testing.T) {
 	}
 	if !strings.Contains(output.String(), "verified") {
 		t.Fatalf("verify output = %q", output.String())
+	}
+	for _, selectionFlag := range [][]string{
+		{"-method", "full-category"},
+		{"-types", "type-a"},
+	} {
+		args := []string{
+			"-action", "verify",
+			"-dataset", datasetPath,
+			"-manifest", manifestPath,
+		}
+		args = append(args, selectionFlag...)
+		if err := run(args, &bytes.Buffer{}); err == nil ||
+			!strings.Contains(err.Error(), "generation and split flags") {
+			t.Fatalf("run(verify %v) error = %v", selectionFlag, err)
+		}
 	}
 }
 

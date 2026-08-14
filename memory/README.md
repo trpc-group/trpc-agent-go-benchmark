@@ -462,7 +462,7 @@ replacements are not accepted for maintained runs.
 | --- | --- | --- |
 | `auto` | Primary | Runner replay -> native auto memory worker -> standard `memory_search` |
 | `mem0_oss` | Primary | Runner replay -> `session.Ingestor` -> Mem0 OSS -> standard `memory_search` |
-| `replay` | Preparation | Writes only the shared sanitized Runner replay artifact |
+| `replay` | Preparation | Writes the shared sanitized Runner replay and deterministic build-plan artifacts |
 | `long_context` | Reference | Answers from the full context without a memory store |
 
 Auto runs can select one extractor update policy while keeping the build plan,
@@ -507,10 +507,13 @@ The following options are relevant to the Go LongMemEval harness:
 | `-lme-auto-qa-only` | `false` | Skip Auto memory build and rerun QA against an existing pgvector table |
 | `-lme-auto-memory-table` | derived from table suffix | Explicit Auto pgvector table used by QA-only runs |
 | `-lme-auto-update-policy` | `merge_similar` | Auto extractor policy: `merge_similar`, `preserve_history`, or `append_only` |
+| `-lme-conversation-extraction` | `disabled` | Conversation extraction mode: `disabled` or `assistant-episode` |
 | `-lme-max-retries` | `3` | Transport retry count |
 | `-lme-answer-max-tokens` | `500` | Maximum answer tokens |
 | `-lme-judge-max-tokens` | `10240` | Maximum judge tokens; the parsed final answer must still be exact `yes` or `no` |
 | `-lme-extraction-wait` | `10m` | Timeout while waiting for Auto memory extraction |
+| `-lme-trace-content` | `hash` | Build-trace content mode: `full`, `hash`, or `none` |
+| `-lme-trace-gzip` | `false` | Compress build-trace attempt files with gzip |
 | `-lme-embedding-cache` | `true` | Enable the persistent LongMemEval embedding cache |
 | `-lme-embedding-cache-dir` | `<output>/longmemeval/.cache` | Override the embedding cache directory |
 | `-mem0-host` | `MEM0_HOST` | Mem0 OSS service URL |

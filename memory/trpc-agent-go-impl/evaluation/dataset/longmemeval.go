@@ -18,8 +18,8 @@ import (
 	"strings"
 )
 
-// EventExtensionLongMemEvalTurnID stores the official LongMemEval turn ID on
-// seeded session events.
+// EventExtensionLongMemEvalTurnID stores the stable benchmark artifact ID for
+// a LongMemEval turn on seeded session events.
 const EventExtensionLongMemEvalTurnID = "longmemeval.turn_id"
 
 // LongMemEvalTurn represents one turn in a LongMemEval session.
@@ -61,15 +61,6 @@ func (inst *LongMemEvalInstance) TotalTurns() int {
 		total += len(sess)
 	}
 	return total
-}
-
-// LongMemEvalTurnID returns the stable artifact ID for a turn.
-func LongMemEvalTurnID(sessionID string, turnIdx int, hasAnswer bool) string {
-	id := fmt.Sprintf("%s_%d", sessionID, turnIdx+1)
-	if hasAnswer {
-		return id
-	}
-	return strings.Replace(id, "answer", "noans", 1)
 }
 
 // LoadLongMemEval loads and validates LongMemEval instances from a JSON file.

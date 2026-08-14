@@ -65,7 +65,7 @@ var (
 		"long_context",
 		"Evaluation scenario (comma-separated): "+
 			"long_context, session_recall, agentic, auto, replay, all "+
-			"(LongMemEval supports long_context, replay, auto, mem0_oss, all)",
+			"(LongMemEval supports long_context, replay, auto, mem0_oss)",
 	)
 	// Memory backend flags (comma-separated for multiple).
 	flagMemoryBackends = flag.String(
@@ -207,11 +207,6 @@ var (
 		"mem0-proxy-run-id",
 		"",
 		"Unique split proxy run ID for scoped Mem0 usage accounting (env MEM0_PROXY_RUN_ID)",
-	)
-	flagLMESessionRecallUserOnly = flag.Bool(
-		"lme-session-recall-user-only",
-		true,
-		"Index only user turns for LongMemEval session_recall because retrieval is user-role only",
 	)
 	// Debug flags (auto scenario diagnosis).
 	flagDebugDumpMemories = flag.Bool("debug-dump-memories", false, "Dump extracted memories (auto scenario only)")
@@ -647,6 +642,9 @@ func validateFlags() {
 	validateDatasetFlags()
 	validateScenarioFlags()
 	backends := validateMemoryBackendFlags()
+	if err := validateLMEMemoryBackends(*flagDatasetFormat, *flagScenario, backends); err != nil {
+		log.Fatal(err)
+	}
 	validateLMEAutoQAOnlyFlags(backends)
 	validateSessionFlags()
 }
@@ -705,6 +703,29 @@ func validateMemoryBackendFlags() []string {
 		}
 	}
 	return backends
+}
+
+func validateLMEMemoryBackends(datasetFormat, rawScenarios string, backends []string) error {
+	if datasetFormat != lmeDatasetFormat {
+		return nil
+	}
+	autoSelected := false
+	for _, scenario := range strings.Split(rawScenarios, ",") {
+		if strings.TrimSpace(scenario) == "auto" {
+			autoSelected = true
+			break
+		}
+	}
+	if !autoSelected {
+		return nil
+	}
+	if len(backends) != 1 || backends[0] != "pgvector" {
+		return fmt.Errorf(
+			"longmemeval auto requires memory-backend pgvector; got %q",
+			strings.Join(backends, ","),
+		)
+	}
+	return nil
 }
 
 func validateLMEAutoQAOnlyFlags(backends []string) {

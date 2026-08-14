@@ -11,6 +11,7 @@ package longmemeval
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -36,7 +37,10 @@ func Run(ctx context.Context, config Config) error {
 	if err != nil {
 		return err
 	}
-	scenarioTypes := getLMEScenarios(config.Scenario)
+	scenarioTypes, err := getLMEScenarios(config.Scenario)
+	if err != nil {
+		return err
+	}
 	if lmeNeedsBuildArtifacts(scenarioTypes) {
 		cfg, err = prepareLMEInputArtifacts(cfg, instances)
 		if err != nil {
@@ -393,12 +397,7 @@ func validateLMEManifestTaskLimit(maxTasks, manifestTasks int) error {
 	)
 }
 
-func getLMEScenarios(raw string) []scenarios.ScenarioType {
-	if raw == "all" {
-		// Reports reuse an existing long_context result as the reference
-		// baseline when present, so all must not rerun long_context.
-		return []scenarios.ScenarioType{scenarios.ScenarioAuto}
-	}
+func getLMEScenarios(raw string) ([]scenarios.ScenarioType, error) {
 	allowed := map[string]scenarios.ScenarioType{
 		"long_context": scenarios.ScenarioLongContext,
 		"replay":       scenarios.ScenarioReplay,
@@ -414,8 +413,8 @@ func getLMEScenarios(raw string) []scenarios.ScenarioType {
 		}
 		scenarioType, ok := allowed[part]
 		if !ok {
-			log.Fatalf(
-				"LongMemEval supports long_context, replay, auto, mem0_oss, all; got %s",
+			return nil, fmt.Errorf(
+				"longmemeval supports long_context, replay, auto, and mem0_oss; got %q",
 				part,
 			)
 		}
@@ -426,9 +425,9 @@ func getLMEScenarios(raw string) []scenarios.ScenarioType {
 		out = append(out, scenarioType)
 	}
 	if len(out) == 0 {
-		log.Fatalf("No LongMemEval scenarios selected")
+		return nil, errors.New("no longmemeval scenarios selected")
 	}
-	return out
+	return out, nil
 }
 
 func newLMEEvaluator(
