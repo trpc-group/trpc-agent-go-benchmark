@@ -11,12 +11,12 @@ This directory stores memory benchmark evaluation results.
 | [REPORT.md](REPORT.md) | Full evaluation report (English) |
 | [REPORT.zh_CN.md](REPORT.zh_CN.md) | Full evaluation report (Chinese) |
 
-### Latest LoCoMo Policy Comparison
+### LoCoMo Update Policy Results
 
-The latest policy comparison uses the full LoCoMo-10 dataset, 1,986 QA items,
+This comparison uses the full LoCoMo-10 dataset, 1,986 QA items,
 `gpt-4o-mini`, `text-embedding-3-small`, top-k 30, and two
-`memory_search` passes. The historical Optimized configuration is the default
-Merge Similar policy.
+`memory_search` passes. The Optimized configuration is the default Merge
+Similar policy.
 
 | Policy configuration | F1 | BLEU | LLM Score | Active memories |
 | --- | ---: | ---: | ---: | ---: |
@@ -24,11 +24,11 @@ Merge Similar policy.
 | **Preserve History** | **0.4865** | **0.4473** | **0.5609** | 2,740 |
 | Append Only | 0.4773 | 0.4397 | 0.5441 | 2,627 |
 
-Assistant-episode experiments are intentionally excluded because LoCoMo maps
-its second human speaker to the assistant role and does not represent
-model-generated assistant results. Preserve History and Append Only have
-structured result artifacts; the Optimized row is retained from the archived
-report baseline because its original structured artifact is unavailable.
+Assistant-episode experiments are excluded: LoCoMo maps its second human
+speaker to the assistant role and is not an appropriate evaluation of
+model-generated assistant results. The Optimized row is quoted from the
+archived report baseline. Category metrics, cost, and runtime are in the
+LoCoMo part of [REPORT.md](REPORT.md).
 
 ### Historical LoCoMo Benchmark Evaluation Summary
 
@@ -166,84 +166,59 @@ Each `results.json` contains:
 
 ## LongMemEval
 
-LongMemEval is the cross-session user-memory benchmark. The current maintained
-harness uses Runner replay, sanitizer validation, and memory-only QA. The
-latest development comparison covers Auto `Merge Similar`, `Preserve History`,
-and `Append Only` update policies plus Mem0 OSS. The report intentionally omits
-earlier LongMemEval tables whose build or governance contracts differ from the
-current turn-pair harness.
+LongMemEval is the cross-session user-memory benchmark. The harness replays
+each case through public `Runner.Run` and answers from memory only. The
+comparison below covers the Auto `Merge Similar`, `Preserve History`, and
+`Append Only` update policies plus Mem0 OSS.
 
-These are current display names for behaviorally identical historical runs;
-the underlying metrics and raw artifacts were not regenerated for the rename.
+The evaluation uses a fixed 50-case subset of `longmemeval_s_cleaned.json`,
+which holds 500 cases, sampled at 10% from each of the six question types.
+The full case list is in Appendix D of the reports. The list pins the exact
+sample but defines no seeded blind split, so the results support relative
+comparison between configurations and are neither final scores on the
+benchmark nor a blind holdout baseline.
 
-New maintained runs use a fixed-denominator publication contract:
+Comparable runs share the dataset, case list, replay, build plan, model
+configuration, tokenizer, turn-pair protocol, and retrieval limit:
 
-- `checkpoint.json` is mutable resume state and is never a report input.
-- `results.json` is published atomically only after every selected case has one
-  terminal status and the run manifest, provenance, artifact digests, top-k,
-  fixed build protocol, phase cost, and build trace all pass validation.
-- Failed and judge-failed cases remain in the fixed denominator and score as
-  incorrect; missing or duplicate cases block publication.
-- `aggregate.<digest>.json` is the sanitized machine-readable aggregate.
-  Content-addressed `bad_cases.<digest>.*` files contain the linked failure
-  records in JSON, English Markdown, and Chinese Markdown.
-- Provider token counts are never estimated. `tokens_known=false` distinguishes
-  unavailable usage from a provider-reported zero.
-
-The maintained report generator accepts only artifacts that satisfy this
-contract. This prevents results produced with backend-specific truncation,
-different retrieval limits, incomplete cost accounting, or the obsolete
-whole-session build protocol from being mixed into the current comparison.
-
-Comparable maintained runs must share the exact dataset, case manifest,
-canonical replay, build plan, model configuration, tokenizer, fixed
-`turn-pair-fragment` protocol, and retrieval limit. The harness normally builds
-memory once per user/assistant pair through public `Runner.Run`. An over-limit
-pair is split without content loss, but each fragment is a separate Runner call
-and extraction boundary; affected case IDs are recorded in provenance. One
-Runner is reused per case, and every backend consumes the same fragments. Pairs
-from one source session share its original session ID, while other source
-sessions use isolated histories under the same user-level memory. The harness
-applies `top-k=20` to every memory backend. Auto
-receives the session date through its extractor reference-date capability;
-Mem0 receives the same date as extraction custom instructions through the
-official `POST /memories` `prompt` field. The date comes from the immutable
-build-plan session observation time and is not inserted into message content.
-Whole-session ingestion and metadata-only Mem0 temporal context are not
-supported by the maintained harness; older outputs that used either remain
-historical diagnostics only. Resume requires the stored and current benchmark
-worktrees to be clean.
-
-Maintained Mem0 results additionally require a successful sanitized preflight.
-The publication manifest records its digest and rejects a run unless the
-verified Mem0 source commit, version, LLM, embedding model, environment-lock
-digest, and observation-prompt capability match the benchmark configuration.
+- The harness builds memory once per user/assistant pair through public
+  `Runner.Run`. An over-limit pair is split without content loss, but each
+  fragment is a separate Runner call and extraction boundary, and the affected
+  case IDs are recorded in provenance. One Runner is reused per case; pairs
+  from one source session share its original session ID, while other source
+  sessions use isolated histories under the same user-level memory.
+- Builder input is validated and timestamped, and `top-k=20` applies to every
+  memory backend.
+- Auto receives the session date through its extractor reference-date
+  capability; Mem0 receives the same date as extraction custom instructions
+  through the official `POST /memories` `prompt` field. The date comes from
+  the build-plan session observation time and is not inserted into message
+  content.
+- Cases that produce no answer stay in the fixed denominator of 50 and score
+  as incorrect.
 
 ### LongMemEval Policy and Assistant Matrix
 
-The development snapshot covers all three Auto update policies with
-assistant-episode extraction disabled and enabled, plus native Mem0 OSS. Every
-row uses the same fixed 50-case selection, `glm52`,
-`text-embedding-ada-002`, ordered turn-pair fragments, and `top-k=20`.
-Assistant-enabled rows are historical references because their extraction
-implementation predates the current merged implementation.
+All three Auto update policies with assistant-episode extraction disabled and
+enabled, plus native Mem0 OSS. Every row uses the same 50 cases, `glm52`,
+`text-embedding-ada-002`, the same ordered turn-pair fragments, and
+`top-k=20`. The assistant-enabled rows are historical references because their
+extraction implementation predates the merged version.
 
 | Policy / backend | Assistant extraction | QA succeeded | Correct | Accuracy | F1 | BLEU | ROUGE-L | Complete-build memories |
 | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| Merge Similar | Disabled | 48/50 | 14 | 28% | 0.0961 | 0.0635 | 0.0885 | 2,955 / 50 cases |
-| Merge Similar | Enabled | 45/50 | 29 | 58% | 0.1626 | 0.1083 | 0.1518 | 6,011 / 50 cases |
-| Preserve History | Disabled | 50/50 | 41 | 82% | 0.1683 | 0.1079 | 0.1614 | 15,353 / 50 cases |
-| Preserve History | Enabled | 48/50 | 45 | 90% | 0.1876 | 0.1204 | 0.1779 | 17,696 / 49 cases |
-| Append Only | Disabled | 50/50 | 41 | 82% | 0.1730 | 0.1112 | 0.1679 | 16,280 / 50 cases |
-| Append Only | Enabled | 47/50 | 44 | 88% | **0.1970** | **0.1295** | **0.1865** | 18,728 / 49 cases |
-| Mem0 OSS | Native | 50/50 | **42** | 84% | 0.1681 | 0.1067 | 0.1588 | 28,041 / 50 cases |
+| Merge Similar | Disabled | 48/50 | 14 | 0.2800 | 0.0961 | 0.0635 | 0.0885 | 2,955 / 50 cases |
+| Merge Similar | Enabled | 45/50 | 29 | 0.5800 | 0.1626 | 0.1083 | 0.1518 | 6,011 / 50 cases |
+| Preserve History | Disabled | 50/50 | 41 | 0.8200 | 0.1683 | 0.1079 | 0.1614 | 15,353 / 50 cases |
+| Preserve History | Enabled | 48/50 | **45** | **0.9000** | 0.1876 | 0.1204 | 0.1779 | 17,696 / 49 cases |
+| Append Only | Disabled | 50/50 | 41 | 0.8200 | 0.1730 | 0.1112 | 0.1679 | 16,280 / 50 cases |
+| Append Only | Enabled | 47/50 | 44 | 0.8800 | **0.1970** | **0.1295** | **0.1865** | 18,728 / 49 cases |
+| Mem0 OSS | Native | 50/50 | 42 | 0.8400 | 0.1681 | 0.1067 | 0.1588 | 28,041 / 50 cases |
 
 Accuracy always uses the fixed denominator of 50. Memory totals include only
 the last successful persistence snapshot for each completely built case;
-partial rows from failed attempts are excluded. The assistant-enabled rows use
-an earlier two-stage implementation and do not reproduce the current head.
-
-The archived case selection does not define a seeded blind split, so the table
-must not be presented as a blind holdout baseline. Two assistant-enabled rows
-have one incomplete memory build each; those failures remain in the fixed
-denominator and score as incorrect.
+partial rows are excluded. The assistant-enabled rows use an earlier two-stage
+implementation and do not reproduce the current head; two of them have one
+case each whose memory build did not complete. Per-question-type results,
+memory footprint, cost, and validity limits are in the LongMemEval part of
+[REPORT.md](REPORT.md).
