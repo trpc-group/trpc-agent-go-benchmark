@@ -4,3 +4,8 @@
 !README.md
 !REPORT.md
 !REPORT.zh_CN.md
+# Aggregates and provenance for the memory audit cited by the reports.
+!audit/
+!audit/README.md
+!audit/*.csv
+!audit/*.json

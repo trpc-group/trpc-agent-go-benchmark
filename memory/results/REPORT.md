@@ -1222,45 +1222,70 @@ detail or that the evidence inside the session was not selected.
 
 #### 6.2 High-Similarity Memory Structure Audit
 
-The memory snapshots in this subsection come from a separate
-assistant-enabled run set under the same protocol: the same 50 cases,
-the same model and embedding, the same turn-pair build, and the same
-top-k=20. Its three policies end with 3,739, 23,072, and 23,920
-entries, which differ from the runs in Section 5, so the discussion
-stays at the level of memory structure and is not mixed with the
-scores and entry counts above.
+This subsection audits the same memory population as Section 5: the
+same six runs and the same handling of the case-local rebuilds and the
+incomplete builds, so the populations are 2,955, 15,353, and 16,280
+entries with assistant extraction disabled and 6,011, 17,696, and
+18,728 with it enabled. Every memory pair within a case whose cosine
+similarity is at least 0.90 is assigned one deterministic text class:
+identical normalized text, strict lexical near-duplicate,
+one-directional containment, high overlap with disagreeing numbers or
+negations, or vector-similar only. The first three are grouped as
+duplicate-like. The predicates call no model and make no semantic
+equivalence judgement.
 
-The audit exports every active memory from the three result tables and
-computes all memory pairs with cosine ≥ 0.90 within a case, 33,167
-pairs in total; the count is exhaustive, with no sampling and no LLM
-calls. Each pair is classified by reproducible text rules as identical
-normalized text, strict lexical near-duplicate, one-directional
-containment, a high-overlap pair whose numbers or negations disagree,
-or vector-similar only. The first three are grouped as duplicate-like.
+The audit script is `memory/adapter/longmemeval_memory_audit.py`, and
+the aggregates and provenance are in `memory/results/audit/`, which
+records the source tables, the excluded cases, each run's manifest
+version and comparison digest, and the SHA-256 digest of every
+consumed snapshot file. The snapshot itself holds dataset text and
+stays out of the repository. The script fails if an audited population
+differs from the inventory in Section 5.
 
-| Configuration | ≥0.90 pairs | Duplicate-like | Number/negation mismatch | ≥0.95 pairs | ≥0.95 duplicate-like | ≥0.95 mismatch |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| Merge Similar | 485 | 29 (6.0%) | 21 (4.3%) | 35 | 10 (28.6%) | 5 (14.3%) |
-| Preserve History | 16,225 | 1,316 (8.1%) | 775 (4.8%) | 2,127 | 817 (38.4%) | 449 (21.1%) |
-| Append Only | 16,457 | 616 (3.7%) | 1,369 (8.3%) | 1,399 | 178 (12.7%) | 453 (32.4%) |
+| Configuration | Assistant extraction | Memories | Pairs ≥0.90 | Per 1k memories | Duplicate-like | Number/negation mismatch | Vector-similar only |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Merge Similar | Disabled | 2,955 | 279 | 94.4 | 18 (6.5%) | 16 (5.7%) | 245 (87.8%) |
+| Preserve History | Disabled | 15,353 | 8,472 | 551.8 | 1,422 (16.8%) | 733 (8.7%) | 6,317 (74.6%) |
+| Append Only | Disabled | 16,280 | 8,742 | 537.0 | 407 (4.7%) | 1,022 (11.7%) | 7,313 (83.7%) |
+| Merge Similar | Enabled | 6,011 | 1,232 | 205.0 | 58 (4.7%) | 66 (5.4%) | 1,108 (89.9%) |
+| Preserve History | Enabled | 17,696 | 8,952 | 505.9 | 1,473 (16.5%) | 482 (5.4%) | 6,997 (78.2%) |
+| Append Only | Enabled | 18,728 | 7,795 | 416.2 | 451 (5.8%) | 314 (4.0%) | 7,030 (90.2%) |
 
-In the same snapshots, 2,932 of the 3,739 final entries (78.4%) had
-been updated at least once under Merge Similar, against 223 of 23,072
-(1.0%) under Preserve History and 2 of 23,920 under Append Only.
+Pair counts grow roughly quadratically with the number of entries, so
+absolute totals are not comparable across rows; the per-1k column
+normalizes them by memory count.
 
-High vector similarity does not imply that two memories should be
-merged: in the cosine ≥ 0.95 band, 21.1% of the Preserve History pairs
-and 32.4% of the Append Only pairs disagree on a number or a negation,
-that is, they are different facts on one topic. Treating that band as
-unconditional duplication and applying an update deletes answerable
-detail, which matches the pattern in 6.1 where Merge Similar retrieves
-the right session but cannot answer.
+The class composition of the cosine ≥ 0.95 band is as follows.
 
-Pair totals are not a quality ranking: the pair count grows roughly
-quadratically with the number of entries, and Merge Similar has only
-485 pairs mainly because it keeps just 3,739 of them. The audit
-describes text structure only; it does not claim semantic equivalence,
-factual correctness, or that any single update was safe.
+| Configuration | Assistant extraction | Pairs ≥0.95 | Exact | Near-duplicate | Containment | Number/negation mismatch | Vector-similar only |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Merge Similar | Disabled | 11 | 0 | 4 | 1 | 2 | 4 |
+| Preserve History | Disabled | 1,885 | 5 | 496 | 433 | 474 | 477 |
+| Append Only | Disabled | 861 | 1 | 96 | 12 | 445 | 307 |
+| Merge Similar | Enabled | 119 | 0 | 17 | 3 | 32 | 67 |
+| Preserve History | Enabled | 1,563 | 3 | 514 | 434 | 247 | 365 |
+| Append Only | Enabled | 441 | 1 | 137 | 16 | 77 | 210 |
+
+- After normalization Merge Similar has the lowest high-similarity
+  pair density at 94.4 per 1k entries, while Preserve History and
+  Append Only are close at 551.8 and 537.0. In the cosine ≥ 0.98 band
+  Merge Similar has no pairs at all, Preserve History has 567 pairs
+  spread over all 50 cases, and Append Only has 39 pairs over 14
+  cases.
+- Duplicate-like pairs concentrate in Preserve History: 16.8% over the
+  whole population and 49.5% in the cosine ≥ 0.95 band, against 12.7%
+  for Append Only in the same band.
+- High vector similarity does not imply textual agreement: in the
+  cosine ≥ 0.95 band 445 of 861 Append Only pairs (51.7%) and 474 of
+  1,885 Preserve History pairs (25.1%) disagree on a number or a
+  negation.
+
+This subsection describes text structure between memories only. The
+classes are structural signals rather than semantic labels, and the
+audit does not link a pair class to an update operation or to answer
+correctness at case level, so it cannot attribute a wrong answer to
+the merging behavior of a policy. As in Section 4, the three
+assistant-enabled rows remain historical references.
 
 ### 7. Findings
 
@@ -1321,9 +1346,10 @@ factual correctness, or that any single update was safe.
   current implementation.
 - The recall metric in 6.1 counts answer sessions rather than evidence
   spans, so "same session" cannot be equated with "answerable".
-- The memory snapshots in 6.2 come from a separate run set under the
-  same protocol; their entry counts differ from Section 5 and are used
-  only for the structural discussion.
+- The classes in 6.2 are deterministic text predicates rather than
+  semantic labels. The audit does not link a pair class to an update
+  operation or to answer correctness at case level, so it supports no
+  causal attribution for an individual wrong answer.
 
 ---
 

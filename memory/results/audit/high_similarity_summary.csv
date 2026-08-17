@@ -1,0 +1,37 @@
+run,run_label,assistant_extraction,memories,band,population_pairs,cases,exact,strict_near_duplicate,directional_containment,critical_mismatch,vector_only,duplicate_like,duplicate_like_rate
+merge_similar,Merge Similar,false,2955,0.98-1.00,0,0,0,0,0,0,0,0,0.0
+merge_similar,Merge Similar,false,2955,0.95-0.98,11,10,0,4,1,2,4,5,0.4545
+merge_similar,Merge Similar,false,2955,0.94-0.95,15,14,0,0,1,2,12,1,0.0667
+merge_similar,Merge Similar,false,2955,0.92-0.94,80,37,0,5,4,5,66,9,0.1125
+merge_similar,Merge Similar,false,2955,0.90-0.92,173,47,0,2,1,7,163,3,0.0173
+merge_similar,Merge Similar,false,2955,0.90-1.00,279,50,0,11,7,16,245,18,0.0645
+preserve_history,Preserve History,false,15353,0.98-1.00,567,50,5,204,57,278,23,266,0.4691
+preserve_history,Preserve History,false,15353,0.95-0.98,1318,50,0,292,376,196,454,668,0.5068
+preserve_history,Preserve History,false,15353,0.94-0.95,708,50,0,52,106,72,478,158,0.2232
+preserve_history,Preserve History,false,15353,0.92-0.94,2147,50,0,68,152,103,1824,220,0.1025
+preserve_history,Preserve History,false,15353,0.90-0.92,3732,50,0,37,73,84,3538,110,0.0295
+preserve_history,Preserve History,false,15353,0.90-1.00,8472,50,5,653,764,733,6317,1422,0.1678
+append_only,Append Only,false,16280,0.98-1.00,39,14,1,9,0,26,3,10,0.2564
+append_only,Append Only,false,16280,0.95-0.98,822,50,0,87,12,419,304,99,0.1204
+append_only,Append Only,false,16280,0.94-0.95,837,50,0,39,21,219,558,60,0.0717
+append_only,Append Only,false,16280,0.92-0.94,2562,50,0,79,51,243,2189,130,0.0507
+append_only,Append Only,false,16280,0.90-0.92,4482,50,0,39,69,115,4259,108,0.0241
+append_only,Append Only,false,16280,0.90-1.00,8742,50,1,253,153,1022,7313,407,0.0466
+merge_similar_assistant,Merge Similar + assistant,true,6011,0.98-1.00,21,15,0,10,1,4,6,11,0.5238
+merge_similar_assistant,Merge Similar + assistant,true,6011,0.95-0.98,98,36,0,7,2,28,61,9,0.0918
+merge_similar_assistant,Merge Similar + assistant,true,6011,0.94-0.95,96,39,0,4,2,9,81,6,0.0625
+merge_similar_assistant,Merge Similar + assistant,true,6011,0.92-0.94,352,50,0,7,5,15,325,12,0.0341
+merge_similar_assistant,Merge Similar + assistant,true,6011,0.90-0.92,665,50,0,12,8,10,635,20,0.0301
+merge_similar_assistant,Merge Similar + assistant,true,6011,0.90-1.00,1232,50,0,40,18,66,1108,58,0.0471
+preserve_history_assistant,Preserve History + assistant,true,17696,0.98-1.00,330,49,3,200,28,77,22,231,0.7
+preserve_history_assistant,Preserve History + assistant,true,17696,0.95-0.98,1233,49,0,314,406,170,343,720,0.5839
+preserve_history_assistant,Preserve History + assistant,true,17696,0.94-0.95,658,49,0,57,123,68,410,180,0.2736
+preserve_history_assistant,Preserve History + assistant,true,17696,0.92-0.94,2229,49,0,77,159,94,1899,236,0.1059
+preserve_history_assistant,Preserve History + assistant,true,17696,0.90-0.92,4502,49,0,40,66,73,4323,106,0.0235
+preserve_history_assistant,Preserve History + assistant,true,17696,0.90-1.00,8952,49,3,688,782,482,6997,1473,0.1645
+append_only_assistant,Append Only + assistant,true,18728,0.98-1.00,48,19,1,18,0,25,4,19,0.3958
+append_only_assistant,Append Only + assistant,true,18728,0.95-0.98,393,48,0,119,16,52,206,135,0.3435
+append_only_assistant,Append Only + assistant,true,18728,0.94-0.95,462,49,0,41,19,36,366,60,0.1299
+append_only_assistant,Append Only + assistant,true,18728,0.92-0.94,2128,49,0,85,52,124,1867,137,0.0644
+append_only_assistant,Append Only + assistant,true,18728,0.90-0.92,4764,49,0,57,43,77,4587,100,0.021
+append_only_assistant,Append Only + assistant,true,18728,0.90-1.00,7795,49,1,320,130,314,7030,451,0.0579

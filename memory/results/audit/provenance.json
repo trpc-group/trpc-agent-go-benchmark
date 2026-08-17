@@ -1,0 +1,272 @@
+{
+  "generated_at": "2026-08-17T08:44:50+00:00",
+  "similarity_threshold": 0.9,
+  "pair_scope": "same case, same app, memory_id_a < memory_id_b",
+  "queries": {
+    "memories": "SELECT memory_id, user_id, memory_content FROM {table} WHERE deleted_at IS NULL ORDER BY user_id, memory_id",
+    "pairs": "SELECT a.user_id, a.memory_id, b.memory_id, 1 - (a.embedding <=> b.embedding) FROM {table} a JOIN {table} b ON a.app_name = b.app_name AND a.user_id = b.user_id AND a.memory_id < b.memory_id WHERE a.deleted_at IS NULL AND b.deleted_at IS NULL AND a.embedding IS NOT NULL AND b.embedding IS NOT NULL AND 1 - (a.embedding <=> b.embedding) >= 0.90 ORDER BY a.user_id, a.memory_id, b.memory_id"
+  },
+  "classification": {
+    "exact": "normalized memory contents are identical",
+    "strict_near_duplicate": "token Jaccard >= 0.60 or sequence ratio >= 0.82",
+    "directional_containment": "max directional token coverage >= 0.85 and min >= 0.30",
+    "critical_mismatch": "number or negation mismatch with min coverage >= 0.50 and token Jaccard >= 0.35",
+    "vector_only": "none of the deterministic predicates above"
+  },
+  "interpretation": "deterministic text predicates over the full pair population; the classes are structural signals, not semantic labels",
+  "snapshot_note": "the snapshot holds dataset-derived memory text and is not committed; regenerate it with the queries above and compare the digests below",
+  "runs": [
+    {
+      "run": "merge_similar",
+      "run_label": "Merge Similar",
+      "assistant_extraction": false,
+      "identity": {
+        "result_dir": "turn_pair_full50_parallel4_20260717",
+        "scenario": "auto-compatible",
+        "timestamp": "2026-07-17T22:57:09.168199499+08:00",
+        "run_manifest_version": 5,
+        "run_compatibility_digest": "sha256:8ad60f0159cc74457aedc1611321873fd9f51be2cf46a5f2c503fc3511227073",
+        "run_comparison_digest": "sha256:d7928a23f318d56746737c7cb0b458742f470a694a3c9c5c8762530ad42afc17"
+      },
+      "reported_memories": 2955,
+      "audited_memories": 2955,
+      "audited_cases": 50,
+      "audited_pairs": 279,
+      "sources": [
+        {
+          "table": "memory_eval_auto_lme50_pair_auto_compatible_20260717",
+          "role": "primary",
+          "snapshot_label": "merge_similar",
+          "excluded_cases": []
+        }
+      ]
+    },
+    {
+      "run": "preserve_history",
+      "run_label": "Preserve History",
+      "assistant_extraction": false,
+      "identity": {
+        "result_dir": "turn_pair_full50_parallel4_20260717",
+        "scenario": "auto-strict",
+        "timestamp": "2026-07-17T22:57:16.980208342+08:00",
+        "run_manifest_version": 5,
+        "run_compatibility_digest": "sha256:c03abaa0ce1d6453b6e2486526902a9c63c19199104bc46c3622426258111825",
+        "run_comparison_digest": "sha256:d7928a23f318d56746737c7cb0b458742f470a694a3c9c5c8762530ad42afc17"
+      },
+      "reported_memories": 15353,
+      "audited_memories": 15353,
+      "audited_cases": 50,
+      "audited_pairs": 8472,
+      "sources": [
+        {
+          "table": "memory_eval_auto_lme50_pair_auto_strict_20260717",
+          "role": "primary",
+          "snapshot_label": "preserve_history",
+          "excluded_cases": [
+            "a1eacc2a"
+          ]
+        },
+        {
+          "table": "memory_eval_auto_r_strict_a1_0719",
+          "role": "case_local_rebuild",
+          "snapshot_label": "preserve_history_recovery",
+          "excluded_cases": []
+        }
+      ]
+    },
+    {
+      "run": "append_only",
+      "run_label": "Append Only",
+      "assistant_extraction": false,
+      "identity": {
+        "result_dir": "turn_pair_full50_parallel4_20260717",
+        "scenario": "auto-add-only",
+        "timestamp": "2026-07-17T22:57:24.1890812+08:00",
+        "run_manifest_version": 5,
+        "run_compatibility_digest": "sha256:cc03b8130bbbaec8a02241e476a60b66b71cedc741f11758d51c76ec4720b7e4",
+        "run_comparison_digest": "sha256:d7928a23f318d56746737c7cb0b458742f470a694a3c9c5c8762530ad42afc17"
+      },
+      "reported_memories": 16280,
+      "audited_memories": 16280,
+      "audited_cases": 50,
+      "audited_pairs": 8742,
+      "sources": [
+        {
+          "table": "memory_eval_auto_lme50_pair_auto_add_only_20260717",
+          "role": "primary",
+          "snapshot_label": "append_only",
+          "excluded_cases": [
+            "a1eacc2a"
+          ]
+        },
+        {
+          "table": "memory_eval_auto_r_add_only_a1_0719",
+          "role": "case_local_rebuild",
+          "snapshot_label": "append_only_recovery",
+          "excluded_cases": []
+        }
+      ]
+    },
+    {
+      "run": "merge_similar_assistant",
+      "run_label": "Merge Similar + assistant",
+      "assistant_extraction": true,
+      "identity": {
+        "result_dir": "assistant_original_a_full50_20260731_2035",
+        "scenario": "auto-compatible",
+        "timestamp": "2026-07-31T20:40:30.307439781+08:00",
+        "run_manifest_version": 5,
+        "run_compatibility_digest": "sha256:d3a72353e7a0c51bb7eeb040ba2314792ab6602f97a390220dc056537fee6b51",
+        "run_comparison_digest": "sha256:ab12d0fb23f4fc26bf82366757cb213debfeb266773d4cd1e2735c8e2c500b71"
+      },
+      "reported_memories": 6011,
+      "audited_memories": 6011,
+      "audited_cases": 50,
+      "audited_pairs": 1232,
+      "sources": [
+        {
+          "table": "memory_lme_assistant_a_compatible_20260731_2035",
+          "role": "primary",
+          "snapshot_label": "merge_similar_assistant",
+          "excluded_cases": []
+        }
+      ]
+    },
+    {
+      "run": "preserve_history_assistant",
+      "run_label": "Preserve History + assistant",
+      "assistant_extraction": true,
+      "identity": {
+        "result_dir": "assistant_original_a_full50_20260731_2035",
+        "scenario": "auto-strict",
+        "timestamp": "2026-07-31T20:40:33.474430773+08:00",
+        "run_manifest_version": 5,
+        "run_compatibility_digest": "sha256:d16b98f97a692c381fd9538ca6d12761330c594552ed0dd2b3dc5b685851cd36",
+        "run_comparison_digest": "sha256:ab12d0fb23f4fc26bf82366757cb213debfeb266773d4cd1e2735c8e2c500b71"
+      },
+      "reported_memories": 17696,
+      "audited_memories": 17696,
+      "audited_cases": 49,
+      "audited_pairs": 8952,
+      "sources": [
+        {
+          "table": "memory_lme_assistant_a_strict_20260731_2035",
+          "role": "primary",
+          "snapshot_label": "preserve_history_assistant",
+          "excluded_cases": [
+            "60159905"
+          ]
+        }
+      ]
+    },
+    {
+      "run": "append_only_assistant",
+      "run_label": "Append Only + assistant",
+      "assistant_extraction": true,
+      "identity": {
+        "result_dir": "assistant_original_a_full50_20260731_2035",
+        "scenario": "auto-add-only",
+        "timestamp": "2026-07-31T20:40:37.362722143+08:00",
+        "run_manifest_version": 5,
+        "run_compatibility_digest": "sha256:2d4d8329914cdd9160e248050f7a3fce5737aee76e1c9fff1491367b1dbd0d9e",
+        "run_comparison_digest": "sha256:ab12d0fb23f4fc26bf82366757cb213debfeb266773d4cd1e2735c8e2c500b71"
+      },
+      "reported_memories": 18728,
+      "audited_memories": 18728,
+      "audited_cases": 49,
+      "audited_pairs": 7795,
+      "sources": [
+        {
+          "table": "memory_lme_assistant_a_add_only_20260731_2035",
+          "role": "primary",
+          "snapshot_label": "append_only_assistant",
+          "excluded_cases": [
+            "58ef2f1c"
+          ]
+        }
+      ]
+    }
+  ],
+  "inputs": [
+    {
+      "file": "merge_similar_memories.csv.gz",
+      "sha256": "db294a6a3bfb04c356bf377f839664023cdebcafb07df80e2fcab0f4353ee56f",
+      "bytes": 357603
+    },
+    {
+      "file": "merge_similar_similarity_ge090.csv.gz",
+      "sha256": "66296e51192d7533a593aa6868272ca45c76c1eb3e5d9f4622fb8060e84c668f",
+      "bytes": 19765
+    },
+    {
+      "file": "preserve_history_memories.csv.gz",
+      "sha256": "da8ce2010b3a57a41a53aa8172b3ad77d2d6c0a7158cd1ad025755b477e61c8a",
+      "bytes": 1422399
+    },
+    {
+      "file": "preserve_history_similarity_ge090.csv.gz",
+      "sha256": "80112b0d6be8170fe49b532078ef114b7c1704b4a67327e858f9c3efcf06471c",
+      "bytes": 433153
+    },
+    {
+      "file": "preserve_history_recovery_memories.csv.gz",
+      "sha256": "0045deb71a46b123e92bc7cc8b1741fede2a3e08dbfe62cda8cbea59ad602370",
+      "bytes": 30663
+    },
+    {
+      "file": "preserve_history_recovery_similarity_ge090.csv.gz",
+      "sha256": "ab7e7468ce53ae2d24842589b0168e0b07054e436f46b63a60c6eb6200f46c15",
+      "bytes": 8681
+    },
+    {
+      "file": "append_only_memories.csv.gz",
+      "sha256": "0c0d7113a527c4a0b1bf934d22024c18cc727ab8c4fbf4393053f319b62259bb",
+      "bytes": 1398055
+    },
+    {
+      "file": "append_only_similarity_ge090.csv.gz",
+      "sha256": "d48cb3a923d9945e5a8b0b74e7f536ac6512ef1d66523c3c257aad7df110ab53",
+      "bytes": 416321
+    },
+    {
+      "file": "append_only_recovery_memories.csv.gz",
+      "sha256": "1a088641208bc3faab72cde088fd32cc4e1b4eb767926acabb6db60899f8bbd2",
+      "bytes": 29888
+    },
+    {
+      "file": "append_only_recovery_similarity_ge090.csv.gz",
+      "sha256": "78b66d4de128e47d96ad01f102c424645ae6937f1153f454e16876496c18261d",
+      "bytes": 8799
+    },
+    {
+      "file": "merge_similar_assistant_memories.csv.gz",
+      "sha256": "a3b0b355317d8bdb9f2f3cdbca66e4e3937f692f233a761aff1dab118ced4acf",
+      "bytes": 1567541
+    },
+    {
+      "file": "merge_similar_assistant_similarity_ge090.csv.gz",
+      "sha256": "0ded5d7d2fa5114bd6e966ae54fd68fab6fd0b5dfadde18a2e70e75c9dfdba2e",
+      "bytes": 83446
+    },
+    {
+      "file": "preserve_history_assistant_memories.csv.gz",
+      "sha256": "5121a03c17a1218646a47ca2b1bacdc875fde0d1c9ca1f1fc0a58c6f67bc2012",
+      "bytes": 2614656
+    },
+    {
+      "file": "preserve_history_assistant_similarity_ge090.csv.gz",
+      "sha256": "c71d15899b2535194b8a739cb431b700bfbe0ad00eaf1787595bd9101b61c232",
+      "bytes": 508806
+    },
+    {
+      "file": "append_only_assistant_memories.csv.gz",
+      "sha256": "7f17f355c05ccce1e877625111ec8ad03094c775d6e836711a0e7133f9e3411b",
+      "bytes": 2605589
+    },
+    {
+      "file": "append_only_assistant_similarity_ge090.csv.gz",
+      "sha256": "86dc69bfda601ccb8642ce2728d57afa6143d23e8d8af73c6e06219111babfed",
+      "bytes": 454597
+    }
+  ]
+}
