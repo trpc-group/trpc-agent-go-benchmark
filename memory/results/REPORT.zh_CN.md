@@ -1116,12 +1116,9 @@ History 与 Append Only 开启后的 44/47（0.9362）。
 单向信息包含、高重合但数值或否定词不一致，以及仅向量相似。
 前三类合称重复/包含型。判据不调用模型，也不给出语义等价判断。
 
-审计脚本为 `memory/adapter/longmemeval_memory_audit.py`，
-聚合结果与 provenance 见 `memory/results/audit/`，
-其中记录了来源表、被排除的 case、各运行的 manifest 版本与
-comparison digest，以及每个输入快照文件的 SHA-256。
-快照含数据集文本，不进入仓库；审计总体与第 5 节条目数不一致时，
-脚本直接报错。
+本地审计脚本为 `memory/adapter/longmemeval_memory_audit.py`。
+由于输入快照包含数据集文本，快照及生成产物均不纳入版本控制；
+审计总体与第 5 节条目数不一致时，脚本直接报错。
 
 | 配置 | Assistant 提取 | 记忆条目 | ≥0.90 pair | 每千条 pair | 重复/包含型 | 数值或否定不一致 | 仅向量相似 |
 | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |

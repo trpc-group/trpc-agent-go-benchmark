@@ -1234,13 +1234,11 @@ negations, or vector-similar only. The first three are grouped as
 duplicate-like. The predicates call no model and make no semantic
 equivalence judgement.
 
-The audit script is `memory/adapter/longmemeval_memory_audit.py`, and
-the aggregates and provenance are in `memory/results/audit/`, which
-records the source tables, the excluded cases, each run's manifest
-version and comparison digest, and the SHA-256 digest of every
-consumed snapshot file. The snapshot itself holds dataset text and
-stays out of the repository. The script fails if an audited population
-differs from the inventory in Section 5.
+The local audit script is
+`memory/adapter/longmemeval_memory_audit.py`. Its source snapshot and
+generated artifacts are not tracked because the snapshot contains dataset
+text. The script fails if an audited population differs from the inventory in
+Section 5.
 
 | Configuration | Assistant extraction | Memories | Pairs ≥0.90 | Per 1k memories | Duplicate-like | Number/negation mismatch | Vector-similar only |
 | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |

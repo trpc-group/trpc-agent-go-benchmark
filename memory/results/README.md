@@ -113,7 +113,6 @@ results/
 +-- README.md                            # This file.
 +-- REPORT.md                            # English evaluation report.
 +-- REPORT.zh_CN.md                      # Chinese evaluation report.
-+-- audit/                               # Memory audit aggregates.
 +-- tools/
 |   +-- extract_paper_locomo_tables.py   # Extract external baselines.
 +-- tmp/                                 # Paper text dumps (ignored).
@@ -224,6 +223,7 @@ case each whose memory build did not complete. Per-question-type results,
 memory footprint, cost, and validity limits are in the LongMemEval part of
 [REPORT.md](REPORT.md).
 
-The structure audit of high-similarity memory pairs for these same six runs
-is in [audit/](audit/README.md): aggregates per similarity band, the class
-definitions, and provenance binding every source table and snapshot digest.
+The reports also include a structure audit of high-similarity memory pairs
+for these same six runs. The local audit script is
+`memory/adapter/longmemeval_memory_audit.py`; its source snapshots and generated
+artifacts are intentionally not tracked.
