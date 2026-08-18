@@ -222,8 +222,3 @@ implementation and do not reproduce the current head; two of them have one
 case each whose memory build did not complete. Per-question-type results,
 memory footprint, cost, and validity limits are in the LongMemEval part of
 [REPORT.md](REPORT.md).
-
-The reports also include a structure audit of high-similarity memory pairs
-for these same six runs. The local audit script is
-`memory/adapter/longmemeval_memory_audit.py`; its source snapshots and generated
-artifacts are intentionally not tracked.

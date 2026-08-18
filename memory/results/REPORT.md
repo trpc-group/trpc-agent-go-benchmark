@@ -1176,7 +1176,7 @@ remote-call and wall-clock figures unsuitable as standalone backend
 speed rankings. This table covers the same case population as Section
 3.
 
-### 6. Retrieval Attribution and Memory Structure Audit
+### 6. Retrieval Attribution and Memory Structure Analysis
 
 #### 6.1 Gold Session Recall and Failure Attribution
 
@@ -1220,10 +1220,11 @@ The metric counts answer sessions rather than evidence spans, so
 "fully recalled but wrong" can mean either that the memory lost the
 detail or that the evidence inside the session was not selected.
 
-#### 6.2 High-Similarity Memory Structure Audit
+#### 6.2 One-off High-Similarity Memory Structure Analysis
 
-This subsection audits the same memory population as Section 5: the
-same six runs and the same handling of the case-local rebuilds and the
+This subsection records a one-off offline analysis of the same memory
+population as Section 5: the same six runs and the same handling of the
+case-local rebuilds and the
 incomplete builds, so the populations are 2,955, 15,353, and 16,280
 entries with assistant extraction disabled and 6,011, 17,696, and
 18,728 with it enabled. Every memory pair within a case whose cosine
@@ -1234,11 +1235,9 @@ negations, or vector-similar only. The first three are grouped as
 duplicate-like. The predicates call no model and make no semantic
 equivalence judgement.
 
-The local audit script is
-`memory/adapter/longmemeval_memory_audit.py`. Its source snapshot and
-generated artifacts are not tracked because the snapshot contains dataset
-text. The script fails if an audited population differs from the inventory in
-Section 5.
+The source snapshot and analysis tooling were not retained. These figures are
+included as a single exploratory observation, not as a maintained or
+reproducible benchmark artifact, and no reproduction workflow is provided.
 
 | Configuration | Assistant extraction | Memories | Pairs ≥0.90 | Per 1k memories | Duplicate-like | Number/negation mismatch | Vector-similar only |
 | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
@@ -1280,7 +1279,7 @@ The class composition of the cosine ≥ 0.95 band is as follows.
 
 This subsection describes text structure between memories only. The
 classes are structural signals rather than semantic labels, and the
-audit does not link a pair class to an update operation or to answer
+analysis does not link a pair class to an update operation or to answer
 correctness at case level, so it cannot attribute a wrong answer to
 the merging behavior of a policy. As in Section 4, the three
 assistant-enabled rows remain historical references.
@@ -1345,9 +1344,10 @@ assistant-enabled rows remain historical references.
 - The recall metric in 6.1 counts answer sessions rather than evidence
   spans, so "same session" cannot be equated with "answerable".
 - The classes in 6.2 are deterministic text predicates rather than
-  semantic labels. The audit does not link a pair class to an update
-  operation or to answer correctness at case level, so it supports no
-  causal attribution for an individual wrong answer.
+  semantic labels. This was a one-off analysis without retained source
+  artifacts or a reproduction workflow. It does not link a pair class to
+  an update operation or to answer correctness at case level, so it
+  supports no causal attribution for an individual wrong answer.
 
 ---
 
