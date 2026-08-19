@@ -1176,115 +1176,7 @@ remote-call and wall-clock figures unsuitable as standalone backend
 speed rankings. This table covers the same case population as Section
 3.
 
-### 6. Retrieval Attribution and Memory Structure Analysis
-
-#### 6.1 Gold Session Recall and Failure Attribution
-
-Gold session recall measures whether QA retrieval covered the answer
-sessions annotated in the dataset. It is the fraction of the answer
-sessions of a case that were hit, so it ranges from 0 to 1, and the
-mean is computed over cases that produced an answer: 48 for Merge
-Similar disabled and 45 enabled, 48 for Preserve History enabled, 47
-for Append Only enabled, and 50 for the remaining configurations. The
-"other cases" column merges partial recall, zero recall, and cases
-that produced no answer.
-
-| Configuration | Assistant extraction | Mean gold session recall | Fully recalled | Correct | Other cases | Correct | memory_search calls |
-| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| Merge Similar | Disabled | 0.6024 | 18 | 6 | 32 | 8 | 195 |
-| Merge Similar | Enabled | 0.9148 | 38 | 26 | 12 | 3 | 116 |
-| Preserve History | Disabled | 0.9700 | 48 | 41 | 2 | 0 | 88 |
-| Preserve History | Enabled | 0.9896 | 47 | 44 | 3 | 1 | 75 |
-| Append Only | Disabled | 0.9700 | 48 | 40 | 2 | 1 | 93 |
-| Append Only | Enabled | 1.0000 | 47 | 44 | 3 | 0 | 76 |
-| Mem0 OSS | Native | 0.9500 | 46 | 40 | 4 | 2 | 98 |
-
-Retrieval is a necessary condition: across the seven runs only 1 of
-the 11 zero-recall cases was answered correctly.
-
-Merge Similar loses information at both layers. With extraction
-disabled its mean recall is only 0.6024, and even on the 18 fully
-recalled cases it answers just 6 correctly (0.3333), against 41/48
-(0.8542) for Preserve History. The merged entries often still point at
-the right session but no longer carry the detail the answer needs. It
-also issues the most retrieval calls, 195 against 75 to 116 for the
-other six runs, which shows the model kept rewriting its query without
-reaching the evidence.
-
-Enabling assistant extraction raises the mean recall of Merge Similar
-to 0.9148 and its accuracy on fully recalled cases to 26/38 (0.6842),
-still below the 44/47 (0.9362) of Preserve History and Append Only
-with extraction enabled.
-
-The metric counts answer sessions rather than evidence spans, so
-"fully recalled but wrong" can mean either that the memory lost the
-detail or that the evidence inside the session was not selected.
-
-#### 6.2 One-off High-Similarity Memory Structure Analysis
-
-This subsection records a one-off offline analysis of the same memory
-population as Section 5: the same six runs and the same handling of the
-case-local rebuilds and the
-incomplete builds, so the populations are 2,955, 15,353, and 16,280
-entries with assistant extraction disabled and 6,011, 17,696, and
-18,728 with it enabled. Every memory pair within a case whose cosine
-similarity is at least 0.90 is assigned one deterministic text class:
-identical normalized text, strict lexical near-duplicate,
-one-directional containment, high overlap with disagreeing numbers or
-negations, or vector-similar only. The first three are grouped as
-duplicate-like. The predicates call no model and make no semantic
-equivalence judgement.
-
-The source snapshot and analysis tooling were not retained. These figures are
-included as a single exploratory observation, not as a maintained or
-reproducible benchmark artifact, and no reproduction workflow is provided.
-
-| Configuration | Assistant extraction | Memories | Pairs ≥0.90 | Per 1k memories | Duplicate-like | Number/negation mismatch | Vector-similar only |
-| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| Merge Similar | Disabled | 2,955 | 279 | 94.4 | 18 (6.5%) | 16 (5.7%) | 245 (87.8%) |
-| Preserve History | Disabled | 15,353 | 8,472 | 551.8 | 1,422 (16.8%) | 733 (8.7%) | 6,317 (74.6%) |
-| Append Only | Disabled | 16,280 | 8,742 | 537.0 | 407 (4.7%) | 1,022 (11.7%) | 7,313 (83.7%) |
-| Merge Similar | Enabled | 6,011 | 1,232 | 205.0 | 58 (4.7%) | 66 (5.4%) | 1,108 (89.9%) |
-| Preserve History | Enabled | 17,696 | 8,952 | 505.9 | 1,473 (16.5%) | 482 (5.4%) | 6,997 (78.2%) |
-| Append Only | Enabled | 18,728 | 7,795 | 416.2 | 451 (5.8%) | 314 (4.0%) | 7,030 (90.2%) |
-
-Pair counts grow roughly quadratically with the number of entries, so
-absolute totals are not comparable across rows; the per-1k column
-normalizes them by memory count.
-
-The class composition of the cosine ≥ 0.95 band is as follows.
-
-| Configuration | Assistant extraction | Pairs ≥0.95 | Exact | Near-duplicate | Containment | Number/negation mismatch | Vector-similar only |
-| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| Merge Similar | Disabled | 11 | 0 | 4 | 1 | 2 | 4 |
-| Preserve History | Disabled | 1,885 | 5 | 496 | 433 | 474 | 477 |
-| Append Only | Disabled | 861 | 1 | 96 | 12 | 445 | 307 |
-| Merge Similar | Enabled | 119 | 0 | 17 | 3 | 32 | 67 |
-| Preserve History | Enabled | 1,563 | 3 | 514 | 434 | 247 | 365 |
-| Append Only | Enabled | 441 | 1 | 137 | 16 | 77 | 210 |
-
-- After normalization Merge Similar has the lowest high-similarity
-  pair density at 94.4 per 1k entries, while Preserve History and
-  Append Only are close at 551.8 and 537.0. In the cosine ≥ 0.98 band
-  Merge Similar has no pairs at all, Preserve History has 567 pairs
-  spread over all 50 cases, and Append Only has 39 pairs over 14
-  cases.
-- Duplicate-like pairs concentrate in Preserve History: 16.8% over the
-  whole population and 49.5% in the cosine ≥ 0.95 band, against 12.7%
-  for Append Only in the same band.
-- High vector similarity does not imply textual agreement: in the
-  cosine ≥ 0.95 band 445 of 861 Append Only pairs (51.7%) and 474 of
-  1,885 Preserve History pairs (25.1%) disagree on a number or a
-  negation.
-
-This subsection describes text structure between memories only. The
-classes are structural signals rather than semantic labels, and the
-analysis does not link a pair class to an update operation or to answer
-correctness at case level, so it cannot attribute a wrong answer to
-the merging behavior of a policy. As in Section 4, the three
-assistant-enabled rows remain historical references.
-
-### 7. Findings
+### 6. Findings
 
 1. **Update policy dominates this sample.** Preserve History raises
    Accuracy from 28% to 82%. Every Merge Similar success is also
@@ -1321,7 +1213,7 @@ assistant-enabled rows remain historical references.
    Mem0 remains a native external baseline and is not configured with
    the Auto-only assistant option.
 
-### 8. Validity Limits
+### 7. Validity Limits
 
 - These 50 cases are a 10% sample drawn proportionally per question
   type, not the official LongMemEval dev/holdout split. The list pins
@@ -1341,14 +1233,6 @@ assistant-enabled rows remain historical references.
   conditions and request construction changed afterwards, so those
   three rows are historical references rather than results of the
   current implementation.
-- The recall metric in 6.1 counts answer sessions rather than evidence
-  spans, so "same session" cannot be equated with "answerable".
-- The classes in 6.2 are deterministic text predicates rather than
-  semantic labels. This was a one-off analysis without retained source
-  artifacts or a reproduction workflow. It does not link a pair class to
-  an update operation or to answer correctness at case level, so it
-  supports no causal attribution for an individual wrong answer.
-
 ---
 
 ## Appendix
