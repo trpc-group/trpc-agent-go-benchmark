@@ -993,8 +993,10 @@ single-session-user.
 
 The 50 selected cases are pinned by case ID, and every experiment in
 this section uses the same cases in the same order. The list records
-no random seed and cannot be re-derived from dataset order, so
-reproduction should use the list in **Appendix D** directly.
+no random seed and cannot be re-derived from dataset order. This is a
+historical fixed subset: **Appendix D** identifies its cases for
+reference, but it predates the current versioned, digest-bound manifest
+contract and cannot be replayed directly by the current harness.
 
 ### 2. Experimental Setup
 
@@ -1276,10 +1278,12 @@ selected by stratifying on question type and drawing 10% of each type
 from the 500 cases of LongMemEval-S, which gives 8, 13, 6, 3, 7, and
 13 after rounding and preserves the type proportions of the full set
 (see Section 1 of the LongMemEval part). The list is pinned by case ID
-and records no random seed, so reproduction should use this table
-rather than resampling. Case IDs match `longmemeval_s_cleaned.json`;
-the three cases carrying the `_abs` suffix are abstention questions,
-where declining to answer is the correct behavior.
+and records no random seed. It identifies the historical fixed subset
+for reference, but predates the current versioned, digest-bound manifest
+contract and cannot be replayed directly by the current harness. Case IDs
+match `longmemeval_s_cleaned.json`; the three cases carrying the `_abs`
+suffix are abstention questions, where declining to answer is the correct
+behavior.
 
 | # | Case ID | Question type |
 | ---: | --- | --- |

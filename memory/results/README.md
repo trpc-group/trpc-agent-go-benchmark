@@ -173,10 +173,12 @@ comparison below covers the Auto `Merge Similar`, `Preserve History`, and
 
 The evaluation uses a fixed 50-case subset of `longmemeval_s_cleaned.json`,
 which holds 500 cases, sampled at 10% from each of the six question types.
-The full case list is in Appendix D of the reports. The list pins the exact
-sample but defines no seeded blind split, so the results support relative
-comparison between configurations and are neither final scores on the
-benchmark nor a blind holdout baseline.
+This is a historical fixed subset. Appendix D of the reports identifies its
+cases for reference, but the list predates the current versioned,
+digest-bound manifest contract and cannot be replayed directly by the current
+harness. It also defines no seeded blind split, so the results support
+relative comparison between configurations and are neither final scores on
+the benchmark nor a blind holdout baseline.
 
 Comparable runs share the dataset, case list, replay, build plan, model
 configuration, tokenizer, turn-pair protocol, and retrieval limit:

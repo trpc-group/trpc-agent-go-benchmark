@@ -895,7 +895,9 @@ multi-session 和 single-session-user。
 
 抽出的 50 个 case 以 case ID 固定下来，本章所有实验共用这一批
 case 和同一顺序。该清单没有记录随机种子，
-无法由数据集顺序重新推导，复现时请直接使用**附录 D** 的清单。
+无法由数据集顺序重新推导。这是一个历史固定子集：**附录 D**
+仅用于标识当时使用的 case；它早于当前带版本和 digest 的 manifest
+契约，无法由当前 harness 直接精确重放。
 
 ### 2. 实验设置
 
@@ -1154,8 +1156,9 @@ LongMemEval 一节的全部实验共用下列 50 个 case。
 选取规则是按问题类型分层，每一类从 LongMemEval-S 的 500 个 case
 中等比例抽取 10%，取整后各类为 8、13、6、3、7、13，
 与全集的类型占比一致（见 LongMemEval 第 1 节）。清单以 case ID
-固定，没有记录随机种子，因此复现时应直接使用下表，
-而不是重新抽样。Case ID 与 `longmemeval_s_cleaned.json` 一致；带
+固定，没有记录随机种子。下表仅用于标识当时使用的历史固定子集；
+它早于当前带版本和 digest 的 manifest 契约，无法由当前 harness
+直接精确重放。Case ID 与 `longmemeval_s_cleaned.json` 一致；带
 `_abs` 后缀的三个 case 是拒答题，正确行为是拒绝作答。
 
 | # | Case ID | 问题类型 |
