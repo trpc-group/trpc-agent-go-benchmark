@@ -31,6 +31,9 @@ pnpm-lock.yaml
 .gocache
 !.github/scripts/run-go-tests.sh
 .DS_Store
+.env
+.env.*
+!.env.example
 .gomodcache
 next-env.d.ts
 .codebuddy
@@ -39,6 +42,13 @@ examples/**/*.evalset_result.json
 examples/results/
 __pycache__
 .venv
+.venv*/
+.uv-cache/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
 examples/knowledge/evaluation/dataset/*
 !examples/claudecode/.claude
 !examples/evaluation/claudecode/.claude
