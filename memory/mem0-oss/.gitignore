@@ -1,0 +1,6 @@
+.env
+preflight.json
+__pycache__/
+*.pyc
+!Dockerfile
+!preflight_test.py

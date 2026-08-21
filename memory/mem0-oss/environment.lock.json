@@ -1,0 +1,149 @@
+{
+  "schema_version": 2,
+  "environment": "longmemeval-mem0-oss",
+  "platform": {
+    "compose": "linux/amd64",
+    "os": "linux",
+    "architecture": "amd64",
+    "machine": "x86_64"
+  },
+  "deployment": {
+    "dockerfile": {
+      "path": "Dockerfile",
+      "sha256": "12413be3d5d7d31a0ab4464b66dfb854677acc0c24f3362d0c009ffde60de83b"
+    },
+    "compose": {
+      "path": "compose.yaml",
+      "sha256": "3fef8fd81d3ea288f467deeabb4b7ce947f4b5b2ec0ed5ed31c562f7a7d62c1f"
+    },
+    "entrypoint": {
+      "path": "entrypoint.sh",
+      "sha256": "666468bb506a05fabce9292fb08aad503ff316b3eda7a400adc4c86683a98dec"
+    },
+    "preflight": {
+      "path": "preflight.py",
+      "sha256": "b1adf725213d04521f9b432174eada9f3f9821dbcb343ab393d3f59b440cb8fd"
+    },
+    "runtime_probe": {
+      "path": "runtime_probe.py",
+      "sha256": "ce44321cb7bd9efe81ab8aa2d4a8fecb9192d49f58ff100ac80c42201ef12e16"
+    }
+  },
+  "mem0": {
+    "repository": "https://github.com/mem0ai/mem0.git",
+    "commit": "3b9aed866ae70d29043388ed0ae5cc4e1844f3e8",
+    "source_archive": {
+      "url": "https://github.com/mem0ai/mem0/archive/3b9aed866ae70d29043388ed0ae5cc4e1844f3e8.tar.gz",
+      "sha256": "b0531bb5cbc313d94e4b566aa6f0d91c434515a0bbe7fe4c9bb53955105a611c"
+    },
+    "server_main_sha256": "272313e10b9b8249d8363ae085b7b4a4aaf41c5867c12080e38e4b4db7138adf",
+    "runtime_source": {
+      "root": "/opt/mem0",
+      "module_file": "/opt/mem0/mem0/__init__.py",
+      "memory_main_sha256": "a5c54936843f78b9b4059a53eac4814b2cf324c47095e02518aae159ed02180e"
+    },
+    "distribution": {
+      "name": "mem0ai",
+      "version": "2.0.11"
+    }
+  },
+  "python": {
+    "version": "3.12.13",
+    "image": {
+      "reference": "docker.io/library/python:3.12-slim-bookworm",
+      "index_digest": "sha256:d50fb7611f86d04a3b0471b46d7557818d88983fc3136726336b2a4c657aa30b",
+      "platform_digest": "sha256:72d3d75f2639ab82b34b29390ad3d6e0827c775befee94edda8e9976818f488d",
+      "config_digest": "sha256:a1e028236d55ab8a2ec45d7c693137b5adb5d230baecdbae4f9f75cf51b6ce66"
+    },
+    "requirements": {
+      "input_path": "requirements.in",
+      "input_sha256": "840e38724ac28230b36a9192bfc95d86001de62b9cdf66d8a7d6b063e79e6dcf",
+      "lock_path": "requirements.lock",
+      "lock_sha256": "22909609a03997035fe724bfa7f424edebded8e50cb1b504947523a257080f17",
+      "resolver": "uv 0.11.27",
+      "exclude_newer": "2026-07-16T00:00:00Z"
+    },
+    "nlp": {
+      "extra": "mem0ai[nlp]",
+      "spacy_version": "3.8.14",
+      "model": {
+        "name": "en_core_web_sm",
+        "version": "3.8.0",
+        "url": "https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl",
+        "sha256": "1932429db727d4bff3deed6b34cfc05df17794f4a52eeb26cf8928f7c1a0fb85"
+      },
+      "required_pipeline_components": [
+        "attribute_ruler",
+        "lemmatizer",
+        "ner",
+        "parser",
+        "tagger",
+        "tok2vec"
+      ]
+    }
+  },
+  "database": {
+    "initialization": {
+      "path": "init-db.sql",
+      "sha256": "688c7a4e14c83eef489d103d08f6b2b0ded29e995fcdecdb6ff056ac711243ca"
+    },
+    "postgres": {
+      "major_version": "17",
+      "version": "17.6",
+      "version_num": "170006",
+      "distribution": "Debian 17.6-1.pgdg12+1",
+      "base_image_reference": "docker.io/library/postgres:17-bookworm",
+      "base_image_digest": "sha256:acd32fd91bbdda025a0cc6d9de5666282dfea5d2f30ca7899c1c787f78062121"
+    },
+    "pgvector": {
+      "version": "0.8.0",
+      "source_commit": "2627c5ff775ae6d7aef0c430121ccf857842d2f2",
+      "image_reference": "docker.io/pgvector/pgvector:0.8.0-pg17-bookworm",
+      "image_index_digest": "sha256:40b404964359299eefdd5f8518facf1886c562848cf4de13b6eaf91cb70c2b87",
+      "platform_digest": "sha256:082fcb2ad21352ebc605414ce5e8ad83b469139398d5b8b06475c842add1979b",
+      "config_digest": "sha256:9cfa957fae1dcb39badc31e50ab5827408e1e655f9fd1d5ab5b49c63322932db"
+    }
+  },
+  "runtime": {
+    "server": {
+      "module": "main:app",
+      "api_title": "Mem0 REST APIs",
+      "api_version": "1.0.0"
+    },
+    "auth_disabled": true,
+    "telemetry_enabled": false,
+    "llm": {
+      "provider": "openai",
+      "model": "glm52",
+      "base_url": "http://host.docker.internal:18080/v1"
+    },
+    "embedder": {
+      "provider": "openai",
+      "model": "text-embedding-ada-002",
+      "base_url": "http://host.docker.internal:18080/v1"
+    },
+    "vector_store": {
+      "provider": "pgvector",
+      "host": "postgres",
+      "port": 5432,
+      "database": "postgres",
+      "collection": "memories"
+    },
+    "required_api_capabilities": [
+      "bm25_scoring",
+      "configuration",
+      "entity_scoring",
+      "llm_generation",
+      "memory_create",
+      "memory_search",
+      "memory_delete",
+      "observation_prompt",
+      "search_explain"
+    ]
+  },
+  "verification": {
+    "mem0_source": "official GitHub commit and SHA-256 verified source archive",
+    "container_images": "Docker Registry v2 immutable manifests",
+    "postgres_base": "official pgvector linux/amd64 SLSA provenance"
+  }
+}

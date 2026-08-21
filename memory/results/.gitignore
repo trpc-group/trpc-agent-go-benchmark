@@ -1,6 +1,6 @@
-# Ignore result data and logs (large, machine-generated).
-*.json
-*.log
-*.pdf
-tmp/
-tools/
+# Ignore all result files (large, machine-generated).
+*
+!.gitignore
+!README.md
+!REPORT.md
+!REPORT.zh_CN.md

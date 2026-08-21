@@ -1,6 +1,35 @@
-# Evaluating Long-Term Conversational Memory on LoCoMo Benchmark
+# Memory Benchmark Report
 
-## 1. Introduction
+This report follows the order in which the experiments were run: first
+the long-term conversational memory evaluation on LoCoMo, together
+with the update policy comparison added later under the same protocol,
+then the cross-session user memory evaluation on LongMemEval. Each
+part states its own setup, results, and analysis.
+
+| Experiment | Benchmark | Subject | Scale | Model |
+| --- | --- | --- | --- | --- |
+| 1 | LoCoMo-10 | Internal scenarios, Python agent frameworks, external memory systems | 1,986 QA | `gpt-4o-mini` |
+| 2 | LoCoMo-10 | Three Auto update policies | 1,986 QA | `gpt-4o-mini` |
+| 3 | LongMemEval | Three update policies × assistant-episode extraction, plus Mem0 OSS | 50 cases | `glm52` |
+
+**Result status**
+
+- The LoCoMo part records the runs as they were executed. The
+  repository keeps only the report text; datasets, logs, and traces
+  are not published with it, so these numbers should be cited as
+  historical run records. Re-running the documented setup should
+  reproduce the same conclusions.
+- The LongMemEval section is a development-stage evaluation on a
+  50-case subset; its composition and full listing are given in
+  Section 1 of that part and in Appendix D. It supports relative
+  comparison between configurations and is not a final score on that
+  benchmark.
+
+---
+
+## Evaluating Long-Term Conversational Memory on LoCoMo Benchmark
+
+### 1. Introduction
 
 This report evaluates the long-term conversational memory of
 **trpc-agent-go** using the **LoCoMo** benchmark (Maharana et al.,
@@ -16,9 +45,9 @@ Both versions are compared against four Python agent frameworks
 (AutoGen, Agno, ADK, CrewAI) and ten external memory systems
 (Mem0, Zep, etc.).
 
-## 2. Experimental Setup
+### 2. Experimental Setup
 
-### 2.1 Benchmark
+#### 2.1 Benchmark
 
 | Item | Value |
 | --- | --- |
@@ -27,7 +56,7 @@ Both versions are compared against four Python agent frameworks
 | Model | GPT-4o-mini (inference + judge) |
 | Embedding | text-embedding-3-small |
 
-### 2.2 Scenarios
+#### 2.2 Scenarios
 
 | Scenario | Description |
 | --- | --- |
@@ -35,7 +64,7 @@ Both versions are compared against four Python agent frameworks
 | **Original** | Auto extraction + pgvector baseline; background extractor writes memories and retrieves them at query time |
 | **Optimized** | Optimized memory extraction strategy and multi-pass retrieval over extracted memories |
 
-### 2.3 Optimizations: Original → Optimized
+#### 2.3 Optimizations: Original → Optimized
 
 The optimized version builds on the original baseline with a series
 of targeted improvements across the memory extraction, storage, and
@@ -94,9 +123,9 @@ retrieval pipeline:
    the highest-scored version. This reduces redundant context
    in the retrieval results.
 
-## 3. Results
+### 3. Results
 
-### 3.1 Internal Scenario Comparison
+#### 3.1 Internal Scenario Comparison
 
 **Table 1: Overall Metrics**
 
@@ -172,7 +201,7 @@ retrieval pipeline:
 > samples and beats the optimized version on all 10 samples, with the
 > largest gains on `locomo10_2`, `locomo10_3`, and `locomo10_5`.
 
-### 3.2 Retrieval Strategies vs Long-Context
+#### 3.2 Retrieval Strategies vs Long-Context
 
 Long-Context places the full transcript into a single LLM call.
 It is effective for short single-session histories, but the two
@@ -190,7 +219,7 @@ retrieval-based strategies expose different production trade-offs:
 
 ---
 
-### 3.3 SQLite vs SQLiteVec (Subset Run)
+#### 3.3 SQLite vs SQLiteVec (Subset Run)
 
 This subsection compares `sqlite` (keyword matching) and `sqlitevec`
 (semantic vector search via sqlite-vec) on a few controlled subset runs.
@@ -290,13 +319,13 @@ We also rerun the same configuration on another representative sample.
 
 ---
 
-## 4. Comparison with Python Agent Frameworks
+### 4. Comparison with Python Agent Frameworks
 
 We ran the same LoCoMo benchmark on four Python agent frameworks —
 **AutoGen**, **Agno**, **ADK**, **CrewAI** — all using GPT-4o-mini,
 the same 10 samples (1,986 QA), and LLM-as-Judge evaluation.
 
-### 4.1 Framework Configurations
+#### 4.1 Framework Configurations
 
 | Framework | Memory Backend | Retrieval | Embedding |
 | --- | --- | --- | --- |
@@ -306,7 +335,7 @@ the same 10 samples (1,986 QA), and LLM-as-Judge evaluation.
 | **ADK** | In-memory | Agent tool call (LoadMemoryTool) | Internal |
 | **CrewAI** | Built-in vector | Auto-retrieve by Crew | Internal |
 
-### 4.2 Framework Memory Approaches
+#### 4.2 Framework Memory Approaches
 
 Below is a detailed breakdown of each framework's memory storage,
 retrieval, and QA call flow. All benchmark implementations share
@@ -448,7 +477,7 @@ and evaluation pipeline.
 > staying in the low-token tier, while the optimized version remains
 > the more extraction-heavy, tool-driven alternative.
 
-### 4.3 Overall Results
+#### 4.3 Overall Results
 
 **Table 7: Memory Scenario — Overall Metrics**
 
@@ -490,7 +519,7 @@ Agno                           |===============================                 
                                0.0      0.1      0.2      0.3      0.4      0.5
 ```
 
-### 4.4 Category-Level F1
+#### 4.4 Category-Level F1
 
 **Table 8: F1 by Category**
 
@@ -520,7 +549,7 @@ Agno                           |===============================                 
 > beating AutoGen's 0.511 by 0.020 while clearly leading all other
 > trpc-agent-go variants and dedicated memory systems.
 
-### 4.5 Token Efficiency and Latency
+#### 4.5 Token Efficiency and Latency
 
 **Table 10: Token Efficiency Comparison**
 
@@ -614,7 +643,7 @@ for **5.6x nominal token cost** (significantly less after cache
 discounts), making it worthwhile for production use where answer
 quality matters more than token budget.
 
-### 4.6 ADK Failure Analysis
+#### 4.6 ADK Failure Analysis
 
 ADK (Google Agent Development Kit) uses an in-memory backend with
 agent tool calls (`LoadMemoryTool`) for memory retrieval. In this
@@ -647,7 +676,7 @@ evaluation, ADK encountered context overflow issues on some samples:
 - Average 49,224 tokens/QA (highest among all frameworks) for
   only 0.362 F1
 
-### 4.7 Per-Sample F1
+#### 4.7 Per-Sample F1
 
 **Table 12: Per-Sample F1 Comparison**
 
@@ -669,7 +698,7 @@ evaluation, ADK encountered context overflow issues on some samples:
 
 ---
 
-## 5. Comparison with External Memory Systems
+### 5. Comparison with External Memory Systems
 
 Source: Mem0 Table 1 (Chhikara et al., 2025, arXiv:2504.19413).
 All systems use GPT-4o-mini. Adversarial category excluded for
@@ -766,9 +795,89 @@ Agno                |====================                      | 0.267
 
 ---
 
-## 6. Conclusion
+### 6. Update Policy Results
 
-### Key Findings
+#### 6.1 Evaluation Protocol
+
+This section compares the archived Optimized result, which uses the
+default Merge Similar policy, with Preserve History and Append Only.
+The two new runs change only the Auto update policy. Assistant-episode
+experiments are excluded: LoCoMo maps a second human speaker to the
+assistant role and is not an appropriate evaluation of model-generated
+assistant results.
+
+| Item | Value |
+| --- | --- |
+| Dataset | Official LoCoMo-10; 10 conversations; 1,986 QA |
+| Dataset SHA-256 | `79fa87e90f04081343b8c8debecb80a9a6842b76a7aa537dc9fdf651ea698ff4` |
+| Scenario and backend | Auto + pgvector |
+| Answer and judge model | `gpt-4o-mini` |
+| Embedding model | `text-embedding-3-small` |
+| Retrieval | top-k 30; two `memory_search` passes |
+| QA context | No QA-history injection; 128,000-token maximum context |
+| Metrics | F1, BLEU, LLM Score, category metrics, tokens, calls, and latency |
+
+#### 6.2 Overall Results
+
+| Policy configuration | F1 | Delta | BLEU | Delta | LLM Score | Delta | Active memories |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Optimized / Merge Similar | 0.4690 | - | 0.4310 | - | 0.5320 | - | unavailable |
+| **Preserve History** | **0.4865** | **+1.75pp** | **0.4473** | **+1.63pp** | **0.5609** | **+2.89pp** | 2,740 |
+| Append Only | 0.4773 | +0.83pp | 0.4397 | +0.87pp | 0.5441 | +1.21pp | 2,627 |
+
+Preserve History is the strongest measured configuration on all three
+overall metrics. Append Only also improves on the Optimized baseline
+while retaining 113 fewer active memories than Preserve History.
+
+#### 6.3 Category Metrics
+
+Each cell is `F1 / BLEU / LLM Score`.
+
+| Policy configuration | Single-hop | Multi-hop | Temporal | Open-domain | Adversarial |
+| --- | --- | --- | --- | --- | --- |
+| Optimized / Merge Similar | 0.396/0.325/0.395 | 0.453/0.415/0.519 | 0.247/0.192/0.364 | 0.441/0.398/0.552 | 0.626/0.626/0.626 |
+| Preserve History | 0.386/0.319/0.387 | 0.530/0.484/0.603 | 0.242/0.196/0.415 | 0.479/0.432/0.607 | 0.586/0.585/0.585 |
+| Append Only | 0.381/0.312/0.353 | 0.498/0.456/0.579 | 0.209/0.161/0.348 | 0.464/0.420/0.585 | 0.605/0.605/0.605 |
+
+The policy gains are concentrated in multi-hop and open-domain
+questions. The Optimized baseline remains stronger on single-hop and
+adversarial F1.
+
+#### 6.4 Answerable-Category Weighted F1
+
+This view excludes adversarial questions and uses the fixed 1,540
+answerable QA items as its denominator.
+
+| Policy configuration | Weighted F1 | Delta vs Optimized |
+| --- | ---: | ---: |
+| Optimized / Merge Similar | 0.4230 | - |
+| **Preserve History** | **0.4579** | **+3.49pp** |
+| Append Only | 0.4402 | +1.72pp |
+
+#### 6.5 Cost and Runtime
+
+| Policy configuration | Prompt tokens | Completion tokens | Total tokens | Delta | Cached tokens | LLM calls | Average latency | Runtime |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Optimized / Merge Similar | 34,007,814 | 115,960 | 34,123,774 | - | unavailable | 5,981 | 8.59s | 4h44m |
+| Preserve History | 35,097,721 | 118,823 | 35,216,544 | +3.20% | 15,295,232 | 5,983 | 10.83s | 5.98h |
+| Append Only | 34,558,815 | 118,906 | 34,677,721 | +1.62% | 15,111,168 | 5,977 | 10.83s | 5.97h |
+
+#### 6.6 Result Integrity
+
+- Preserve History and Append Only each contain 10 conversations and
+  the fixed 1,986 QA items, with structured result artifacts and
+  independent pgvector tables.
+- One transient embedding 504 was retried successfully; no case or
+  score was replaced.
+- The Optimized numbers are retained from the existing report
+  baseline. Its original structured result artifact is not present in
+  this repository, so exact deltas are report-derived and must not be
+  described as independently reproduced from a committed artifact.
+
+---
+### 7. Conclusion
+
+#### Key Findings
 
 1. **trpc-agent-go Session Recall is now the strongest overall
    configuration.** It ranks **#1 in 5-category weighted F1** at
@@ -827,7 +936,7 @@ Agno                |====================                      | 0.267
    still at 0.174. Time-aware retrieval, temporal query rewriting,
    and richer reranking remain the main next steps.
 
-### Production Recommendations
+#### Production Recommendations
 
 | Use Case | Recommended Approach |
 | --- | --- |
@@ -838,9 +947,299 @@ Agno                |====================                      | 0.267
 
 ---
 
+## LongMemEval
+
+After the LoCoMo evaluation we moved to LongMemEval, which puts more
+weight on building and retrieving user memory across sessions. It
+covers two dimensions LoCoMo cannot evaluate: how an update policy
+behaves on long-span input, and what assistant-episode extraction
+contributes.
+
+This section reports a development-stage evaluation on a 50-case
+subset. The numbers support relative comparison between configurations
+and are not a final score on the benchmark.
+
+### 1. Dataset and Case Selection
+
+LongMemEval (Wu et al., 2024) evaluates long-term memory over
+multi-session user/assistant chat histories, with 500 questions in six
+question types. This section uses the cleaned build of
+**LongMemEval-S**, `longmemeval_s_cleaned.json`: each question ships
+with a haystack of past sessions, 23,867 sessions across the full 500
+cases, 38 to 62 sessions per case with a median of 48. Every type can
+contain **abstention questions**, whose question IDs carry the `_abs`
+suffix; the correct behavior there is to recognize that the history
+holds no supporting evidence and decline to answer. The full set
+contains 30 of them.
+
+| Question type | Full set | Abstention | Cases here |
+| --- | ---: | ---: | ---: |
+| knowledge-update | 78 | 6 | 8 |
+| multi-session | 133 | 12 | 13 |
+| single-session-assistant | 56 | 0 | 6 |
+| single-session-preference | 30 | 0 | 3 |
+| single-session-user | 70 | 6 | 7 |
+| temporal-reasoning | 133 | 6 | 13 |
+| Total | 500 | 30 | 50 |
+
+One configuration takes about 30 hours end to end, which ruled out
+running all 500 cases within the time and token budget of this round.
+The subset is therefore **stratified by question type, taking 10% of
+each type**: 8, 13, 6, 3, 7, and 13 after rounding, 50 cases in total,
+with the same type proportions as the full set. Abstention questions
+receive no separate quota and enter through the stratified draw, which
+yields three of them, in knowledge-update, multi-session, and
+single-session-user.
+
+The 50 selected cases are pinned by case ID, and every experiment in
+this section uses the same cases in the same order. The list records
+no random seed and cannot be re-derived from dataset order. This is a
+historical fixed subset: **Appendix D** identifies its cases for
+reference, but it predates the current versioned, digest-bound manifest
+contract and cannot be replayed directly by the current harness.
+
+### 2. Experimental Setup
+
+| Item | Value |
+| --- | --- |
+| Dataset | LongMemEval-S cleaned (`longmemeval_s_cleaned.json`) |
+| Cases | 50 cases sampled proportionally per question type, covering all six types |
+| Distribution | knowledge-update 8; multi-session 13; assistant 6; preference 3; user 7; temporal 13 |
+| Input | 2,353 sessions; 24,370 turns; 12,280 user/assistant pairs |
+| Build protocol | Ordered turn-pair fragments; all scenarios share the same replay input |
+| Build chunk limit | 6,000 `cl100k_base` tokens; one over-limit pair was split without content loss across separate extraction boundaries |
+| Answer, extraction, and judge model | `glm52` |
+| Embedding model | `text-embedding-ada-002` |
+| Retrieval | Standard `memory_search`, fixed `top-k=20` |
+| Benchmark revision | `c8c305c4c50594e3d083e06a5248cfeb81b15823` |
+| trpc-agent-go revision | `1b3adb2f4bb8` |
+| Primary metric | Fixed-denominator LLM-judge Accuracy |
+
+All scenarios consume the same replay input and case order. Memory is
+normally built once per user/assistant pair; an over-limit pair is
+split without content loss, but each fragment is a separate Runner
+call and extraction boundary, and the affected case IDs are recorded
+in provenance. Pairs from one source session retain their session
+identity; different source sessions remain isolated under the same
+case-level user memory. Auto receives the source observation date
+through the extractor reference-date API. Mem0 OSS 2.0.11
+(`3b9aed866ae70d29043388ed0ae5cc4e1844f3e8`) receives the same date
+through the supported extraction `prompt` field. QA uses a fresh
+session and can see only the current question, its date, and results
+returned by `memory_search`. Gold answers and evidence are available
+only to evaluation and diagnostics.
+
+The three Auto runs differ only in update policy and use independent
+pgvector tables. Mem0 retains its native extraction and reconciliation
+behavior. Cases that do not complete remain in the fixed denominator
+of 50 and score as incorrect.
+
+### 3. Update Policy Results
+
+| Scenario | Policy | Successful | Failed | Correct | Accuracy | F1 | BLEU | ROUGE-L | Runtime |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Auto | Merge Similar | 48/50 | 2 | 14 | 0.2800 | 0.0961 | 0.0635 | 0.0885 | 28h34m |
+| Auto | Preserve History | 50/50 | 0 | 41 | 0.8200 | 0.1683 | 0.1079 | 0.1614 | 29h51m |
+| Auto | Append Only | 50/50 | 0 | 41 | 0.8200 | **0.1730** | **0.1112** | **0.1679** | 28h07m |
+| Mem0 OSS | native | 50/50 | 0 | 42 | **0.8400** | 0.1681 | 0.1067 | 0.1588 | 30h15m |
+
+Runtime is the total build and QA time for the 50 cases of a scenario.
+The Failed column counts cases that produced no answer; they stay in
+the fixed denominator of 50 and score as incorrect. The two Merge
+Similar failures come from QA exceeding eight tool iterations.
+
+#### Accuracy by Question Type
+
+| Question type | Count | Merge Similar | Preserve History | Append Only | Mem0 OSS |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| knowledge-update | 8 | 0.5000 | 0.8750 | **1.0000** | 0.8750 |
+| multi-session | 13 | 0.2308 | **0.8462** | 0.7692 | 0.7692 |
+| single-session-assistant | 6 | 0.0000 | 0.0000 | 0.1667 | **0.5000** |
+| single-session-preference | 3 | 0.0000 | **1.0000** | **1.0000** | **1.0000** |
+| single-session-user | 7 | 0.2857 | **1.0000** | 0.8571 | **1.0000** |
+| temporal-reasoning | 13 | 0.3846 | **1.0000** | **1.0000** | 0.9231 |
+
+The table shows that the largest shortfall of the framework against
+Mem0 OSS is on single-session-assistant.
+
+### 4. Assistant-Episode Extraction Ablation
+
+This section compares the three Auto update policies with
+assistant-episode extraction disabled and enabled on the same 50
+cases, six runs in total. The enabled rows use the conditional
+two-stage extractor as it was then: ordinary user-memory extraction
+runs first, and a bounded assistant-result extraction request is
+issued only for a strong structured-result candidate. That
+implementation predates the merged version, and eligibility,
+grounding, and request construction changed afterwards, so the enabled
+rows are historical references and do not represent the current
+implementation. Mem0 uses its native extraction behavior and is listed
+as an external reference row.
+
+All seven rows use the same 50 cases and order, `glm52`,
+`text-embedding-ada-002`, the same ordered turn-pair fragments, the
+same 6,000-token chunk limit, and `top-k=20`.
+
+| Policy / backend | Assistant extraction | QA succeeded | Failed | Correct | Accuracy | F1 | BLEU | ROUGE-L |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Merge Similar | Disabled | 48/50 | 2 | 14 | 0.2800 | 0.0961 | 0.0635 | 0.0885 |
+| Merge Similar | Enabled | 45/50 | 5 | 29 | 0.5800 | 0.1626 | 0.1083 | 0.1518 |
+| Preserve History | Disabled | 50/50 | 0 | 41 | 0.8200 | 0.1683 | 0.1079 | 0.1614 |
+| Preserve History | Enabled | 48/50 | 2 | **45** | **0.9000** | 0.1876 | 0.1204 | 0.1779 |
+| Append Only | Disabled | 50/50 | 0 | 41 | 0.8200 | 0.1730 | 0.1112 | 0.1679 |
+| Append Only | Enabled | 47/50 | 3 | 44 | 0.8800 | **0.1970** | **0.1295** | **0.1865** |
+| Mem0 OSS (reference) | Native | 50/50 | 0 | 42 | 0.8400 | 0.1681 | 0.1067 | 0.1588 |
+
+Failed QA remains in the fixed 50-case denominator and scores as
+incorrect. The assistant-enabled runs are not replacements selected by
+score; each row is one complete experimental configuration.
+
+#### Accuracy by Question Type (Assistant Extraction Enabled)
+
+| Question type | Count | Merge Similar | Preserve History | Append Only | Mem0 OSS |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| knowledge-update | 8 | 0.7500 | **1.0000** | **1.0000** | 0.8750 |
+| multi-session | 13 | 0.3077 | 0.7692 | **0.8462** | 0.7692 |
+| single-session-assistant | 6 | **0.8333** | **0.8333** | **0.8333** | 0.5000 |
+| single-session-preference | 3 | **1.0000** | 0.6667 | 0.6667 | **1.0000** |
+| single-session-user | 7 | **1.0000** | **1.0000** | 0.8571 | **1.0000** |
+| temporal-reasoning | 13 | 0.3077 | **1.0000** | 0.9231 | 0.9231 |
+
+Compared with the same question types under disabled extraction in
+Section 3, single-session-assistant is where the gain concentrates:
+the three policies move from 0.0000, 0.0000 and 0.1667 to 0.8333,
+above the 0.5000 of Mem0. Merge Similar improves on the widest front,
+with single-session-user rising from 0.2857 to 1.0000 and
+knowledge-update from 0.5000 to 0.7500. Enabling extraction also
+produces a few regressions, each corresponding to a single case:
+single-session-preference falls from 1.0000 to 0.6667 for Preserve
+History and Append Only, multi-session falls from 0.8462 to 0.7692 for
+Preserve History, and temporal-reasoning falls from 1.0000 to 0.9231
+for Append Only and from 0.3846 to 0.3077 for Merge Similar. Assistant
+extraction does affect the other question types, but the effect is
+limited. In practice we recommend enabling it only when the assistant
+returns information worth persisting, such as important facts, and
+keeping it disabled by default.
+
+### 5. Memory Footprint and Cost
+
+| Scenario | Complete builds | Final entries | Entries/case | Median | Range |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Auto Merge Similar | 50/50 | 2,955 | 59.10 | 58 | 35-87 |
+| Auto Preserve History | 50/50 | 15,353 | 307.06 | 305.5 | 257-381 |
+| Auto Append Only | 50/50 | 16,280 | 325.60 | 326 | 264-396 |
+| Mem0 OSS | 50/50 | 28,041 | 560.82 | 564.5 | 465-602 |
+
+The inventory is taken from the stored memory entries at the end of
+each completed build. The general snapshot reader requests up to
+10,000 entries and the Mem0 OSS adapter observes up to 1,000; both are
+well above the observed maximum of 602, so these counts are not
+truncated. They count active entries after ingestion, not extraction
+operations or database rows shared across cases.
+
+Memory footprint with assistant-episode extraction enabled:
+
+| Policy / backend | Assistant extraction | Active memories | Complete builds | Entries per complete build |
+| --- | --- | ---: | ---: | ---: |
+| Merge Similar | Disabled | 2,955 | 50/50 | 59.10 |
+| Merge Similar | Enabled | 6,011 | 50/50 | 120.22 |
+| Preserve History | Disabled | 15,353 | 50/50 | 307.06 |
+| Preserve History | Enabled | 17,696 | 49/50 | 361.14 |
+| Append Only | Disabled | 16,280 | 50/50 | 325.60 |
+| Append Only | Enabled | 18,728 | 49/50 | 382.20 |
+| Mem0 OSS | Native | 28,041 | 50/50 | 560.82 |
+
+The inventory counts fully built cases only. With assistant extraction
+enabled, Preserve History and Append Only each have one case that did
+not finish building, so those two rows are short by one case.
+
+| Policy / backend | Assistant extraction | Build LLM calls | Build LLM tokens | QA+judge calls | QA+judge tokens | Build embedding requests | Remote embedding calls | Cache hits |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Merge Similar | Disabled | 12,281 | 96,999,123 | 240 | 2,048,381 | 37,907 | 26,074 | 11,833 |
+| Merge Similar | Enabled | 15,647 | 83,758,408 | 201 | 1,619,884 | 40,254 | 28,737 | 11,517 |
+| Preserve History | Disabled | 12,336 | 95,086,050 | 163 | 434,852 | 28,028 | 27,581 | 447 |
+| Preserve History | Enabled | 15,602 | 86,783,156 | 153 | 399,363 | 30,579 | 30,122 | 457 |
+| Append Only | Disabled | 12,411 | 84,701,403 | 168 | 467,266 | 28,860 | 28,401 | 459 |
+| Append Only | Enabled | 15,496 | 76,326,984 | 153 | 406,198 | 31,044 | 30,583 | 461 |
+| Mem0 OSS | Native | 12,359 | 113,205,317* | 171 | 410,912 | 23,044 | 23,044 | 0 |
+
+Cost accounting includes requests that failed or incomplete builds had
+already issued, which differs from the memory inventory above, where
+each row counts only the last successful snapshot. With assistant
+extraction enabled, build LLM calls rise from 12,281-12,411 to
+15,496-15,647, an increase of 3,085-3,366 calls, roughly as if a
+quarter of the 12,280 pairs triggered a second extraction.
+
+`*` Mem0 proxy accounting captured calls and observed token fields,
+but the provider record marks build LLM and embedding token totals as
+`tokens_known=false`; they must not be interpreted as complete
+provider usage. Shared caches and concurrent execution also make
+remote-call and wall-clock figures unsuitable as standalone backend
+speed rankings. This table covers the same case population as Section
+3.
+
+### 6. Findings
+
+1. **Update policy dominates this sample.** Preserve History raises
+   Accuracy from 28% to 82%. Every Merge Similar success is also
+   correct under Preserve History; Preserve History adds 27 correct
+   cases without a regression unique to Merge Similar. Its completed
+   cases retain about 5.2 times as many final entries per case as
+   Merge Similar, showing how strongly Merge Similar reconciliation
+   reduces the stored evidence set.
+2. **Preserve History and Append Only tie on Accuracy but preserve
+   different evidence.** They agree on 39 correct cases and each has
+   two unique successes. Preserve History is stronger on multi-session
+   and single-session-user questions; Append Only is stronger on
+   knowledge-update and assistant questions and has the highest
+   lexical-overlap metrics.
+3. **Mem0 and the two new Auto policies are complementary.** Mem0 and
+   Preserve History agree on 38 correct cases; Mem0 has four unique
+   successes and Preserve History has three. Mem0 is strongest on
+   assistant-memory questions, while Preserve History leads
+   multi-session and temporal Accuracy.
+4. **Assistant-episode extraction helps every policy, with diminishing
+   returns.** Enabling it raises Accuracy by 30 points for Merge
+   Similar, 8 points for Preserve History, and 6 points for Append
+   Only: the weaker the baseline, the more assistant-side evidence
+   adds. Preserve History with assistant extraction has the highest
+   Accuracy (0.9000), and Append Only with assistant extraction has
+   the strongest lexical-overlap metrics (F1 0.1970, BLEU 0.1295,
+   ROUGE-L 0.1865). These gains come from the extraction
+   implementation as it was then and need to be re-attributed with a
+   rerun on the current implementation.
+5. **Those gains come with a larger memory footprint and more
+   failures.** Enabling assistant extraction adds 3,056, 2,343, and
+   2,448 active memories respectively, while QA failures move from
+   2/0/0 to 5/2/3, and two of the runs each leave one case unbuilt.
+   Mem0 remains a native external baseline and is not configured with
+   the Auto-only assistant option.
+
+### 7. Validity Limits
+
+- These 50 cases are a 10% sample drawn proportionally per question
+  type, not the official LongMemEval dev/holdout split. The list pins
+  the exact sample but defines no seeded blind split, so the
+  conclusions apply to relative comparison between configurations and
+  are neither final scores on the benchmark nor a blind holdout
+  baseline.
+- The sample is small: one case is worth 2 accuracy points, so
+  differences within 2 points between policies should not be read as a
+  stable gap.
+- Two of the assistant-enabled runs in Section 4 each have one case
+  that did not finish building, which slightly understates their
+  memory footprint, so the six runs there should be used as
+  development diagnostics.
+- The three assistant-enabled runs use the two-stage implementation as
+  it was then. It predates the merged version, and the extraction
+  conditions and request construction changed afterwards, so those
+  three rows are historical references rather than results of the
+  current implementation.
+---
+
 ## Appendix
 
-### A. Experimental Environment
+### A. LoCoMo Experimental Environment
 
 | Component | Version/Config |
 | --- | --- |
@@ -850,7 +1249,7 @@ Agno                |====================                      | 0.267
 | PostgreSQL | 15+ with pgvector extension |
 | Dataset | LoCoMo-10 (10 samples, 1,986 QA) |
 
-### B. Full Category Breakdown (F1 / BLEU / LLM)
+### B. LoCoMo Full Category Breakdown (F1 / BLEU / LLM)
 
 | Scenario | single-hop | multi-hop | temporal | open-domain | adversarial |
 | --- | --- | --- | --- | --- | --- |
@@ -859,7 +1258,7 @@ Agno                |====================                      | 0.267
 | Optimized | 0.396/0.325/0.395 | 0.453/0.415/0.519 | 0.247/0.192/0.364 | 0.441/0.398/0.552 | 0.626/0.626/0.626 |
 | Original | 0.316/0.250/0.270 | 0.096/0.088/0.060 | 0.088/0.068/0.115 | 0.358/0.319/0.425 | 0.814/0.814/0.814 |
 
-### C. Token Usage — Full Breakdown
+### C. LoCoMo Token Usage — Full Breakdown
 
 | Scenario | Prompt Tokens | Completion Tokens | Total Tokens | LLM Calls | Calls/QA |
 | --- | ---: | ---: | ---: | ---: | ---: |
@@ -872,6 +1271,77 @@ Agno                |====================                      | 0.267
 | Agno | 20,694,534 | 31,194 | 20,725,728 | 1,986 | 1.0 |
 | ADK | 97,691,620 | 67,833 | 97,759,453 | 4,028 | 2.0 |
 
+### D. The LongMemEval 50-Case List
+
+Every LongMemEval experiment uses the 50 cases below. They were
+selected by stratifying on question type and drawing 10% of each type
+from the 500 cases of LongMemEval-S, which gives 8, 13, 6, 3, 7, and
+13 after rounding and preserves the type proportions of the full set
+(see Section 1 of the LongMemEval part). The list is pinned by case ID
+and records no random seed. It identifies the historical fixed subset
+for reference, but predates the current versioned, digest-bound manifest
+contract and cannot be replayed directly by the current harness. Case IDs
+match `longmemeval_s_cleaned.json`; the three cases carrying the `_abs`
+suffix are abstention questions, where declining to answer is the correct
+behavior.
+
+| # | Case ID | Question type |
+| ---: | --- | --- |
+| 1 | `4dfccbf8` | temporal-reasoning |
+| 2 | `gpt4_ec93e27f` | temporal-reasoning |
+| 3 | `a1eacc2a` | knowledge-update |
+| 4 | `gpt4_e072b769` | temporal-reasoning |
+| 5 | `3ba21379` | knowledge-update |
+| 6 | `gpt4_70e84552` | temporal-reasoning |
+| 7 | `f4f1d8a4_abs` | single-session-user |
+| 8 | `545bd2b5` | single-session-user |
+| 9 | `59524333` | knowledge-update |
+| 10 | `0977f2af` | knowledge-update |
+| 11 | `60159905` | multi-session |
+| 12 | `gpt4_f2262a51` | multi-session |
+| 13 | `195a1a1b` | single-session-preference |
+| 14 | `gpt4_fa19884c` | temporal-reasoning |
+| 15 | `58ef2f1c` | single-session-user |
+| 16 | `a346bb18` | multi-session |
+| 17 | `ef66a6e5` | multi-session |
+| 18 | `7527f7e2` | single-session-user |
+| 19 | `3fdac837` | multi-session |
+| 20 | `bbf86515` | temporal-reasoning |
+| 21 | `f0853d11` | temporal-reasoning |
+| 22 | `603deb26` | knowledge-update |
+| 23 | `129d1232` | multi-session |
+| 24 | `1d4e3b97` | single-session-preference |
+| 25 | `gpt4_4cd9eba1` | temporal-reasoning |
+| 26 | `faba32e5` | single-session-user |
+| 27 | `gpt4_1e4a8aeb` | temporal-reasoning |
+| 28 | `2698e78f_abs` | knowledge-update |
+| 29 | `gpt4_fa19884d` | temporal-reasoning |
+| 30 | `2788b940` | multi-session |
+| 31 | `3e321797` | single-session-assistant |
+| 32 | `0100672e` | multi-session |
+| 33 | `b3c15d39` | multi-session |
+| 34 | `d7c942c3` | knowledge-update |
+| 35 | `4f54b7c9` | multi-session |
+| 36 | `08f4fc43` | temporal-reasoning |
+| 37 | `0e5e2d1a` | single-session-assistant |
+| 38 | `b01defab` | knowledge-update |
+| 39 | `51b23612` | single-session-assistant |
+| 40 | `6456829e` | multi-session |
+| 41 | `gpt4_2d58bcd6` | temporal-reasoning |
+| 42 | `25e5aa4f` | single-session-user |
+| 43 | `6456829e_abs` | multi-session |
+| 44 | `778164c6` | single-session-assistant |
+| 45 | `d851d5ba` | multi-session |
+| 46 | `06f04340` | single-session-preference |
+| 47 | `bcbe585f` | temporal-reasoning |
+| 48 | `c960da58` | single-session-user |
+| 49 | `e3fc4d6e` | single-session-assistant |
+| 50 | `4baee567` | single-session-assistant |
+
+By question type: knowledge-update 8; multi-session 13;
+single-session-assistant 6; single-session-preference 3;
+single-session-user 7; temporal-reasoning 13, for a total of 50.
+
 ---
 
 ## References
@@ -879,3 +1349,4 @@ Agno                |====================                      | 0.267
 1. Maharana, A., Lee, D., Tulyakov, S., Bansal, M., Barbieri, F., and Fang, Y. "Evaluating Very Long-Term Conversational Memory of LLM Agents." arXiv:2402.17753, 2024.
 2. Chhikara, P., Khant, D., Aryan, S., Singh, T., and Yadav, D. "Mem0: Building Production-Ready AI Agents with Scalable Long-Term Memory." arXiv:2504.19413, 2025.
 3. Hu, C., et al. "Memory in the Age of AI Agents." arXiv:2512.13564, 2024.
+4. Wu, D., Wang, H., Yu, W., Zhang, Y., Chang, K.-W., and Yu, D. "LongMemEval: Benchmarking Chat Assistants on Long-Term Interactive Memory." arXiv:2410.10813, 2024.

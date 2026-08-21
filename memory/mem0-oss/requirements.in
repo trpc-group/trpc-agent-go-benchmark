@@ -1,0 +1,27 @@
+# Tencent is pleased to support the open source community by making
+# trpc-agent-go-benchmark available.
+#
+# Copyright (C) 2026 Tencent. All rights reserved.
+#
+# trpc-agent-go-benchmark is licensed under the Apache License Version 2.0.
+
+# Top-level dependencies from mem0ai/mem0 server/requirements.txt at
+# 3b9aed866ae70d29043388ed0ae5cc4e1844f3e8, resolved and then pinned exactly.
+# The hash-locked requirements.lock is the authoritative install input.
+alembic==1.18.5
+anthropic==0.116.0
+bcrypt==4.0.1
+cryptography==49.0.0
+fastapi==0.115.8
+google-generativeai==0.8.6
+mem0ai[nlp]==2.0.11
+passlib[bcrypt]==1.7.4
+posthog==7.24.0
+psycopg[binary]==3.3.4
+psycopg-pool==3.3.1
+pydantic[email]==2.10.4
+python-dotenv==1.2.2
+python-jose[cryptography]==3.5.0
+slowapi==0.1.10
+sqlalchemy==2.0.51
+uvicorn==0.34.0
