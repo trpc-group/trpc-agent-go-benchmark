@@ -1,0 +1,25 @@
+embedding:
+  provider: openai
+  api_base: "https://api.example.com/v1"
+  api_key: "<api-key>"
+  model: "<embedding-model>"
+  # Set the model's actual output dimension.
+  dimensions: 1024
+  timeout: 120
+  max_retries: 2
+  batch_size: 64
+  concurrency: 4
+  extra_headers: {}
+
+retrieval:
+  mode: hybrid
+  max_results: 4
+  max_chars: 6000
+
+# Optional persistent exact-input cache. When enabled, access is always
+# read-through/write-through. Change model_fingerprint whenever weights,
+# tokenizer, pooling, normalization, or serving preprocessing changes.
+cache:
+  enabled: false
+  directory: "<embedding-cache-directory>"
+  model_fingerprint: "<immutable-model-and-preprocessing-revision>"

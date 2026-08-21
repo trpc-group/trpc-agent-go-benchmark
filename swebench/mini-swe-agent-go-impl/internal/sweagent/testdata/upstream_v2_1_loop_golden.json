@@ -1,0 +1,77 @@
+{
+  "upstream_commit": "3a9b8e874d322a9cfb1f391ff4f4df67721c108c",
+  "task": "fix deterministic issue",
+  "info": {
+    "exit_status": "Submitted",
+    "submission": "diff --git a/a b/a\n"
+  },
+  "api_calls": 3,
+  "commands": [
+    "inspect",
+    "before-submit",
+    "submit"
+  ],
+  "messages": [
+    {
+      "role": "system",
+      "content": {
+        "length": 95,
+        "sha256": "f554fe1eeb6b4f3ce9021cf87edbafc12ceee37b8b3a6838b0aebb4125ab3714"
+      }
+    },
+    {
+      "role": "user",
+      "content": {
+        "length": 4514,
+        "sha256": "d97c18d76abf4562281118afa4e765498d1a9ceab3681334ef02f48e7185ec15"
+      }
+    },
+    {
+      "role": "user",
+      "content": {
+        "length": 554,
+        "sha256": "1a74a233aaaf5a8254b94cd91236e30d6eb2af98435fee5e8608bd612266456a"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "inspect",
+      "actions": [
+        {
+          "command": "inspect",
+          "tool_call_id": "inspect"
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "content": {
+        "length": 55,
+        "sha256": "dfe52a726d0d70aeb5e439f04aabdc257224a3236795faae7fb2ff9703fffced"
+      },
+      "tool_call_id": "inspect",
+      "raw_output": "inspected\n",
+      "returncode": 0
+    },
+    {
+      "role": "assistant",
+      "content": "finish",
+      "actions": [
+        {
+          "command": "before-submit",
+          "tool_call_id": "before"
+        },
+        {
+          "command": "submit",
+          "tool_call_id": "submit"
+        }
+      ]
+    },
+    {
+      "role": "exit",
+      "content": "diff --git a/a b/a\n",
+      "exit_status": "Submitted",
+      "submission": "diff --git a/a b/a\n"
+    }
+  ]
+}

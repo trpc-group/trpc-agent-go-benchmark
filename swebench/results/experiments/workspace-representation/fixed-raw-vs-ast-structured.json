@@ -1,0 +1,238 @@
+{
+  "schema_version": 1,
+  "result_id": "workspace-representation-fixed-raw-vs-ast-structured-full500",
+  "status": "completed",
+  "evidence_status": "complete_single_sequential_run_per_arm",
+  "source_repository": "https://github.com/hr-chang/trpc-agent-go-benchmark",
+  "question": "Under the intended same workspace-RAG agent configuration, how do indentation-preserving fixed-raw chunks and AST-structured chunks compare on the canonical SWE-bench Verified 500-case panel?",
+  "source_artifacts": [
+    {
+      "role": "ast_plan",
+      "frozen_branch_head": "7264ec6d3946ec79b0c09ecfe4b5d8018c323d02",
+      "path": "swebench/results/experiments/workspace-rag/v6-bge-m3-ast-b500-exploratory-plan.json",
+      "sha256": "ebe9763ed607b4b4d7fbfac417a6871085ab03a529b4ffa93ac34b1ab53c6269"
+    },
+    {
+      "role": "ast_result",
+      "frozen_branch_head": "7264ec6d3946ec79b0c09ecfe4b5d8018c323d02",
+      "path": "swebench/results/experiments/workspace-rag/v6-bge-m3-ast-b500-exploratory-result.json",
+      "sha256": "89f3e59c54a74678a963f88bdc5a97b681ae52eeddab2ed9337ba8045d01c6ae"
+    },
+    {
+      "role": "fixed_raw_plan",
+      "frozen_branch_head": "7264ec6d3946ec79b0c09ecfe4b5d8018c323d02",
+      "path": "swebench/results/experiments/workspace-rag/v7-bge-m3-fixedraw-a500-completion-plan.json",
+      "sha256": "56780db45ceee595912f48c24556cae011970ae87d761face5f68b5cc9202cb9"
+    },
+    {
+      "role": "fixed_raw_result",
+      "frozen_branch_head": "7264ec6d3946ec79b0c09ecfe4b5d8018c323d02",
+      "path": "swebench/results/experiments/workspace-rag/v7-bge-m3-fixedraw-a500-completion-result.json",
+      "sha256": "49b018ce50e3aeae1c3cd009e1632b3c4abed2680d0b6bb5da45630751d64d8d"
+    }
+  ],
+  "scope": {
+    "dataset": "princeton-nlp/SWE-bench_Verified",
+    "panel_cases": 500,
+    "case_list_sha256": "a6b0fd7c8c2969a0eef892e032250adcfa6d32362d395c246930e61b575ac9b9",
+    "benchmark_revision": "1532343d90ed0e86d9bab7365166ee060ab2a34d",
+    "framework_revision": "9c4a839314a2f0f0b782196e52a45c733a94f213",
+    "model": "GLM-5.2",
+    "reasoning_effort": "high",
+    "embedding_model": "bge-m3",
+    "retrieval_mode": "hybrid",
+    "observation_codec": "xml",
+    "code_search": true,
+    "workspace_preload": true,
+    "agent_workers": 15,
+    "case_timeout": "2h",
+    "intended_quality_variable": "workspace representation",
+    "execution_difference": "The AST-structured arm used quality-blind recovery for 36 infrastructure-affected cases after host resource discontinuities; the fixed-raw arm had no non-Agent generation failures. Canonical generation outcomes in both arms retain all Agent failures."
+  },
+  "rate_card": {
+    "cached_prompt_per_million": 2.0,
+    "uncached_prompt_per_million": 8.0,
+    "completion_per_million": 28.0,
+    "unit": "billing_unit"
+  },
+  "arms": {
+    "fixed_raw": {
+      "representation_schema": "workspace-representation/v1;reader=text;chunk=fixed;size=1024;overlap=128;whitespace=preserve",
+      "generation": {
+        "cases": 500,
+        "predictions": 500,
+        "terminal_counts": {
+          "Submitted": 499,
+          "Error": 1
+        },
+        "empty_patches": 2,
+        "non_agent_failures": 0,
+        "quality_blind_recovery_cases": 0
+      },
+      "official_harness": {
+        "resolved": 396,
+        "resolved_rate": 0.792,
+        "completed": 497,
+        "unresolved_nonempty": 101,
+        "empty_patch": 2,
+        "error": 1,
+        "denominator": 500
+      },
+      "model_metrics": {
+        "llm_calls": 13134,
+        "prompt_tokens": 234985393,
+        "cached_prompt_tokens": 229644864,
+        "uncached_prompt_tokens": 5340529,
+        "completion_tokens": 3445329,
+        "total_tokens": 238430722,
+        "actual_cost": 598.483172,
+        "all_prompt_uncached_cost": 1976.352356,
+        "fixed_prompt_cache_hit_rate_cost": {
+          "0": 1976.352356,
+          "0.9": 707.431234,
+          "0.95": 636.935616,
+          "0.98": 594.638245,
+          "1": 566.439998
+        }
+      },
+      "agent_metrics": {
+        "tool_calls": 13698,
+        "case_duration_sum_ms": 334895100,
+        "case_duration_mean_ms": 669790.2,
+        "case_duration_median_ms": 406971.5,
+        "case_duration_p95_ms": 1956275,
+        "case_duration_max_ms": 5674695
+      },
+      "retrieval_metrics": {
+        "workspace_documents": 6781187,
+        "eligible_files": 699590,
+        "indexed_files": 699578,
+        "preload_injected_cases": 500,
+        "code_search_calls": 77,
+        "embedding_inputs": 878237,
+        "embedding_errors": 0,
+        "embedding_cache_hit_rate": 0.8704906275122519,
+        "embedding_cache_errors": 0
+      }
+    },
+    "ast_structured": {
+      "representation_schema": "workspace-representation/v1;reader=python-ast;tests=include;hidden=include;paths=stable;fallback=file;embedding=structured-code",
+      "generation": {
+        "cases": 500,
+        "predictions": 500,
+        "terminal_counts": {
+          "Submitted": 498,
+          "Error": 2
+        },
+        "empty_patches": 2,
+        "non_agent_failures_recovered": true,
+        "quality_blind_recovery_cases": 36,
+        "recovery_selection": {
+          "infrastructure_or_environment_errors": 7,
+          "timeouts_under_host_pressure": 6,
+          "unfinished_at_host_termination": 23
+        },
+        "valid_agent_outcomes_rerun": false
+      },
+      "official_harness": {
+        "resolved": 403,
+        "resolved_rate": 0.806,
+        "completed": 498,
+        "unresolved_nonempty": 95,
+        "empty_patch": 2,
+        "error": 0,
+        "denominator": 500
+      },
+      "model_metrics": {
+        "llm_calls": 13555,
+        "prompt_tokens": 249636343,
+        "cached_prompt_tokens": 244123008,
+        "uncached_prompt_tokens": 5513335,
+        "completion_tokens": 3793943,
+        "total_tokens": 253430286,
+        "actual_cost": 638.5831,
+        "all_prompt_uncached_cost": 2103.321148,
+        "fixed_prompt_cache_hit_rate_cost": {
+          "0": 2103.321148,
+          "0.9": 755.284896,
+          "0.95": 680.393993,
+          "0.98": 635.459451,
+          "1": 605.50309
+        }
+      },
+      "agent_metrics": {
+        "tool_calls": 14099,
+        "case_duration_sum_ms": 187712336,
+        "case_duration_mean_ms": 375424.672,
+        "case_duration_median_ms": 206294,
+        "case_duration_p95_ms": 1139132,
+        "case_duration_max_ms": 4641078
+      },
+      "retrieval_metrics": {
+        "workspace_documents": 13704528,
+        "eligible_files": 699590,
+        "indexed_files": 699544,
+        "preload_injected_cases": 500,
+        "code_search_calls": 81,
+        "embedding_inputs": 253371,
+        "embedding_errors": 0,
+        "embedding_cache_hit_rate": 0.9814193378542265,
+        "embedding_cache_errors": 0,
+        "fallback_documents": 18380,
+        "fallback_document_rate": 0.0013411625705022456
+      }
+    }
+  },
+  "paired_comparison": {
+    "direction": "ast_structured minus fixed_raw",
+    "resolved_cases": 7,
+    "resolved_rate_percentage_points": 1.4,
+    "paired_cells": {
+      "both_resolved": 373,
+      "fixed_raw_only": 23,
+      "ast_structured_only": 30,
+      "neither_resolved": 74,
+      "discordant": 53
+    },
+    "exact_mcnemar_two_sided_p": 0.4101027163746913,
+    "paired_difference_95_percent_interval_percentage_points": {
+      "method": "paired Wald interval",
+      "lower": -1.453966438161937,
+      "upper": 4.253966438161937
+    },
+    "llm_calls": 421,
+    "tool_calls": 401,
+    "total_tokens": 14999564,
+    "total_tokens_percent": 6.290952723785319,
+    "actual_cost": 40.099928,
+    "actual_cost_percent": 6.700259903047028,
+    "fixed_cache_cost_percent": {
+      "0": 6.424401,
+      "0.9": 6.764426,
+      "0.95": 6.823041,
+      "0.98": 6.864881,
+      "1": 6.896245
+    }
+  },
+  "interpretation": {
+    "engineering": "The full-panel realization favored AST-structured preloaded workspace context by 7 cases (+1.4 percentage points), supporting continued validation of AST-structured context representation as a configurable benchmark capability.",
+    "retrieval_boundary": "Workspace preload was enabled and injected for all 500 cases in both arms, while explicit code_search was called only 77 and 81 times. This comparison primarily evaluates the representation of preloaded retrieved context, not the value of enabling retrieval itself.",
+    "statistical_boundary": "The paired interval includes zero and the exact discordance test is not significant. One sequential realization per arm cannot establish a stable causal representation gain or estimate run-to-run variance.",
+    "recovery_boundary": "The AST-structured arm canonically recovered 36 quality-blind infrastructure-affected cases after disclosed host resource discontinuities; the fixed-raw arm had no non-Agent generation failures. This execution asymmetry is not part of the intended quality treatment and further limits causal interpretation.",
+    "cost_boundary": "In this full-panel realization AST used 6.3% more model tokens and 6.7% more observed model-side cost; cache-standardized costs were 6.4%-6.9% higher.",
+    "implementation_boundary": "The historical experiment and the public benchmark rebuild have different tool-order and invocation-dedup contracts. These results validate the method direction but are not attributed to the rebuilt main implementation without revalidation."
+  },
+  "secondary_context": {
+    "order_balanced_54_case_screen": "The earlier repeated 54-case screen had equal resolved outcomes and 15.86% lower AST token volume. It is not pooled with this single full-panel realization.",
+    "preload_ablation": "A separate single full-panel AST no-preload realization resolved 77.8% versus 80.6% with preload; it is supporting context, not part of this representation contrast."
+  },
+  "validation": {
+    "official_harness_used": true,
+    "binary_quality_outcome_available_for_all_500": true,
+    "generation_fingerprints_match": true,
+    "embedding_errors": 0,
+    "cache_errors": 0,
+    "recovery_asymmetry_disclosed": true,
+    "raw_responses_and_patches_committed": false
+  }
+}

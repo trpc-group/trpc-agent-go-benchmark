@@ -1,0 +1,94 @@
+{
+  "schema_version": 1,
+  "result_id": "native-current-revision-full500",
+  "status": "completed",
+  "evidence_status": "complete_single_run",
+  "source_repository": "https://github.com/hr-chang/trpc-agent-go-benchmark",
+  "question": "What absolute official-harness quality and model-side usage did the frozen current-revision Native agent achieve without workspace retrieval?",
+  "source_artifacts": [
+    {
+      "role": "plan",
+      "frozen_branch_head": "7264ec6d3946ec79b0c09ecfe4b5d8018c323d02",
+      "path": "swebench/results/experiments/workspace-rag/v9-glm52-native-e3-full500-plan.json",
+      "sha256": "642c4f7769285e34d42baaf2136be1f471bf7f1c4ef40f596c06c38c5cee2548"
+    },
+    {
+      "role": "result",
+      "frozen_branch_head": "7264ec6d3946ec79b0c09ecfe4b5d8018c323d02",
+      "path": "swebench/results/experiments/workspace-rag/v9-glm52-native-e3-full500-result.json",
+      "sha256": "8cd969457bb1c3b158524bfbf749700931658ead07cb5246814ba1a61649f366"
+    }
+  ],
+  "scope": {
+    "dataset": "princeton-nlp/SWE-bench_Verified",
+    "panel_cases": 500,
+    "case_list_sha256": "a6b0fd7c8c2969a0eef892e032250adcfa6d32362d395c246930e61b575ac9b9",
+    "benchmark_revision": "1532343d90ed0e86d9bab7365166ee060ab2a34d",
+    "framework_revision": "9c4a839314a2f0f0b782196e52a45c733a94f213",
+    "model": "GLM-5.2",
+    "reasoning_effort": "high",
+    "observation_codec": "xml",
+    "code_search": false,
+    "workspace_index": false,
+    "design": "one current-revision full-panel realization"
+  },
+  "official_harness": {
+    "resolved": 378,
+    "resolved_rate": 0.756,
+    "completed": 499,
+    "unresolved_nonempty": 121,
+    "empty_patch": 1,
+    "error": 0,
+    "denominator": 500,
+    "target": "tag",
+    "verifier_mode": "calibrated"
+  },
+  "model_metrics": {
+    "llm_calls": 12880,
+    "prompt_tokens": 202936938,
+    "cached_prompt_tokens": 198262656,
+    "uncached_prompt_tokens": 4674282,
+    "completion_tokens": 3361415,
+    "total_tokens": 206298353,
+    "actual_cost": 528.039188,
+    "all_prompt_uncached_cost": 1717.615124,
+    "fixed_prompt_cache_hit_rate_cost": {
+      "0": 1717.615124,
+      "0.9": 621.755659,
+      "0.95": 560.874577,
+      "0.98": 524.345929,
+      "1": 499.993496
+    },
+    "rate_card": {
+      "cached_prompt_per_million": 2.0,
+      "uncached_prompt_per_million": 8.0,
+      "completion_per_million": 28.0,
+      "unit": "billing_unit"
+    }
+  },
+  "agent_metrics": {
+    "tool_calls": 13816,
+    "code_search_calls": 0
+  },
+  "descriptive_current_revision_context": {
+    "native": 0.756,
+    "ast_no_preload": 0.778,
+    "fixed_raw_preload": 0.792,
+    "ast_structured_preload": 0.806,
+    "boundary": "These are sequential single realizations. The ordering is descriptive and does not isolate a stable retrieval effect."
+  },
+  "limitations": [
+    "There is one stochastic realization, so no current-revision Native run-level variance is available.",
+    "Sequential comparisons with workspace-retrieval arms can be confounded by backend time, host order, and model-cache conditions.",
+    "Historical Native runs with different source and framework revisions are not pooled as exact repeats.",
+    "The public benchmark rebuild must be revalidated before these results can be attributed to its runtime implementation."
+  ],
+  "validation": {
+    "generation_cases": 500,
+    "predictions": 500,
+    "generation_non_agent_failures": 0,
+    "official_harness_exit_zero": true,
+    "official_harness_error_zero": true,
+    "raw_responses_and_patches_committed": false
+  }
+}
