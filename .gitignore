@@ -25,6 +25,8 @@ CLAUDE.md
 *test*.sh
 *test*.exp
 *test*.py
+!knowledge/tests/
+!knowledge/tests/**/*.py
 *.db
 .codex
 pnpm-lock.yaml

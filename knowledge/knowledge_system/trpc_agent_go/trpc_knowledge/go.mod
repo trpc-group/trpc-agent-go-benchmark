@@ -3,6 +3,7 @@ module trpc.group/trpc-go/trpc-agent-go-benchmark/knowledge/knowledge_system/trp
 go 1.24.6
 
 require (
+	github.com/openai/openai-go v1.12.0
 	trpc.group/trpc-go/trpc-agent-go v1.7.0
 	trpc.group/trpc-go/trpc-agent-go/knowledge/vectorstore/pgvector v1.7.0
 )
@@ -20,7 +21,6 @@ require (
 	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
 	github.com/jackc/pgx/v5 v5.7.2 // indirect
 	github.com/jackc/puddle/v2 v2.2.2 // indirect
-	github.com/openai/openai-go v1.12.0 // indirect
 	github.com/panjf2000/ants/v2 v2.10.0 // indirect
 	github.com/pgvector/pgvector-go v0.2.3 // indirect
 	github.com/tidwall/gjson v1.14.4 // indirect
