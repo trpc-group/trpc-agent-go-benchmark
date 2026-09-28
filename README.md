@@ -62,16 +62,17 @@ opens that local catalog once through the framework `FSRepository` and reuses it
 scaled suites generate only their additional synthetic Skills in one temporary catalog per arm.
 Tool handlers and task state remain in-process and do not touch external systems or user files.
 
-For a larger local menu sweep, add `-skills 32 -tools 256`; generated entries are
+For a larger provider-backed menu sweep, add `-skills 32 -tools 127`; generated entries are
 read-only local fixtures (additional Skill files use a temporary per-arm directory)
-and do not require containers or external services.
+and do not require containers or external services. Static-All also exposes
+`skill_load`, keeping the complete OpenAI-compatible function menu at 128.
 Reports also retain request-level/task-first TTFT, task duration, and per-arm wall-clock
 timing; compare repetitions alternate arm order and record `arm_order`. The test-only
 scripted-model path is for plumbing regression, not a provider claim.
 
 See [`activationbench/README.md`](activationbench/README.md) for safety guarantees,
-metrics, the limits of this Lite fixture compared with Toolathlon, and the recorded
-real-provider results and reproduction protocol.
+metrics, the limits of this Lite fixture compared with Toolathlon, and the
+provider-result publication protocol.
 
 ## Source Repository
 

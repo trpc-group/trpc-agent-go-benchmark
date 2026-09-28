@@ -158,6 +158,7 @@ type RunResult struct {
 	Passed             bool    `json:"passed"`
 	Score              float64 `json:"score"`
 	EvaluationMessage  string  `json:"evaluation_message,omitempty"`
+	FinalResponse      string  `json:"final_response,omitempty"`
 	RequiredToolCount  int     `json:"required_tool_count"`
 	SatisfiedToolCount int     `json:"satisfied_tool_count"`
 	CollateralCount    int     `json:"collateral_count"`

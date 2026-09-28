@@ -12,7 +12,7 @@ identical runs:
 The benchmark uses the framework's top-level `runner.Run`, filesystem
 `FSRepository`, `SessionService`, Skill activation APIs, and the framework
 OpenAI-compatible model. The benchmark owns only its local task world, tool
-handlers, final-state evaluators, request-level observation, and paired report
+handlers, task evaluators, request-level observation, and paired report
 aggregation.
 
 ## Scope and safety
@@ -99,88 +99,38 @@ tokenize prompts or estimate missing provider usage. The report includes:
 - prompt, completion, total, cached, and reasoning token usage;
 - request TTFT and task-first TTFT (average, p50, p95, and max);
 - task duration and total arm wall-clock time;
-- final-state pass rate and score;
+- final-state/final-response pass rate and score, including collateral state
+  changes;
 - tool recall, precision, wrong calls, invalid calls, Skill loads, and inferred
   ToolSet activations;
 - initial, peak, and per-request visible-tool menu sizes.
 
-The final state is the quality metric. Required tool traces are diagnostic: a
-task may be completed through an equivalent valid sequence. Provider or
-control-flow errors are reported separately as `error_runs`; they are not
-silently counted as successful or failed task evaluations. Token and quality
+Task success requires every target predicate, every requested read-only result,
+and no state change outside the task's allowed final state. Required tool traces
+remain diagnostic so an equivalent valid sequence can pass. Provider or
+control-flow errors are reported separately as `error_runs`; token and quality
 deltas are marked non-comparable when usage is incomplete or an arm has errors.
 
-## Real-provider results
+The report records the effective activation lifetime, LLM/tool iteration
+limits, per-arm timeout, selected task ids, streaming mode, arm order, and
+capability counts. The CLI rejects Static-All and compare runs whose first
+OpenAI-compatible request would exceed 128 functions; because `skill_load` is
+also present, these modes allow at most 127 domain tools.
 
-The benchmark has been run with two model tiers on the full 32-Skill/127-Tool
-scale. Each table reports the aggregate values emitted by the benchmark; the
-two arms use the same 18-task suite.
+## Publishing results
 
-### Weaker model: `gpt-4.1-mini`
+A publishable comparison must retain the generated `report.json` and satisfy
+all of these report conditions:
 
-This run used five paired repetitions (90 task samples per arm). Provider token
-usage was complete in both arms. One Dynamic-Activation task ended with a
-`max tool iterations` control-flow error, so its quality and token deltas are
-shown as raw observations and are **not** a clean paired comparison.
+- `status=complete` with no `run_errors` or `error_runs`;
+- complete provider usage for every request in both arms;
+- equal task ids and repetition ids across paired arms;
+- the same effective configuration for every reported repetition;
+- enough paired repetitions for the stated statistical claim.
 
-| Metric | Static-All | Dynamic-Activation | Dynamic − Static |
-| --- | ---: | ---: | ---: |
-| Final-state pass rate (`quality_pass`) | 78.9% | 82.0% | +3.1 pp* |
-| Observed pass rate | 78.9% | 81.1% | +2.2 pp* |
-| Average score | 0.817 | 0.846 | +0.030* |
-| Evaluated samples / errors | 90 / 0 | 89 / 1 | — |
-| Total tokens | 1,772,790 | **795,818** | **−976,972*** |
-| Average tokens / task | 19,698 | **8,842** | **−10,855*** |
-| Request TTFT average | 3,180.3 ms | **1,970.8 ms** | **−1,209.5 ms** |
-| Task-first TTFT average | 3,379.7 ms | **1,902.9 ms** | **−1,476.8 ms** |
-| Task duration average | 11,791.7 ms | **11,014.9 ms** | **−776.8 ms** |
-| Task duration p95 | 18,480.6 ms | **15,851.6 ms** | **−2,629.0 ms** |
-| Arm wall-clock time | 1,061.5 s | **991.6 s** | **−69.9 s** |
-| Average visible-tool menu | 128.0 | **12.6** | **−115.4** |
-
-\* The report marks quality and token deltas as non-comparable because one
-Dynamic-Activation sample had a control-flow error. The latency and menu-size
-figures are still useful operational observations, but this run should not be
-used alone to claim a statistically reliable quality improvement.
-
-### Stronger model: `gpt-5.5`
-
-This run used three paired repetitions (54 task samples per arm), completed all
-evaluations without errors, and had complete provider-reported usage in both
-arms.
-
-| Metric | Static-All | Dynamic-Activation | Dynamic − Static |
-| --- | ---: | ---: | ---: |
-| Final-state pass rate | 100.0% | 100.0% | 0.0 pp |
-| Average score | 1.000 | 1.000 | 0.000 |
-| Total tokens | 1,578,066 | **491,504** | **−68.9%** |
-| Average tokens / task | 29,223 | **9,102** | **−68.9%** |
-| Request TTFT average | 4,156.5 ms | **2,622.1 ms** | **−36.9%** |
-| Task-first TTFT average | 4,079.9 ms | **2,471.6 ms** | **−39.4%** |
-| Task duration average | 21,416.5 ms | **13,785.9 ms** | **−35.6%** |
-| Task duration p95 | 30,272.3 ms | **19,091.7 ms** | **−36.9%** |
-| Arm wall-clock time | 1,156.6 s | **744.6 s** | **−35.6%** |
-| Average visible-tool menu | 128.0 | **11.3** | **−116.7** |
-
-This stronger-model run demonstrates equal task quality with substantially lower
-resource use under Dynamic-Activation: total provider-reported tokens fell by
-68.9%, request TTFT by 36.9%, and task wall-clock time by 35.6%. Static-All was
-already at the 100% quality ceiling, so this experiment does not demonstrate a
-positive quality delta; the valid claim is equal quality with lower cost and
-latency.
-
-These are empirical observations for one task suite, scale, and a small number
-of repetitions. They are not guarantees for every model or menu size. At a
-small 8-Skill/64-Tool menu, Skill-loading and model-retry overhead can outweigh
-the savings from the smaller initial menu. Provider/control-flow error runs
-(for example, repeated empty responses that hit the LLM-call guard) must not be
-presented as benchmark quality results; rerun with a stable provider and require
-complete usage and evaluation.
-
-The terminal may still show individual tool execution errors such as an invalid
-identifier or an incorrect file path. If the agent recovers and the final state
-is correct, the run remains evaluated successfully; those attempts are retained
-in wrong/invalid-call diagnostics rather than removed from the report.
+Individual failed tool attempts remain in wrong/invalid-call diagnostics. A
+recovered run can pass only when its final response is complete and its final
+state contains no unrelated change.
 
 ## Extending the benchmark
 

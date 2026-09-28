@@ -14,6 +14,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	bench "trpc.group/trpc-go/trpc-agent-go-benchmark/activationbench"
 	"trpc.group/trpc-go/trpc-agent-go-benchmark/activationbench/metrics"
@@ -128,6 +129,17 @@ func TestSelectModelRejectsRemovedMockSource(t *testing.T) {
 	}
 }
 
+func TestValidateOpenAIStaticFunctionLimit(t *testing.T) {
+	accepted := tasks.MustScaledSuiteWithSkills(32, 127)
+	if err := validateOpenAIStaticFunctionLimit(accepted); err != nil {
+		t.Fatalf("127 domain tools should fit the provider limit: %v", err)
+	}
+	rejected := tasks.MustScaledSuiteWithSkills(32, 128)
+	if err := validateOpenAIStaticFunctionLimit(rejected); err == nil {
+		t.Fatal("128 domain tools plus skill_load should exceed the provider limit")
+	}
+}
+
 func TestWriteReportKeepsIncompleteRunDiagnostics(t *testing.T) {
 	aggregate := metrics.NewAggregate("static-all", []metrics.RunResult{{
 		Passed: true,
@@ -135,12 +147,17 @@ func TestWriteReportKeepsIncompleteRunDiagnostics(t *testing.T) {
 		Error: "context deadline exceeded",
 	}})
 	value := report{
-		Benchmark: "report-test",
-		Mode:      "static",
-		Status:    "incomplete",
-		RunErrors: []string{"static-all repetition 0: context deadline exceeded"},
-		Aggregate: &aggregate,
-		Results:   []metrics.RunResult{{TaskID: "task-1", Passed: true}, {TaskID: "task-2", Error: "context deadline exceeded"}},
+		Benchmark:          "report-test",
+		Mode:               "static-all",
+		Status:             "incomplete",
+		RunErrors:          []string{"static-all repetition 0: context deadline exceeded"},
+		ActivationLifetime: "session",
+		MaxLLMCalls:        12,
+		MaxToolIterations:  8,
+		ArmTimeoutNanos:    int64(2 * time.Minute),
+		TaskIDs:            []string{"task-1", "task-2"},
+		Aggregate:          &aggregate,
+		Results:            []metrics.RunResult{{TaskID: "task-1", Passed: true}, {TaskID: "task-2", Error: "context deadline exceeded"}},
 	}
 	dir := t.TempDir()
 	if err := writeReport(dir, value); err != nil {
@@ -151,7 +168,7 @@ func TestWriteReportKeepsIncompleteRunDiagnostics(t *testing.T) {
 		t.Fatalf("read report: %v", err)
 	}
 	text := string(data)
-	for _, want := range []string{"\"status\": \"incomplete\"", "\"run_errors\"", "\"error_runs\": 1", "context deadline exceeded"} {
+	for _, want := range []string{"\"status\": \"incomplete\"", "\"run_errors\"", "\"activation_lifetime\": \"session\"", "\"max_llm_calls\": 12", "\"max_tool_iterations\": 8", "\"arm_timeout_nanos\": 120000000000", "\"task_ids\"", "\"error_runs\": 1", "context deadline exceeded"} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("report missing %q: %s", want, text)
 		}
@@ -160,7 +177,7 @@ func TestWriteReportKeepsIncompleteRunDiagnostics(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read summary: %v", err)
 	}
-	for _, want := range []string{"status=incomplete", "run_errors=", "evaluated=1/2 errors=1", "observed_pass=", "streaming=false"} {
+	for _, want := range []string{"status=incomplete", "run_errors=", "evaluated=1/2 errors=1", "observed_pass=", "streaming=false", "lifetime=session", "max_llm_calls=12", "max_tool_iterations=8", "arm_timeout_ms=120000.0", "task_ids=task-1,task-2"} {
 		if !strings.Contains(string(summary), want) {
 			t.Fatalf("summary missing %q: %s", want, summary)
 		}

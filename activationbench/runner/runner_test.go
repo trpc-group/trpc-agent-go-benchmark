@@ -120,6 +120,9 @@ func TestRunTaskStaticAndDynamic(t *testing.T) {
 	if !static.Passed || !dynamic.Passed {
 		t.Fatalf("runs should pass: static=%+v dynamic=%+v", static, dynamic)
 	}
+	if static.FinalResponse != "done" || dynamic.FinalResponse != "done" {
+		t.Fatalf("final responses = (%q, %q), want done", static.FinalResponse, dynamic.FinalResponse)
+	}
 	if static.InitialToolCount <= dynamic.InitialToolCount {
 		t.Fatalf("static initial tools = %d, dynamic = %d; dynamic should start smaller", static.InitialToolCount, dynamic.InitialToolCount)
 	}
@@ -198,14 +201,32 @@ func TestDrainRunEventsPropagatesFrameworkErrorEvents(t *testing.T) {
 		Error:  &model.ResponseError{Type: model.ErrorTypeFlowError, Message: "tool loop failed"},
 	}}
 	close(events)
-	if err := drainRunEvents(events); err == nil || err.Error() != "flow_error: tool loop failed" {
+	if _, err := drainRunEvents(events); err == nil || err.Error() != "flow_error: tool loop failed" {
 		t.Fatalf("drainRunEvents error = %v, want flow error", err)
 	}
 }
 
 func TestDrainRunEventsRejectsNilChannel(t *testing.T) {
-	if err := drainRunEvents(nil); err == nil {
+	if _, err := drainRunEvents(nil); err == nil {
 		t.Fatal("drainRunEvents should reject a nil event channel")
+	}
+}
+
+func TestDrainRunEventsCapturesFinalAssistantResponse(t *testing.T) {
+	events := make(chan *event.Event, 1)
+	events <- &event.Event{Response: &model.Response{
+		Done: true,
+		Choices: []model.Choice{{Message: model.Message{
+			Role: model.RoleAssistant, Content: "message id: mail-001",
+		}}},
+	}}
+	close(events)
+	content, err := drainRunEvents(events)
+	if err != nil {
+		t.Fatalf("drainRunEvents: %v", err)
+	}
+	if content != "message id: mail-001" {
+		t.Fatalf("final response = %q", content)
 	}
 }
 

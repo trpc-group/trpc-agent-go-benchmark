@@ -46,13 +46,17 @@ type report struct {
 	SkillSource   string `json:"skill_source"`
 	ModelSource   string `json:"model_source"`
 	QualitySource string `json:"quality_source"`
-	// QualityMeasured indicates that every task has a final-state evaluator and
-	// the reported pass rate is an empirical provider run.
+	// QualityMeasured 表示每个任务均具有状态与最终回复 evaluator。
 	QualityMeasured bool `json:"quality_measured"`
 	// Streaming is the effective request mode used by the runner. The default
 	// is true so real-provider TTFT samples represent an adapter-visible first
 	// response rather than a full non-streaming completion.
 	Streaming           bool      `json:"streaming"`
+	ActivationLifetime  string    `json:"activation_lifetime"`
+	MaxLLMCalls         int       `json:"max_llm_calls"`
+	MaxToolIterations   int       `json:"max_tool_iterations"`
+	ArmTimeoutNanos     int64     `json:"arm_timeout_nanos"`
+	TaskIDs             []string  `json:"task_ids"`
 	Runs                int       `json:"runs"`
 	Skills              int       `json:"skills"`
 	ToolSets            int       `json:"tool_sets"`
@@ -154,6 +158,11 @@ func main() {
 	if err != nil {
 		fatalf("configure model: %v", err)
 	}
+	if compare || mode == bench.ModeStaticAll {
+		if err := validateOpenAIStaticFunctionLimit(suite); err != nil {
+			fatalf("configure model: %v", err)
+		}
+	}
 	traceWriter, err := newRequestTraceWriter(*requestTraceFlag)
 	if err != nil {
 		fatalf("open request trace: %v", err)
@@ -232,7 +241,10 @@ func main() {
 		}
 	}
 
-	modeName := strings.ToLower(strings.TrimSpace(*modeFlag))
+	modeName := string(mode)
+	if compare {
+		modeName = "compare"
+	}
 	output := report{
 		Benchmark:           suite.Name,
 		Mode:                modeName,
@@ -243,6 +255,11 @@ func main() {
 		QualitySource:       selection.qualitySource,
 		QualityMeasured:     selection.qualityMeasured,
 		Streaming:           !*noStreamFlag,
+		ActivationLifetime:  string(lifetime),
+		MaxLLMCalls:         *maxLLMFlag,
+		MaxToolIterations:   *maxToolFlag,
+		ArmTimeoutNanos:     timeoutNanos(*timeoutFlag),
+		TaskIDs:             suiteTaskIDs(suite),
 		Runs:                *runsFlag,
 		Skills:              len(suite.Skills),
 		ToolSets:            suiteToolSetCount(suite),
@@ -334,7 +351,7 @@ func selectModel(source, modelName, baseURL, apiKeyEnv string, suite bench.Suite
 	switch strings.ToLower(strings.TrimSpace(source)) {
 	case "openai", "openai-compatible":
 		if !suiteHasEvaluators(suite) {
-			return modelSelection{}, fmt.Errorf("real provider mode requires a final-state evaluator for every task")
+			return modelSelection{}, fmt.Errorf("real provider mode requires an evaluator for every task")
 		}
 		config, err := openAIConfigFromEnv(modelName, baseURL, apiKeyEnv)
 		if err != nil {
@@ -347,7 +364,7 @@ func selectModel(source, modelName, baseURL, apiKeyEnv string, suite bench.Suite
 			factory:         config.Factory(),
 			modelSource:     "openai-compatible:" + config.model,
 			tokenSource:     "provider",
-			qualitySource:   "final-state-evaluator",
+			qualitySource:   "final-state-and-response-evaluator",
 			qualityMeasured: true,
 		}, nil
 	default:
@@ -412,7 +429,7 @@ func printSummary(value report) {
 
 func summaryText(value report) string {
 	var builder strings.Builder
-	fmt.Fprintf(&builder, "ActivationBench-Lite\nbenchmark=%s mode=%s status=%s runs=%d skills=%d tool_sets=%d tools=%d distractors=%d tasks=%d model_source=%s token_source=%s skill_source=%s quality_source=%s quality_measured=%t streaming=%t arm_order=%s\n", value.Benchmark, value.Mode, value.Status, value.Runs, value.Skills, value.ToolSets, value.Tools, value.Distractors, value.Tasks, value.ModelSource, value.TokenSource, value.SkillSource, value.QualitySource, value.QualityMeasured, value.Streaming, strings.Join(value.ArmOrder, ","))
+	fmt.Fprintf(&builder, "ActivationBench-Lite\nbenchmark=%s mode=%s status=%s runs=%d skills=%d tool_sets=%d tools=%d distractors=%d tasks=%d task_ids=%s model_source=%s token_source=%s skill_source=%s quality_source=%s quality_measured=%t streaming=%t lifetime=%s max_llm_calls=%d max_tool_iterations=%d arm_timeout_ms=%.1f arm_order=%s\n", value.Benchmark, value.Mode, value.Status, value.Runs, value.Skills, value.ToolSets, value.Tools, value.Distractors, value.Tasks, strings.Join(value.TaskIDs, ","), value.ModelSource, value.TokenSource, value.SkillSource, value.QualitySource, value.QualityMeasured, value.Streaming, value.ActivationLifetime, value.MaxLLMCalls, value.MaxToolIterations, durationMillis(value.ArmTimeoutNanos), strings.Join(value.ArmOrder, ","))
 	fmt.Fprintf(&builder, "wall_total_ms=%.1f wall_static_ms=%.1f wall_dynamic_ms=%.1f\n", durationMillis(value.ElapsedNanos), durationMillis(value.StaticElapsedNanos), durationMillis(value.DynamicElapsedNanos))
 	if len(value.RunErrors) > 0 {
 		fmt.Fprintf(&builder, "run_errors=%s\n", strings.Join(value.RunErrors, " | "))
@@ -453,6 +470,21 @@ func runElapsed(start time.Time) int64 {
 		return 0
 	}
 	return time.Since(start).Nanoseconds()
+}
+
+func timeoutNanos(timeout time.Duration) int64 {
+	if timeout <= 0 {
+		return 0
+	}
+	return timeout.Nanoseconds()
+}
+
+func suiteTaskIDs(suite bench.Suite) []string {
+	ids := make([]string, 0, len(suite.Tasks))
+	for _, task := range suite.Tasks {
+		ids = append(ids, task.ID)
+	}
+	return ids
 }
 
 func durationMillis(nanos int64) float64 {

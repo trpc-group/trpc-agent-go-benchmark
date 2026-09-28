@@ -83,9 +83,11 @@ type CallRecord struct {
 // created for every mode/task pair, preventing one arm from affecting the
 // other.  Handlers may use Values for domain state and Calls for diagnostics.
 type TaskState struct {
-	mu     sync.RWMutex
-	Values map[string]any `json:"values,omitempty"`
-	Calls  []CallRecord   `json:"calls,omitempty"`
+	mu                    sync.RWMutex
+	Values                map[string]any `json:"values,omitempty"`
+	Calls                 []CallRecord   `json:"calls,omitempty"`
+	finalResponse         string
+	finalResponseObserved bool
 }
 
 // NewTaskState creates a task state with a deep, type-preserving copy of
@@ -140,6 +142,27 @@ func (s *TaskState) Set(key string, value any) {
 	}
 	s.Values[key] = value
 	s.mu.Unlock()
+}
+
+// SetFinalResponse 记录 runner 观察到的最终 assistant response。
+func (s *TaskState) SetFinalResponse(content string) {
+	if s == nil {
+		return
+	}
+	s.mu.Lock()
+	s.finalResponse = content
+	s.finalResponseObserved = true
+	s.mu.Unlock()
+}
+
+// FinalResponse 返回最终 assistant response 以及 runner 是否已经观察该回复。
+func (s *TaskState) FinalResponse() (string, bool) {
+	if s == nil {
+		return "", false
+	}
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.finalResponse, s.finalResponseObserved
 }
 
 // Evaluation is the outcome of a task evaluator.

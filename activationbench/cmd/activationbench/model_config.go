@@ -26,6 +26,7 @@ const (
 	defaultAPIKeyEnv      = "OPENAI_API_KEY"
 	defaultOpenAIBaseURL  = "https://api.openai.com/v1"
 	openAIFunctionNameMax = 64
+	openAIMaxFunctions    = 128
 	openAIMaxRetries      = 0
 )
 
@@ -110,6 +111,21 @@ func validateOpenAISuite(suite bench.Suite) error {
 		if !validOpenAIFunctionName(name) {
 			return fmt.Errorf("tool %q has an OpenAI-incompatible model-facing name %q", spec.Name, name)
 		}
+	}
+	return nil
+}
+
+func validateOpenAIStaticFunctionLimit(suite bench.Suite) error {
+	// WithSkills 在领域工具之外注册 skill_load。
+	const frameworkSkillFunctions = 1
+	visibleFunctions := len(suite.Tools) + frameworkSkillFunctions
+	if visibleFunctions > openAIMaxFunctions {
+		return fmt.Errorf(
+			"static OpenAI-compatible request exposes %d functions; maximum is %d (use -tools <= %d)",
+			visibleFunctions,
+			openAIMaxFunctions,
+			openAIMaxFunctions-frameworkSkillFunctions,
+		)
 	}
 	return nil
 }

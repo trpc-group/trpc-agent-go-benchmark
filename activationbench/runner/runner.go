@@ -413,6 +413,7 @@ func (r *Runner) runTask(
 	defer func() { _ = frameworkInstance.Close() }()
 	start := time.Now()
 	var runErr error
+	var finalResponse string
 	events, err := frameworkInstance.Run(
 		ctx,
 		r.config.UserID,
@@ -423,8 +424,9 @@ func (r *Runner) runTask(
 	if err != nil {
 		runErr = err
 	} else {
-		runErr = drainRunEvents(events)
+		finalResponse, runErr = drainRunEvents(events)
 	}
+	state.SetFinalResponse(finalResponse)
 	duration := time.Since(start)
 	// Resolve required tool aliases against the actual suite metadata.  This
 	// keeps the default evaluator correct for custom ToolSet names (for
@@ -458,6 +460,7 @@ func (r *Runner) runTask(
 		Passed:             evaluation.Passed && runErr == nil,
 		Score:              evaluation.Score,
 		EvaluationMessage:  evaluation.Message,
+		FinalResponse:      finalResponse,
 		RequiredToolCount:  requiredCount,
 		SatisfiedToolCount: satisfiedCount,
 		CollateralCount:    evaluation.CollateralCount,
@@ -572,11 +575,12 @@ func snapshotModelRequest(taskID string, mode bench.Mode, index int, request *mo
 	return trace
 }
 
-func drainRunEvents(events <-chan *event.Event) error {
+func drainRunEvents(events <-chan *event.Event) (string, error) {
 	if events == nil {
-		return fmt.Errorf("agent returned a nil event channel")
+		return "", fmt.Errorf("agent returned a nil event channel")
 	}
 	var firstErr error
+	var finalResponse string
 	for ev := range events {
 		if ev == nil {
 			continue
@@ -588,8 +592,30 @@ func drainRunEvents(events <-chan *event.Event) error {
 		if (ev.IsTerminalError() || (ev.IsError() && ev.Done)) && firstErr == nil {
 			firstErr = eventError(ev)
 		}
+		if content := finalAssistantResponse(ev); content != "" {
+			finalResponse = content
+		}
 	}
-	return firstErr
+	return finalResponse, firstErr
+}
+
+// finalAssistantResponse 提取 framework 已合并的最终 assistant 文本。
+func finalAssistantResponse(ev *event.Event) string {
+	if ev == nil || ev.Response == nil || !ev.Response.IsFinalResponse() ||
+		ev.Response.IsToolResultResponse() || ev.Response.IsUserMessage() {
+		return ""
+	}
+	contents := make([]string, 0, len(ev.Response.Choices))
+	for _, choice := range ev.Response.Choices {
+		content := strings.TrimSpace(choice.Message.Content)
+		if content == "" {
+			content = strings.TrimSpace(choice.Delta.Content)
+		}
+		if content != "" {
+			contents = append(contents, content)
+		}
+	}
+	return strings.Join(contents, "\n")
 }
 
 func eventError(ev *event.Event) error {
