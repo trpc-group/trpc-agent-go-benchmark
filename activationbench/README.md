@@ -76,7 +76,7 @@ For the main experiment, use the same model and task suite in both arms:
 MODEL_NAME='gpt-5.5' go run ./cmd/activationbench \
   -model-source openai-compatible \
   -mode compare \
-  -runs 3 \
+  -runs 5 \
   -skills 32 \
   -tools 127 \
   -timeout 20m \
@@ -116,6 +116,68 @@ limits, per-arm timeout, selected task ids, streaming mode, arm order, and
 capability counts. The CLI rejects Static-All and compare runs whose first
 OpenAI-compatible request would exceed 128 functions; because `skill_load` is
 also present, these modes allow at most 127 domain tools.
+
+## Provider results
+
+Both runs below used the same effective configuration: five paired
+repetitions, all 18 tasks, 32 Skills, 32 ToolSets, 127 domain tools, streaming,
+invocation-scoped activation, 32 maximum LLM calls, 16 maximum tool
+iterations, and a 20-minute timeout per arm. Each arm scheduled 90 task
+samples. The arm order alternated on every repetition.
+
+### `gpt-4.1-mini`
+
+The report was generated at `2026-09-29T02:18:06Z`. Static-All evaluated all
+90 samples without a run error. Dynamic-Activation evaluated 89 samples and
+recorded one `max tool iterations` error for `research-save-finding` in
+repetition 3. Provider usage was complete in both arms, but the report marks
+the quality and token deltas as non-comparable because of that task error.
+The values below are diagnostic observations.
+
+| Metric | Static-All | Dynamic-Activation | Raw Dynamic − Static |
+| --- | ---: | ---: | ---: |
+| Evaluated samples / errors | 90 / 0 | 89 / 1 | — |
+| Quality pass rate | 78.9% | 83.1% | +4.3 pp* |
+| Observed pass rate | 78.9% | 82.2% | +3.3 pp* |
+| Average score | 0.818 | 0.868 | +0.050* |
+| Total tokens | 1,796,744 | 805,018 | −991,726 (−55.2%)* |
+| Average tokens / scheduled task | 19,964 | 8,945 | −11,019* |
+| Request TTFT average | 3,034.1 ms | 1,808.7 ms | −1,225.4 ms* |
+| Task-first TTFT average | 3,239.5 ms | 1,796.6 ms | −1,442.9 ms* |
+| Task duration average | 11,273.9 ms | 10,169.8 ms | −1,104.1 ms* |
+| Task duration p95 | 16,978.2 ms | 15,650.4 ms | −1,327.8 ms* |
+| Arm wall-clock time | 1,014.9 s | 915.5 s | −99.4 s* |
+| Average visible-tool menu | 128.0 | 11.9 | −116.1* |
+
+\* These raw deltas do not support a paired quality, cost, or latency claim
+because one Dynamic-Activation sample ended with a framework error.
+
+### `gpt-5.5`
+
+The report was generated at `2026-09-28T16:43:56Z`. Both arms evaluated all
+90 samples without errors, every request had provider-reported usage, and the
+report marks the quality and token deltas as comparable.
+
+| Metric | Static-All | Dynamic-Activation | Dynamic − Static |
+| --- | ---: | ---: | ---: |
+| Evaluated samples / errors | 90 / 0 | 90 / 0 | — |
+| Quality pass rate | 97.8% | 100.0% | +2.2 pp |
+| Average score | 0.994 | 1.000 | +0.006 |
+| Total tokens | 2,636,823 | 836,091 | −1,800,732 (−68.3%) |
+| Average tokens / task | 29,298 | 9,290 | −20,008 (−68.3%) |
+| Request TTFT average | 3,327.6 ms | 2,180.2 ms | −1,147.4 ms (−34.5%) |
+| Task-first TTFT average | 3,447.3 ms | 2,038.7 ms | −1,408.6 ms (−40.9%) |
+| Task duration average | 17,358.5 ms | 11,843.7 ms | −5,514.7 ms (−31.8%) |
+| Task duration p95 | 23,370.0 ms | 18,049.2 ms | −5,320.8 ms (−22.8%) |
+| Arm wall-clock time | 1,562.5 s | 1,066.2 s | −496.3 s (−31.8%) |
+| Average visible-tool menu | 128.0 | 11.3 | −116.7 |
+
+For this complete paired run, Dynamic-Activation used 68.3% fewer total tokens,
+reduced request-average TTFT by 34.5%, reduced task-first TTFT by 40.9%, and
+reduced average task duration by 31.8%. Its observed quality pass rate was
+100.0%, compared with 97.8% for Static-All. These measurements describe this
+suite, model endpoint, and run configuration; they are not guarantees for
+other models or workloads.
 
 ## Publishing results
 
