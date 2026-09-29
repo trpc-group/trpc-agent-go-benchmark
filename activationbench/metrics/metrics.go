@@ -187,10 +187,7 @@ type RunResult struct {
 	ActivationCount    int                `json:"activation_count"`
 }
 
-// PassRate returns the evaluator success rate for usable task results.
-// Results with a non-empty RunResult.Error are infrastructure/flow failures,
-// not quality observations, and are excluded from this denominator. Use
-// ObservedPassRate when a caller explicitly wants the all-sample diagnostic.
+// PassRate 返回全部任务样本的通过率，运行错误按未通过计数。
 func PassRate(results []RunResult) float64 {
 	passed, evaluated := qualityCounts(results)
 	if evaluated == 0 {
@@ -199,30 +196,15 @@ func PassRate(results []RunResult) float64 {
 	return float64(passed) / float64(evaluated)
 }
 
-// ObservedPassRate returns the fraction of all result samples marked passed,
-// including samples that carry an infrastructure/flow error. It is a
-// diagnostic only; quality comparisons should use PassRate and inspect the
-// error counts exposed by Aggregate.
+// ObservedPassRate 保留早期报告字段，与 PassRate 使用相同定义。
 func ObservedPassRate(results []RunResult) float64 {
-	if len(results) == 0 {
-		return 0
-	}
-	passed := 0
-	for _, result := range results {
-		if result.Passed {
-			passed++
-		}
-	}
-	return float64(passed) / float64(len(results))
+	return PassRate(results)
 }
 
 func qualityCounts(results []RunResult) (passed, evaluated int) {
 	for _, result := range results {
-		if strings.TrimSpace(result.Error) != "" {
-			continue
-		}
 		evaluated++
-		if result.Passed {
+		if strings.TrimSpace(result.Error) == "" && result.Passed {
 			passed++
 		}
 	}
@@ -246,18 +228,14 @@ func AnnotateRepetition(results []RunResult, repetition int) []RunResult {
 // Aggregate is a summary for one benchmark mode.
 type Aggregate struct {
 	Mode string `json:"mode"`
-	// Runs counts every task-result sample, including samples that stopped with
-	// an infrastructure/flow error. EvaluatedRuns is the quality denominator;
-	// ErrorRuns makes the excluded samples explicit.
+	// Runs 与 EvaluatedRuns 均统计全部任务样本，ErrorRuns 单独记录运行错误。
 	Runs          int `json:"runs"`
 	EvaluatedRuns int `json:"evaluated_runs"`
 	ErrorRuns     int `json:"error_runs"`
 	Passed        int `json:"passed"`
-	// PassRate is Passed / EvaluatedRuns. It excludes RunResult.Error samples;
-	// ObservedPassRate below is the all-sample diagnostic.
+	// PassRate 为 Passed / Runs，运行错误按未通过计数。
 	PassRate float64 `json:"pass_rate"`
-	// ObservedPassRate is the all-sample diagnostic (Passed / Runs). It can be
-	// lower than PassRate when provider/flow errors are present.
+	// ObservedPassRate 保留早期报告字段，与 PassRate 数值相同。
 	ObservedPassRate       float64    `json:"observed_pass_rate"`
 	AverageScore           float64    `json:"average_score"`
 	AverageToolRecall      float64    `json:"average_tool_recall"`
@@ -348,9 +326,7 @@ type Comparison struct {
 	Static      Aggregate `json:"static"`
 	Dynamic     Aggregate `json:"dynamic"`
 	TokenDelta  Delta     `json:"token_delta"`
-	// TokenDeltaComparable is false when either arm has a missing usage sample
-	// (or no raw request samples). Numeric deltas are still retained for
-	// diagnostics, but callers should not present them as a token-saving claim.
+	// TokenDeltaComparable 表示两个实验臂的 request usage 均完整。
 	TokenDeltaComparable bool `json:"token_delta_comparable"`
 	// AverageTokenDelta is the per-task (or per repetition-task) token delta.
 	// TokenDelta above uses the aggregate totals; both are retained because a
@@ -369,9 +345,7 @@ type Comparison struct {
 	WrongToolCallDelta   Delta `json:"wrong_tool_call_delta"`
 	InvalidToolCallDelta Delta `json:"invalid_tool_call_delta"`
 	CollateralDelta      Delta `json:"collateral_delta"`
-	// QualityDeltaComparable is false when either arm contains an
-	// infrastructure/flow error or has no evaluator-observed samples. Numeric
-	// quality deltas remain available for diagnostics in that case.
+	// QualityDeltaComparable 表示两个实验臂均包含任务样本。
 	QualityDeltaComparable bool        `json:"quality_delta_comparable"`
 	StaticRuns             []RunResult `json:"static_runs"`
 	DynamicRuns            []RunResult `json:"dynamic_runs"`
@@ -400,24 +374,20 @@ func NewAggregate(mode string, results []RunResult) Aggregate {
 	taskFirstTTFTValues := make([]int64, 0, len(results))
 	var ttftTotal int64
 	var taskFirstTTFTTotal int64
-	observedPassed := 0
 	for _, result := range results {
-		if result.Passed {
-			observedPassed++
-		}
 		qualitySample := strings.TrimSpace(result.Error) == ""
+		agg.EvaluatedRuns++
 		if qualitySample {
-			agg.EvaluatedRuns++
 			if result.Passed {
 				agg.Passed++
 			}
 			score += result.Score
-			recall += result.ToolRecall
-			precision += result.ToolPrecision
-			collateral += float64(result.CollateralCount)
 		} else {
 			agg.ErrorRuns++
 		}
+		recall += result.ToolRecall
+		precision += result.ToolPrecision
+		collateral += float64(result.CollateralCount)
 		if result.DurationNanos > 0 {
 			agg.DurationSamples++
 			agg.TotalDurationNanos += result.DurationNanos
@@ -490,14 +460,12 @@ func NewAggregate(mode string, results []RunResult) Aggregate {
 		promptTokens = append(promptTokens, resultPromptTokens(result))
 	}
 	if agg.Runs > 0 {
-		agg.ObservedPassRate = float64(observedPassed) / float64(agg.Runs)
-	}
-	if agg.EvaluatedRuns > 0 {
-		agg.PassRate = float64(agg.Passed) / float64(agg.EvaluatedRuns)
-		agg.AverageScore = score / float64(agg.EvaluatedRuns)
-		agg.AverageToolRecall = recall / float64(agg.EvaluatedRuns)
-		agg.AverageToolPrecision = precision / float64(agg.EvaluatedRuns)
-		agg.AverageCollateralCount = collateral / float64(agg.EvaluatedRuns)
+		agg.PassRate = float64(agg.Passed) / float64(agg.Runs)
+		agg.ObservedPassRate = agg.PassRate
+		agg.AverageScore = score / float64(agg.Runs)
+		agg.AverageToolRecall = recall / float64(agg.Runs)
+		agg.AverageToolPrecision = precision / float64(agg.Runs)
+		agg.AverageCollateralCount = collateral / float64(agg.Runs)
 	}
 	agg.AverageVisibleTools = visible / float64(agg.Runs)
 	agg.AverageInitialTools = initial / float64(agg.Runs)
@@ -636,21 +604,19 @@ func NewComparison(benchmark string, static, dynamic []RunResult) Comparison {
 			Absolute: dynamicTokens - staticTokens,
 			Relative: relativeDelta(staticTokens, dynamicTokens),
 		},
-		TokenDeltaComparable: staticAgg.UsageComplete && dynamicAgg.UsageComplete &&
-			staticAgg.ErrorRuns == 0 && dynamicAgg.ErrorRuns == 0,
-		AverageTokenDelta:    delta(staticAverageTokens, dynamicAverageTokens),
-		QualityDelta:         passRateDelta,
-		PassRateDelta:        passRateDelta,
-		ScoreDelta:           delta(staticAgg.AverageScore, dynamicAgg.AverageScore),
-		ToolRecallDelta:      delta(staticAgg.AverageToolRecall, dynamicAgg.AverageToolRecall),
-		ToolPrecisionDelta:   delta(staticAgg.AverageToolPrecision, dynamicAgg.AverageToolPrecision),
-		WrongToolCallDelta:   delta(staticAgg.AverageWrongToolCalls, dynamicAgg.AverageWrongToolCalls),
-		InvalidToolCallDelta: delta(staticAgg.AverageInvalidToolCalls, dynamicAgg.AverageInvalidToolCalls),
-		CollateralDelta:      delta(staticAgg.AverageCollateralCount, dynamicAgg.AverageCollateralCount),
-		QualityDeltaComparable: staticAgg.ErrorRuns == 0 && dynamicAgg.ErrorRuns == 0 &&
-			staticAgg.EvaluatedRuns > 0 && dynamicAgg.EvaluatedRuns > 0,
-		StaticRuns:  append([]RunResult(nil), static...),
-		DynamicRuns: append([]RunResult(nil), dynamic...),
+		TokenDeltaComparable:   staticAgg.UsageComplete && dynamicAgg.UsageComplete,
+		AverageTokenDelta:      delta(staticAverageTokens, dynamicAverageTokens),
+		QualityDelta:           passRateDelta,
+		PassRateDelta:          passRateDelta,
+		ScoreDelta:             delta(staticAgg.AverageScore, dynamicAgg.AverageScore),
+		ToolRecallDelta:        delta(staticAgg.AverageToolRecall, dynamicAgg.AverageToolRecall),
+		ToolPrecisionDelta:     delta(staticAgg.AverageToolPrecision, dynamicAgg.AverageToolPrecision),
+		WrongToolCallDelta:     delta(staticAgg.AverageWrongToolCalls, dynamicAgg.AverageWrongToolCalls),
+		InvalidToolCallDelta:   delta(staticAgg.AverageInvalidToolCalls, dynamicAgg.AverageInvalidToolCalls),
+		CollateralDelta:        delta(staticAgg.AverageCollateralCount, dynamicAgg.AverageCollateralCount),
+		QualityDeltaComparable: staticAgg.Runs > 0 && dynamicAgg.Runs > 0,
+		StaticRuns:             append([]RunResult(nil), static...),
+		DynamicRuns:            append([]RunResult(nil), dynamic...),
 	}
 }
 

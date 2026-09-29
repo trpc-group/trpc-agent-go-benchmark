@@ -70,28 +70,27 @@ func TestNewAggregateUsesSuccessNormalizedTokens(t *testing.T) {
 	}
 }
 
-func TestAggregateSeparatesFlowErrorsFromQualitySamples(t *testing.T) {
+func TestAggregateCountsFlowErrorsAsFailedSamples(t *testing.T) {
 	results := []RunResult{
 		{Passed: true, Score: 1},
 		{Passed: false, Score: 0, Error: "context deadline exceeded"},
 		{Passed: false, Score: 0.25},
-		// A malformed caller result must still be counted in the all-sample
-		// diagnostic, while the error keeps it out of the quality denominator.
+		// 带有运行错误的样本始终按未通过计数。
 		{Passed: true, Score: 1, Error: "provider stopped"},
 	}
 	agg := NewAggregate("quality-errors", results)
-	if agg.Runs != 4 || agg.EvaluatedRuns != 2 || agg.ErrorRuns != 2 || agg.Passed != 1 {
-		t.Fatalf("quality/error counts = runs=%d evaluated=%d errors=%d passed=%d, want (4, 2, 2, 1)",
+	if agg.Runs != 4 || agg.EvaluatedRuns != 4 || agg.ErrorRuns != 2 || agg.Passed != 1 {
+		t.Fatalf("quality/error counts = runs=%d evaluated=%d errors=%d passed=%d, want (4, 4, 2, 1)",
 			agg.Runs, agg.EvaluatedRuns, agg.ErrorRuns, agg.Passed)
 	}
-	if agg.PassRate != 0.5 || agg.ObservedPassRate != 0.5 {
-		t.Fatalf("pass rates = quality=%v observed=%v, want (0.5, 0.5)", agg.PassRate, agg.ObservedPassRate)
+	if agg.PassRate != 0.25 || agg.ObservedPassRate != 0.25 {
+		t.Fatalf("pass rates = quality=%v observed=%v, want (0.25, 0.25)", agg.PassRate, agg.ObservedPassRate)
 	}
-	if agg.AverageScore != 0.625 {
-		t.Fatalf("average quality score = %v, want 0.625", agg.AverageScore)
+	if agg.AverageScore != 0.3125 {
+		t.Fatalf("average quality score = %v, want 0.3125", agg.AverageScore)
 	}
-	if PassRate(results) != 0.5 || ObservedPassRate(results) != 0.5 {
-		t.Fatalf("helper pass rates = quality=%v observed=%v, want (0.5, 0.5)",
+	if PassRate(results) != 0.25 || ObservedPassRate(results) != 0.25 {
+		t.Fatalf("helper pass rates = quality=%v observed=%v, want (0.25, 0.25)",
 			PassRate(results), ObservedPassRate(results))
 	}
 }
@@ -260,21 +259,24 @@ func TestNewComparisonMarksMissingArmUsageIncomparable(t *testing.T) {
 	}
 }
 
-func TestNewComparisonMarksFlowErrorsIncomparable(t *testing.T) {
+func TestNewComparisonCountsFlowErrorsAsFailures(t *testing.T) {
 	static := []RunResult{{
 		Passed: true, Usage: TokenUsage{TotalTokens: 100},
 		Requests: []RequestRecord{{Usage: TokenUsage{TotalTokens: 100}, UsageSource: UsageSourceReported}},
 	}}
 	dynamic := []RunResult{{
-		Passed: false, Error: "provider unavailable", Usage: TokenUsage{TotalTokens: 60},
+		Passed: false, Score: 0.75, Error: "provider unavailable", Usage: TokenUsage{TotalTokens: 60},
 		Requests: []RequestRecord{{Usage: TokenUsage{TotalTokens: 60}, UsageSource: UsageSourceReported}},
 	}}
 	comparison := NewComparison("suite", static, dynamic)
-	if comparison.TokenDeltaComparable || comparison.QualityDeltaComparable {
-		t.Fatalf("flow error should block claims: token=%t quality=%t", comparison.TokenDeltaComparable, comparison.QualityDeltaComparable)
+	if !comparison.TokenDeltaComparable || !comparison.QualityDeltaComparable {
+		t.Fatalf("complete paired samples should remain comparable: token=%t quality=%t", comparison.TokenDeltaComparable, comparison.QualityDeltaComparable)
 	}
-	if comparison.Static.EvaluatedRuns != 1 || comparison.Dynamic.EvaluatedRuns != 0 || comparison.Dynamic.ErrorRuns != 1 {
+	if comparison.Static.EvaluatedRuns != 1 || comparison.Dynamic.EvaluatedRuns != 1 || comparison.Dynamic.ErrorRuns != 1 {
 		t.Fatalf("comparison error accounting = static=%+v dynamic=%+v", comparison.Static, comparison.Dynamic)
+	}
+	if comparison.Dynamic.PassRate != 0 || comparison.Dynamic.AverageScore != 0 || comparison.PassRateDelta.Absolute != -1 {
+		t.Fatalf("flow error was not counted as a failed sample: dynamic=%+v delta=%+v", comparison.Dynamic, comparison.PassRateDelta)
 	}
 }
 

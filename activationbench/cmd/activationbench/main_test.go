@@ -177,7 +177,7 @@ func TestWriteReportKeepsIncompleteRunDiagnostics(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read summary: %v", err)
 	}
-	for _, want := range []string{"status=incomplete", "run_errors=", "evaluated=1/2 errors=1", "observed_pass=", "streaming=false", "lifetime=session", "max_llm_calls=12", "max_tool_iterations=8", "arm_timeout_ms=120000.0", "task_ids=task-1,task-2"} {
+	for _, want := range []string{"status=incomplete", "run_errors=", "evaluated=2/2 errors=1", "observed_pass=", "streaming=false", "lifetime=session", "max_llm_calls=12", "max_tool_iterations=8", "arm_timeout_ms=120000.0", "task_ids=task-1,task-2"} {
 		if !strings.Contains(string(summary), want) {
 			t.Fatalf("summary missing %q: %s", want, summary)
 		}

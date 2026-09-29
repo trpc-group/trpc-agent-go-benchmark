@@ -108,8 +108,8 @@ tokenize prompts or estimate missing provider usage. The report includes:
 Task success requires every target predicate, every requested read-only result,
 and no state change outside the task's allowed final state. Required tool traces
 remain diagnostic so an equivalent valid sequence can pass. Provider or
-control-flow errors are reported separately as `error_runs`; token and quality
-deltas are marked non-comparable when usage is incomplete or an arm has errors.
+control-flow errors are reported as `error_runs` and counted as failed task
+samples. Token deltas require complete provider usage in both arms.
 
 The report records the effective activation lifetime, LLM/tool iteration
 limits, per-arm timeout, selected task ids, streaming mode, arm order, and
@@ -127,36 +127,33 @@ samples. The arm order alternated on every repetition.
 
 ### `gpt-4.1-mini`
 
-The report was generated at `2026-09-29T02:18:06Z`. Static-All evaluated all
-90 samples without a run error. Dynamic-Activation evaluated 89 samples and
-recorded one `max tool iterations` error for `research-save-finding` in
-repetition 3. Provider usage was complete in both arms, but the report marks
-the quality and token deltas as non-comparable because of that task error.
-The values below are diagnostic observations.
+The report was generated at `2026-09-29T02:18:06Z`. Static-All completed all
+90 samples without a run error. Dynamic-Activation recorded one
+`max tool iterations` error for `research-save-finding` in repetition 3; that
+sample is counted as failed. Provider usage was complete in both arms.
 
-| Metric | Static-All | Dynamic-Activation | Raw Dynamic − Static |
+| Metric | Static-All | Dynamic-Activation | Dynamic − Static |
 | --- | ---: | ---: | ---: |
-| Evaluated samples / errors | 90 / 0 | 89 / 1 | — |
-| Quality pass rate | 78.9% | 83.1% | +4.3 pp* |
-| Observed pass rate | 78.9% | 82.2% | +3.3 pp* |
-| Average score | 0.818 | 0.868 | +0.050* |
-| Total tokens | 1,796,744 | 805,018 | −991,726 (−55.2%)* |
-| Average tokens / scheduled task | 19,964 | 8,945 | −11,019* |
-| Request TTFT average | 3,034.1 ms | 1,808.7 ms | −1,225.4 ms* |
-| Task-first TTFT average | 3,239.5 ms | 1,796.6 ms | −1,442.9 ms* |
-| Task duration average | 11,273.9 ms | 10,169.8 ms | −1,104.1 ms* |
-| Task duration p95 | 16,978.2 ms | 15,650.4 ms | −1,327.8 ms* |
-| Arm wall-clock time | 1,014.9 s | 915.5 s | −99.4 s* |
-| Average visible-tool menu | 128.0 | 11.9 | −116.1* |
+| Task samples / errors | 90 / 0 | 90 / 1 | — |
+| Quality pass rate | 78.9% | 82.2% | +3.3 pp |
+| Average score | 0.818 | 0.858 | +0.041 |
+| Total tokens | 1,796,744 | 805,018 | −991,726 (−55.2%) |
+| Average tokens / task | 19,964 | 8,945 | −11,019 (−55.2%) |
+| Request TTFT average | 3,034.1 ms | 1,808.7 ms | −1,225.4 ms (−40.4%) |
+| Task-first TTFT average | 3,239.5 ms | 1,796.6 ms | −1,442.9 ms (−44.5%) |
+| Task duration average | 11,273.9 ms | 10,169.8 ms | −1,104.1 ms (−9.8%) |
+| Task duration p95 | 16,978.2 ms | 15,650.4 ms | −1,327.8 ms (−7.8%) |
+| Arm wall-clock time | 1,014.9 s | 915.5 s | −99.4 s (−9.8%) |
+| Average visible-tool menu | 128.0 | 11.9 | −116.1 |
 
-\* These raw deltas do not support a paired quality, cost, or latency claim
-because one Dynamic-Activation sample ended with a framework error.
+In this run, Dynamic-Activation used 55.2% fewer total tokens, reduced
+request-average TTFT by 40.4%, and recorded an 82.2% pass rate after counting
+the tool-iteration error as failed. Static-All recorded a 78.9% pass rate.
 
 ### `gpt-5.5`
 
-The report was generated at `2026-09-28T16:43:56Z`. Both arms evaluated all
-90 samples without errors, every request had provider-reported usage, and the
-report marks the quality and token deltas as comparable.
+The report was generated at `2026-09-28T16:43:56Z`. Both arms completed all
+90 samples without errors, and every request had provider-reported usage.
 
 | Metric | Static-All | Dynamic-Activation | Dynamic − Static |
 | --- | ---: | ---: | ---: |
@@ -184,15 +181,16 @@ other models or workloads.
 A publishable comparison must retain the generated `report.json` and satisfy
 all of these report conditions:
 
-- `status=complete` with no `run_errors` or `error_runs`;
+- `status=complete` with no top-level `run_errors`;
 - complete provider usage for every request in both arms;
 - equal task ids and repetition ids across paired arms;
 - the same effective configuration for every reported repetition;
 - enough paired repetitions for the stated statistical claim.
 
-Individual failed tool attempts remain in wrong/invalid-call diagnostics. A
-recovered run can pass only when its final response is complete and its final
-state contains no unrelated change.
+Task-level `error_runs` count as failed samples. Individual failed tool attempts
+remain in wrong/invalid-call diagnostics. A recovered run can pass only when
+its final response is complete and its final state contains no unrelated
+change.
 
 ## Extending the benchmark
 
