@@ -7,6 +7,7 @@
 ## 仓库结构
 
 - `anthropic_skills`：Agent Skills 兼容性与 token 使用 benchmark。
+- `activationbench`：本地、无容器的 Skill → ToolSet 动态激活 benchmark。
 - `gaia`：GAIA benchmark 实现与相关资产。
 - `knowledge`：Knowledge system 评测脚本与相关资源。
 - `memory`：长上下文与 memory backend benchmark。

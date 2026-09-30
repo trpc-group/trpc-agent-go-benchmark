@@ -7,6 +7,7 @@ Benchmark suites for `trpc-agent-go`.
 ## Repository Layout
 
 - `anthropic_skills`: Agent Skills compatibility and token usage benchmarks.
+- `activationbench`: Local, no-container Skill → ToolSet activation benchmark.
 - `gaia`: GAIA benchmark implementation and assets.
 - `knowledge`: Knowledge-system evaluation assets and scripts.
 - `memory`: Long-context and memory-backend benchmarks.
